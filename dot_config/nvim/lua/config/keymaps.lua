@@ -2,8 +2,17 @@
 -- Default keymaps that are always set: https://github.com/LazyVim/LazyVim/blob/main/lua/lazyvim/config/keymaps.lua
 -- Add any additional keymaps here
 
-vim.keymap.set("n", "<leader>cp", function()
+vim.keymap.set({ "n", "v" }, "<leader>cp", function()
   local path = "@" .. vim.fn.expand("%:.")
+  local mode = vim.fn.mode()
+  if mode == "v" or mode == "V" or mode == "\22" then
+    local start_line = vim.fn.getpos("v")[2]
+    local end_line = vim.fn.getpos(".")[2]
+    if start_line > end_line then
+      start_line, end_line = end_line, start_line
+    end
+    path = path .. ":" .. start_line .. "-" .. end_line
+  end
   vim.fn.setreg("+", path)
   vim.notify("Copied: " .. path)
 end, { desc = "Copy relative path" })
