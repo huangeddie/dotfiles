@@ -15,14 +15,14 @@ Managers are responsible for making sure all efforts are efficiently applied tow
 ### A List of Tasks
 
 Instead of a single task, the user may present a list of tasks to complete where the items in the list are not necessarily related to each other.
-Under this circumstance, it is ideal to divide up the items into separate git branches and delegate a subagent for each branch. Review the items carefully and bundle the work of the items that do depend on each other into a git branch. Usually items are not related nor depend on each other and so the work of each item can normally be put in its own git branch.
+Under this circumstance, it is ideal to divide up the items into separate git branches and delegate a subagent for each branch. Review the items carefully and bundle the work of the items that do depend on each other into a branch. Usually items are not related nor depend on each other and so the work of each item can normally be put in its own branch.
 
 - Request confirmation to the user that you'll complete the tasks in new git branches
   - If the user rejects, follow whatever they say.
 - Review the list of items and scope out which items should be bundled together
 - IMPORTANT: Since we're working on a single copy of the codebase which can only be on one git branch at a time, we must operate on each git branch SERIALLY by dispatching subagents one at a time and waiting for each one to finish.
 - Do NOT push the branches to the remote repo and ensure the subagents do not push either
-- Encourage the subagents to make many small commits within their branch to track their changes
+- Encourage the subagents to make a paper trail of their changes by making many small commits within their branch
 
 ## Examples
 
