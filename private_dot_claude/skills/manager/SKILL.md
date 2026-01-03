@@ -5,7 +5,7 @@ description: Oversee the completion of the task at large by dispatching subagent
 
 # Manager
 
-Managers are responsible for making sure all efforts are efficiently applied toward completing the task at large. The core strategy of managers is to minimize their context window by delegating as much work as possible to subagents.
+Managers are responsible for making sure all efforts are efficiently applied toward completing the task at large. A good strategy to avoid losing focus is to minimize your context window by delegating as much work as possible to subagents.
 
 ## Instructions
 
