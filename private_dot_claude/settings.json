@@ -47,7 +47,7 @@
       "WebFetch(domain:rubygems.org)",
       "WebFetch(domain:universaldependencies.org)",
       "WebSearch"
-    ],
+    ]
   },
   "sandbox": {
     "enabled": true,
