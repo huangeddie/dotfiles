@@ -38,7 +38,7 @@
       "Bash(touch:*)",
       "Bash(xargs:*)",
       "Edit(./**)",
-      "Skill(manager)",
+      "Skill(managing-subagents)",
       "WebFetch(domain:docs.anthropic.com)",
       "WebFetch(domain:en.wikipedia.org)",
       "WebFetch(domain:guides.rubyonrails.org)",
