@@ -2,6 +2,13 @@
 -- Default keymaps that are always set: https://github.com/LazyVim/LazyVim/blob/main/lua/lazyvim/config/keymaps.lua
 -- Add any additional keymaps here
 
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = "markdown",
+  callback = function()
+    pcall(vim.keymap.del, "n", "<leader>cp", { buffer = 0 })
+  end,
+})
+
 vim.keymap.set({ "n", "v" }, "<leader>cp", function()
   local path = "@" .. vim.fn.expand("%:.")
   local mode = vim.fn.mode()
