@@ -9,4 +9,5 @@
 
 [merge]
     conflictStyle = zdiff3
+	tool = nvimdiff
 
