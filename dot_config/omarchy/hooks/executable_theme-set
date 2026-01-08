@@ -1,0 +1,17 @@
+#!/bin/bash
+
+# Update lazygit's delta pager to match the current theme's light/dark mode
+
+THEME_PATH="$HOME/.config/omarchy/current/theme"
+LAZYGIT_CONFIG="$HOME/.config/lazygit/config.yml"
+
+if [[ -f "$THEME_PATH/light.mode" ]]; then
+  MODE="--light"
+else
+  MODE="--dark"
+fi
+
+# Update the delta pager line in lazygit config
+if [[ -f "$LAZYGIT_CONFIG" ]]; then
+  sed -i "s/--light\|--dark/$MODE/" "$LAZYGIT_CONFIG"
+fi
