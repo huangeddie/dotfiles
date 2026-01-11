@@ -32,6 +32,7 @@
       "Bash(rmdir:*)",
       "Bash(rubocop:*)",
       "Bash(ruby:*)",
+      "Bash(sed:*)",
       "Bash(sqlite3:*)",
       "Bash(tee:*)",
       "Bash(test:*)",
