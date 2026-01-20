@@ -1,0 +1,5 @@
+Host main
+    HostName 100.83.182.14
+    User eddie
+    RequestTTY yes
+    RemoteCommand tmux new -A -s main -d
