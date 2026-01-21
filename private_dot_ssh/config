@@ -3,4 +3,4 @@ Host main
     User eddie
     RequestTTY yes
     SetEnv TERM=xterm-256color
-    RemoteCommand /bin/bash -l -c 'tmux -u new -A -s main'
+    RemoteCommand /bin/bash -l -c 'tmux new -A -s main -D'
