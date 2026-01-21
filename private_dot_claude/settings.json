@@ -39,6 +39,8 @@
       "Bash(touch:*)",
       "Bash(xargs:*)",
       "Edit(./**)",
+      "Read(tmp/**)",
+      "Edit(tmp/**)",
       "Skill(managing-subagents)",
       "WebFetch(domain:docs.anthropic.com)",
       "WebFetch(domain:en.wikipedia.org)",
