@@ -2,4 +2,5 @@ Host main
     HostName 100.83.182.14
     User eddie
     RequestTTY yes
-    RemoteCommand tmux new -A -s main -d
+    SetEnv TERM=xterm-256color
+    RemoteCommand /bin/bash -l -c 'tmux -u new -A -s main'
