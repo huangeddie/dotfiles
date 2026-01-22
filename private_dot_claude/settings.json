@@ -38,6 +38,7 @@
       "Bash(test:*)",
       "Bash(touch:*)",
       "Bash(xargs:*)",
+      "Bash(awk:*)",
       "Edit(./**)",
       "Read(tmp/**)",
       "Edit(tmp/**)",
