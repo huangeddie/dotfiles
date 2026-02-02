@@ -4,3 +4,8 @@ Host main
     RequestTTY yes
     SetEnv TERM=xterm-256color
     RemoteCommand /bin/bash -l -c 'tmux new -A -s main -D'
+Host minipc
+    HostName 100.81.167.12
+    User eddie
+    RequestTTY yes
+    SetEnv TERM=xterm-256color
