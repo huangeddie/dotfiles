@@ -1,0 +1,6 @@
+eval "$(~/.local/bin/mise activate)"
+
+export EDITOR=nvim
+export VISUAL=nvim
+
+[[ "$PWD" == "$HOME" ]] && cd ~/Documents/GitHub/LearnLingo/
