@@ -4,3 +4,5 @@ export EDITOR=nvim
 export VISUAL=nvim
 
 [[ "$PWD" == "$HOME" ]] && cd ~/Documents/GitHub/LearnLingo/
+
+alias lg='lazygit'
