@@ -6,3 +6,5 @@ export VISUAL=nvim
 alias lg='lazygit'
 alias la='ls -a'
 alias lingo='cd ~/Documents/GitHub/LearnLingo/'
+alias c='claude --dangerously-skip-permissions'
+
