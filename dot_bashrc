@@ -2,9 +2,11 @@
 [[ $- != *i* ]] && return
 
 # All the default Omarchy aliases and functions
-# (don't mess with these directly, just overwrite them here!)
-source ~/.local/share/omarchy/default/bash/rc
-
+if [ -f ~/.local/share/omarchy/default/bash/rc ]; then
+  source ~/.local/share/omarchy/default/bash/rc
+elif [ -f /etc/skel/.bashrc ]; then
+  source /etc/skel/.bashrc
+fi
 # Add your own exports, aliases, and functions here.
 export PATH="$HOME/.local/bin:$PATH"
 export PATH="$HOME/.cargo/bin:$PATH"
@@ -15,7 +17,7 @@ alias lg='lazygit'
 alias vault='cd ~/Documents/Second\ Brain/'
 alias la='ls -a'
 
-[[ "$PWD" == "$HOME" ]] &&  cd ~/Documents/GitHub/LearnLingo/
+alias lingo='cd ~/Documents/GitHub/LearnLingo/'
 
 # Auto-attach to tmux session
 alias ta='tmux new -A -s main -D'

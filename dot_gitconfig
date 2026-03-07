@@ -11,3 +11,6 @@
     conflictStyle = zdiff3
 	tool = nvimdiff
 
+[user]
+	email = aigagror@gmail.com
+	name = Eddie Huang
