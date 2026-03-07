@@ -3,7 +3,6 @@ eval "$(~/.local/bin/mise activate)"
 export EDITOR=nvim
 export VISUAL=nvim
 
-[[ "$PWD" == "$HOME" ]] && cd ~/Documents/GitHub/LearnLingo/
-
 alias lg='lazygit'
 alias la='ls -a'
+alias lingo='cd ~/Documents/GitHub/LearnLingo/'
