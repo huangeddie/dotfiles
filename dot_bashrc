@@ -18,6 +18,7 @@ alias vault='cd ~/Documents/Second\ Brain/'
 alias la='ls -a'
 
 alias lingo='cd ~/Documents/GitHub/LearnLingo/'
+alias c='claude --dangerously-skip-permissions'
 
 # Auto-attach to tmux session
 alias ta='tmux new -A -s main -D'
