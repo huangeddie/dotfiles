@@ -21,8 +21,5 @@ alias lingo='cd ~/Documents/GitHub/LearnLingo/'
 alias c='claude --dangerously-skip-permissions'
 
 # Auto-attach to tmux session
-alias ta='tmux new -A -s main -D'
+alias ta='tmux new -A'
 
-# Added by `rbenv init` on Sat Mar  7 04:05:42 AM UTC 2026
-eval "$(~/.rbenv/bin/rbenv init - --no-rehash bash)"
-eval "$(~/.rbenv/bin/rbenv init - bash)"
