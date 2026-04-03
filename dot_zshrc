@@ -9,3 +9,9 @@ alias lingo='cd ~/Documents/GitHub/LearnLingo/'
 alias c='claude --dangerously-skip-permissions'
 alias vault='cd ~/Documents/Second\ Brain/'
 
+chezmoi-clean() {
+  chezmoi managed | while read -r f; do
+    [[ ! -e "$HOME/$f" ]] && chezmoi forget "$HOME/$f"
+  done
+}
+
