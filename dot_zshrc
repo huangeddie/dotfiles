@@ -15,3 +15,6 @@ chezmoi-clean() {
   done
 }
 
+
+# opencode
+export PATH=/Users/eddiehuang/.opencode/bin:$PATH
