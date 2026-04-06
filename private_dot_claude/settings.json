@@ -79,5 +79,6 @@
     "enabled": true,
     "autoAllowBashIfSandboxed": true
   },
-  "skipDangerousModePermissionPrompt": true
+  "skipDangerousModePermissionPrompt": true,
+  "effortLevel": "high"
 }
