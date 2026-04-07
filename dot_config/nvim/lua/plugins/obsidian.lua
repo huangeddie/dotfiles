@@ -21,7 +21,7 @@ return {
     workspaces = {
       {
         name = "personal",
-        path = "~/Documents/Obsidian/Second Brain/",
+        path = "~/Documents/Second Brain/",
       },
     },
 

@@ -14,10 +14,10 @@ export PATH="$HOME/.cargo/bin:$PATH"
 # Make an alias for invoking commands you use constantly
 # alias p='python'
 alias lg='lazygit'
-alias vault='cd ~/Documents/Second\ Brain/'
+[[ -d ~/Documents/Second\ Brain/ ]] && alias vault='cd ~/Documents/Second\ Brain/'
 alias la='ls -a'
 
-alias lingo='cd ~/Documents/GitHub/LearnLingo/'
+[[ -d ~/Documents/GitHub/LearnLingo/ ]] && alias lingo='cd ~/Documents/GitHub/LearnLingo/'
 alias c='claude --dangerously-skip-permissions'
 
 # Auto-attach to tmux session

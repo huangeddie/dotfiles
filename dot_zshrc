@@ -5,9 +5,9 @@ export VISUAL=nvim
 
 alias lg='lazygit'
 alias la='ls -a'
-alias lingo='cd ~/Documents/GitHub/LearnLingo/'
+[[ -d ~/Documents/GitHub/LearnLingo/ ]] && alias lingo='cd ~/Documents/GitHub/LearnLingo/'
 alias c='claude --dangerously-skip-permissions'
-alias vault='cd ~/Documents/Second\ Brain/'
+[[ -d ~/Documents/Second\ Brain/ ]] && alias vault='cd ~/Documents/Second\ Brain/'
 
 chezmoi-clean() {
   chezmoi managed | while read -r f; do
