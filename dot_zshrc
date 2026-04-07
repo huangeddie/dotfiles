@@ -1,4 +1,4 @@
-eval "$(~/.local/bin/mise activate)"
+[[ -f ~/.local/bin/mise ]] && eval "$(~/.local/bin/mise activate)"
 
 export EDITOR=nvim
 export VISUAL=nvim
