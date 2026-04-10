@@ -1,0 +1,81 @@
+# Btop Flexoki Light theme
+# Colors from Flexoki Light palette
+
+# Main background (#FFFCF0 - flexoki-paper)
+theme[main_bg]="#FFFCF0"
+
+# Main text color (#100F0F - flexoki-black)
+theme[main_fg]="#100F0F"
+
+# Title color for boxes (#100F0F - flexoki-black)
+theme[title]="#100F0F"
+
+# Highlight color for keyboard shortcuts (#AF3029 - flexoki-red-600)
+theme[hi_fg]="#AF3029"
+
+# Background color of selected items (#F2F0E5 - flexoki-50)
+theme[selected_bg]="#F2F0E5"
+
+# Foreground color of selected items (#205EA6 - flexoki-blue-600)
+theme[selected_fg]="#205EA6"
+
+# Color of inactive/disabled text (#B7B5AC - flexoki-300)
+theme[inactive_fg]="#B7B5AC"
+
+# Color of text appearing on top of graphs (#878580 - flexoki-500)
+theme[graph_text]="#878580"
+
+# Misc colors for processes box (#66800B - flexoki-green-600)
+theme[proc_misc]="#66800B"
+
+# Box outline colors (#DAD8CE - flexoki-150)
+theme[cpu_box]="#DAD8CE"
+theme[mem_box]="#DAD8CE"
+theme[net_box]="#DAD8CE"
+theme[proc_box]="#DAD8CE"
+theme[div_line]="#DAD8CE"
+
+# Temperature graph colors
+theme[temp_start]="#66800B" # green
+theme[temp_mid]="#AD8301"   # yellow
+theme[temp_end]="#AF3029"   # red
+
+# CPU graph colors
+theme[cpu_start]="#24837B" # cyan
+theme[cpu_mid]="#205EA6"   # blue
+theme[cpu_end]="#5E409D"   # purple
+
+# Mem/Disk free meter
+theme[free_start]="#AF3029" # red
+theme[free_mid]="#BC5215"   # orange
+theme[free_end]="#66800B"   # green
+
+# Mem/Disk cached meter
+theme[cached_start]="#205EA6" # blue
+theme[cached_mid]="#5E409D"   # purple
+theme[cached_end]="#66800B"   # green
+
+# Mem/Disk available meter
+theme[available_start]="#AF3029" # red
+theme[available_mid]="#BC5215"   # orange
+theme[available_end]="#AD8301"   # yellow
+
+# Mem/Disk used meter
+theme[used_start]="#66800B" # green
+theme[used_mid]="#BC5215"   # orange
+theme[used_end]="#AF3029"   # red
+
+# Download graph colors
+theme[download_start]="#66800B" # green
+theme[download_mid]="#24837B"   # cyan
+theme[download_end]="#205EA6"   # blue
+
+# Upload graph colors
+theme[upload_start]="#AF3029" # red
+theme[upload_mid]="#BC5215"   # orange
+theme[upload_end]="#AD8301"   # yellow
+
+# Process box color gradient
+theme[process_start]="#66800B" # green
+theme[process_mid]="#BC5215"   # orange
+theme[process_end]="#AF3029"   # red

@@ -1,0 +1,4 @@
+# bat configuration file
+
+# Set the theme to a light-mode friendly one
+--theme="GitHub"
