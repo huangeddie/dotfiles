@@ -23,3 +23,8 @@ alias c='claude --dangerously-skip-permissions'
 # Auto-attach to tmux session
 alias ta='tmux new -A'
 
+# Source aliases
+if [ -f ~/.bash_aliases ]; then
+  . ~/.bash_aliases
+fi
+
