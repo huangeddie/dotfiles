@@ -1,0 +1,81 @@
+# Btop Flexoki Dark theme
+# Colors from Flexoki Dark palette
+
+# Main background (#100F0F - flexoki-black)
+theme[main_bg]="#100F0F"
+
+# Main text color (#CECDC3 - flexoki-200)
+theme[main_fg]="#CECDC3"
+
+# Title color for boxes (#CECDC3 - flexoki-200)
+theme[title]="#CECDC3"
+
+# Highlight color for keyboard shortcuts (#D14D41 - flexoki-red-400)
+theme[hi_fg]="#D14D41"
+
+# Background color of selected items (#1C1B1A - flexoki-950)
+theme[selected_bg]="#1C1B1A"
+
+# Foreground color of selected items (#4385BE - flexoki-blue-400)
+theme[selected_fg]="#4385BE"
+
+# Color of inactive/disabled text (#575653 - flexoki-700)
+theme[inactive_fg]="#575653"
+
+# Color of text appearing on top of graphs (#878580 - flexoki-500)
+theme[graph_text]="#878580"
+
+# Misc colors for processes box (#879A39 - flexoki-green-400)
+theme[proc_misc]="#879A39"
+
+# Box outline colors (#403E3C - flexoki-800)
+theme[cpu_box]="#403E3C"
+theme[mem_box]="#403E3C"
+theme[net_box]="#403E3C"
+theme[proc_box]="#403E3C"
+theme[div_line]="#403E3C"
+
+# Temperature graph colors
+theme[temp_start]="#879A39" # green-400
+theme[temp_mid]="#D0A215"   # yellow-400
+theme[temp_end]="#D14D41"   # red-400
+
+# CPU graph colors
+theme[cpu_start]="#3AA99F" # cyan-400
+theme[cpu_mid]="#4385BE"   # blue-400
+theme[cpu_end]="#8B7EC8"   # purple-400
+
+# Mem/Disk free meter
+theme[free_start]="#D14D41" # red-400
+theme[free_mid]="#DA702C"   # orange-400
+theme[free_end]="#879A39"   # green-400
+
+# Mem/Disk cached meter
+theme[cached_start]="#4385BE" # blue-400
+theme[cached_mid]="#8B7EC8"   # purple-400
+theme[cached_end]="#879A39"   # green-400
+
+# Mem/Disk available meter
+theme[available_start]="#D14D41" # red-400
+theme[available_mid]="#DA702C"   # orange-400
+theme[available_end]="#D0A215"   # yellow-400
+
+# Mem/Disk used meter
+theme[used_start]="#879A39" # green-400
+theme[used_mid]="#DA702C"   # orange-400
+theme[used_end]="#D14D41"   # red-400
+
+# Download graph colors
+theme[download_start]="#879A39" # green-400
+theme[download_mid]="#3AA99F"   # cyan-400
+theme[download_end]="#4385BE"   # blue-400
+
+# Upload graph colors
+theme[upload_start]="#D14D41" # red-400
+theme[upload_mid]="#DA702C"   # orange-400
+theme[upload_end]="#D0A215"   # yellow-400
+
+# Process box color gradient
+theme[process_start]="#879A39" # green-400
+theme[process_mid]="#DA702C"   # orange-400
+theme[process_end]="#D14D41"   # red-400
