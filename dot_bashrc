@@ -19,28 +19,35 @@ fi
 
 # Dynamic btop theme switching
 btop() {
-    # Query terminal background color (OSC 11)
-    # Wrap in tmux passthrough if necessary
-    if [ -n "$TMUX" ]; then
-        echo -ne "\ePtmux;\e\e]11;?\a\e\\" > /dev/tty
-    else
-        echo -ne "\e]11;?\a" > /dev/tty
+    # Default to dark
+    local theme="flexoki_dark.theme"
+    local response=""
+
+    # 1. Try terminal background color query (OSC 11)
+    # This works in Ghostty, Alacritty, Kitty, etc.
+    if [ -t 0 ] && [ -t 1 ]; then
+        if [ -n "$TMUX" ]; then
+            echo -ne "\ePtmux;\e\e]11;?\a\e\\" > /dev/tty
+        else
+            echo -ne "\e]11;?\a" > /dev/tty
+        fi
+        # Read response with short timeout
+        read -t 0.1 -s -d $'\a' response < /dev/tty 2>/dev/null
     fi
 
-    # Read response with short timeout
-    # Response is usually ^]11;rgb:RRRR/GGGG/BBBB
-    local response
-    read -t 0.1 -s -d $'\a' response < /dev/tty
-
-    local theme="flexoki_dark.theme" # Default to dark
-    if [[ "$response" =~ rgb:([0-9a-fA-F]{2})[0-9a-fA-F]{2}\/([0-9a-fA-F]{2})[0-9a-fA-F]{2}\/([0-9a-fA-F]{2})[0-9a-fA-F]{2} ]]; then
+    if [[ "$response" =~ rgb:([0-9a-fA-F]{2})[0-9a-fA-F]*\/([0-9a-fA-F]{2})[0-9a-fA-F]*\/([0-9a-fA-F]{2})[0-9a-fA-F]* ]]; then
         local r=$((16#${BASH_REMATCH[1]}))
         local g=$((16#${BASH_REMATCH[2]}))
         local b=$((16#${BASH_REMATCH[3]}))
-        
-        # Simple luminance calculation
         local lum=$(( (r * 299 + g * 587 + b * 114) / 1000 ))
         if [ "$lum" -gt 128 ]; then
+            theme="flexoki_light.theme"
+        fi
+    else
+        # 2. Fallback: Query XDG Desktop Portal for color-scheme preference
+        # 0=Default/No Preference, 1=Prefer Dark, 2=Prefer Light
+        local portal_scheme=$(busctl --user call org.freedesktop.portal.Desktop /org/freedesktop/portal/desktop org.freedesktop.portal.Settings Read ss "org.freedesktop.appearance" "color-scheme" 2>/dev/null | awk '{print $NF}')
+        if [ "$portal_scheme" = "2" ] || [ "$portal_scheme" = "0" ]; then
             theme="flexoki_light.theme"
         fi
     fi
