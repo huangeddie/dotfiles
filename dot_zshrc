@@ -3,12 +3,10 @@
 export EDITOR=nvim
 export VISUAL=nvim
 
-alias lg='lazygit'
-alias la='ls -a'
-[[ -d ~/Documents/GitHub/LearnLingo/ ]] && alias lingo='cd ~/Documents/GitHub/LearnLingo/'
-alias c='claude --dangerously-skip-permissions'
-[[ -d ~/Documents/Second\ Brain/ ]] && alias vault='cd ~/Documents/Second\ Brain/'
-
+# Source aliases
+if [ -f ~/.zsh_aliases ]; then
+  . ~/.zsh_aliases
+fi
 
 # opencode
 export PATH="$HOME/.opencode/bin:$PATH"
