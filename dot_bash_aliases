@@ -18,4 +18,3 @@ alias la='ls -a'
 
 # Chezmoi
 alias cz='chezmoi'
-alias sm='ssh main'
