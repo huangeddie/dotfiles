@@ -28,3 +28,40 @@ if [ -f ~/.bash_aliases ]; then
   . ~/.bash_aliases
 fi
 
+
+# Dynamic btop theme switching
+btop() {
+    # Query terminal background color (OSC 11)
+    # Wrap in tmux passthrough if necessary
+    if [ -n "$TMUX" ]; then
+        echo -ne "\ePtmux;\e\e]11;?\a\e\\" > /dev/tty
+    else
+        echo -ne "\e]11;?\a" > /dev/tty
+    fi
+
+    # Read response with short timeout
+    # Response is usually ^]11;rgb:RRRR/GGGG/BBBB
+    local response
+    read -t 0.1 -s -d $'\a' response < /dev/tty
+
+    local theme="flexoki_dark.theme" # Default to dark
+    if [[ "$response" =~ rgb:([0-9a-fA-F]{2})[0-9a-fA-F]{2}\/([0-9a-fA-F]{2})[0-9a-fA-F]{2}\/([0-9a-fA-F]{2})[0-9a-fA-F]{2} ]]; then
+        local r=$((16#${BASH_REMATCH[1]}))
+        local g=$((16#${BASH_REMATCH[2]}))
+        local b=$((16#${BASH_REMATCH[3]}))
+        
+        # Simple luminance calculation
+        local lum=$(( (r * 299 + g * 587 + b * 114) / 1000 ))
+        if [ "$lum" -gt 128 ]; then
+            theme="flexoki_light.theme"
+        fi
+    fi
+
+    # Update btop config dynamically
+    local config="$HOME/.config/btop/btop.conf"
+    if [ -f "$config" ]; then
+        sed -i "s/^color_theme = .*/color_theme = \"$theme\"/" "$config"
+    fi
+
+    command btop "$@"
+}
