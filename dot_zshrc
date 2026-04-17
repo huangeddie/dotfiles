@@ -1,12 +1,2 @@
-[[ -f ~/.local/bin/mise ]] && eval "$(~/.local/bin/mise activate)"
-
-export EDITOR=nvim
-export VISUAL=nvim
-
-# Source aliases
-if [ -f ~/.zsh_aliases ]; then
-  . ~/.zsh_aliases
-fi
-
-# opencode
-export PATH="$HOME/.opencode/bin:$PATH"
+# bash is primary; .bashrc is the source of truth and is portable enough to run under zsh.
+[ -f ~/.bashrc ] && . ~/.bashrc

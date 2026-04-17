@@ -6,8 +6,10 @@ Personal dotfiles managed with [chezmoi](https://www.chezmoi.io/). The working d
 
 Files are named with chezmoi's source-state conventions. What lives here:
 
-- `dot_bashrc`, `dot_zshrc` — shell rc files. `bashrc` defines a `btop` wrapper that picks a light/dark Flexoki theme from the terminal background (OSC 11) with an XDG portal fallback.
-- `dot_bash_aliases`, `dot_zsh_aliases` — shared aliases (`lg`, `lj`, `c`, `cz`, `vault`, …). Kept in sync by hand — when adding an alias, update both unless it's shell-specific.
+- `dot_bashrc` — **the source of truth for shell init.** Bash is the primary shell (most machines are Linux); the file is written portably so zsh can source it directly. Bash-only blocks (omarchy/skel sourcing, OSC 11 terminal-background query in the `btop` wrapper) are gated on `$BASH_VERSION`. Defines a `btop` wrapper that picks a light/dark Flexoki theme from the terminal background (OSC 11, bash only) with an XDG portal fallback.
+- `dot_zshrc` — thin pointer that sources `~/.bashrc`. Used on the occasional Mac zsh session.
+- `dot_bash_profile` — sources `~/.bashrc` so login bash shells get the same setup.
+- `dot_bash_aliases`, `dot_zsh_aliases` — shared aliases (`lg`, `lj`, `c`, `cz`, `vault`, …). Kept in sync by hand — when adding an alias, update both unless it's shell-specific. `bashrc` sources the right one based on `$BASH_VERSION` / `$ZSH_VERSION`.
 - `dot_gitconfig`, `dot_prettierrc`, `dot_tmux.conf` — tool configs.
 - `dot_config/` — XDG configs: `bat`, `btop` (with Flexoki light/dark themes), `ghostty` (incl. shaders), `jjui`, `lazygit`, `nvim`, `omarchy`.
 - `private_dot_claude/` — Claude Code `settings.json` and skills (deployed at `~/.claude`, mode 0600). Heads up: this is the same directory Claude Code itself reads from, so changes here affect Claude's own behavior.

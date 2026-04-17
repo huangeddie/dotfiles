@@ -1,37 +1,46 @@
 # If not running interactively, don't do anything (leave this at the top of this file)
 [[ $- != *i* ]] && return
 
-# All the default Omarchy aliases and functions
-if [ -f ~/.local/share/omarchy/default/bash/rc ]; then
-  source ~/.local/share/omarchy/default/bash/rc
-elif [ -f /etc/skel/.bashrc ]; then
-  source /etc/skel/.bashrc
+if [ -n "$BASH_VERSION" ]; then
+  if [ -f ~/.local/share/omarchy/default/bash/rc ]; then
+    source ~/.local/share/omarchy/default/bash/rc
+  elif [ -f /etc/skel/.bashrc ]; then
+    source /etc/skel/.bashrc
+  fi
 fi
-# Add your own exports, aliases, and functions here.
+
+export EDITOR=nvim
+export VISUAL=nvim
+
 export PATH="$HOME/.local/bin:$PATH"
 export PATH="$HOME/.cargo/bin:$PATH"
-#
-# Source aliases
-if [ -f ~/.bash_aliases ]; then
-  . ~/.bash_aliases
+export PATH="$HOME/.opencode/bin:$PATH"
+
+if [ -f ~/.local/bin/mise ]; then
+  if [ -n "$BASH_VERSION" ]; then
+    eval "$(~/.local/bin/mise activate bash)"
+  elif [ -n "$ZSH_VERSION" ]; then
+    eval "$(~/.local/bin/mise activate zsh)"
+  fi
 fi
 
+if [ -n "$BASH_VERSION" ] && [ -f ~/.bash_aliases ]; then
+  . ~/.bash_aliases
+elif [ -n "$ZSH_VERSION" ] && [ -f ~/.zsh_aliases ]; then
+  . ~/.zsh_aliases
+fi
 
-# Dynamic btop theme switching
 btop() {
-    # Default to dark
     local theme="flexoki_dark.theme"
     local response=""
 
-    # 1. Try terminal background color query (OSC 11)
-    # This works in Ghostty, Alacritty, Kitty, etc.
-    if [ -t 0 ] && [ -t 1 ]; then
+    # zsh's `read` doesn't support `-t <float>` or `-d`, so OSC 11 query is bash-only.
+    if [ -n "$BASH_VERSION" ] && [ -t 0 ] && [ -t 1 ]; then
         if [ -n "$TMUX" ]; then
             echo -ne "\ePtmux;\e\e]11;?\a\e\\" > /dev/tty
         else
             echo -ne "\e]11;?\a" > /dev/tty
         fi
-        # Read response with short timeout
         read -t 0.1 -s -d $'\a' response < /dev/tty 2>/dev/null
     fi
 
@@ -44,15 +53,13 @@ btop() {
             theme="flexoki_light.theme"
         fi
     else
-        # 2. Fallback: Query XDG Desktop Portal for color-scheme preference
-        # 0=Default/No Preference, 1=Prefer Dark, 2=Prefer Light
+        # XDG Portal color-scheme: 0=No Preference, 1=Dark, 2=Light
         local portal_scheme=$(busctl --user call org.freedesktop.portal.Desktop /org/freedesktop/portal/desktop org.freedesktop.portal.Settings Read ss "org.freedesktop.appearance" "color-scheme" 2>/dev/null | awk '{print $NF}')
         if [ "$portal_scheme" = "2" ] || [ "$portal_scheme" = "0" ]; then
             theme="flexoki_light.theme"
         fi
     fi
 
-    # Update btop config dynamically
     local config="$HOME/.config/btop/btop.conf"
     if [ -f "$config" ]; then
         sed -i "s/^color_theme = .*/color_theme = \"$theme\"/" "$config"
