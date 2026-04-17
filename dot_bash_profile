@@ -1,0 +1,2 @@
+# Login shells: source .bashrc so interactive setup applies.
+[ -f ~/.bashrc ] && . ~/.bashrc
