@@ -30,12 +30,13 @@ elif [ -n "$ZSH_VERSION" ] && [ -f ~/.zsh_aliases ]; then
   . ~/.zsh_aliases
 fi
 
-btop() {
-    local theme="flexoki_dark.theme"
+_sync_theme() {
+    export COLORTERM=truecolor
+    export BACKGROUND="dark"
     local response=""
 
-    # zsh's `read` doesn't support `-t <float>` or `-d`, so OSC 11 query is bash-only.
-    if [ -n "$BASH_VERSION" ] && [ -t 0 ] && [ -t 1 ]; then
+    # Query terminal for background color (OSC 11)
+    if [ -t 0 ] && [ -t 1 ]; then
         if [ -n "$TMUX" ]; then
             echo -ne "\ePtmux;\e\e]11;?\a\e\\" > /dev/tty
         else
@@ -50,14 +51,23 @@ btop() {
         local b=$((16#${BASH_REMATCH[3]}))
         local lum=$(( (r * 299 + g * 587 + b * 114) / 1000 ))
         if [ "$lum" -gt 128 ]; then
-            theme="flexoki_light.theme"
+            export BACKGROUND="light"
         fi
     else
-        # XDG Portal color-scheme: 0=No Preference, 1=Dark, 2=Light
+        # Fallback: XDG Portal color-scheme: 0=No Preference, 1=Dark, 2=Light
         local portal_scheme=$(busctl --user call org.freedesktop.portal.Desktop /org/freedesktop/portal/desktop org.freedesktop.portal.Settings Read ss "org.freedesktop.appearance" "color-scheme" 2>/dev/null | awk '{print $NF}')
         if [ "$portal_scheme" = "2" ] || [ "$portal_scheme" = "0" ]; then
-            theme="flexoki_light.theme"
+            export BACKGROUND="light"
         fi
+    fi
+}
+
+_sync_theme
+
+btop() {
+    local theme="flexoki_dark.theme"
+    if [ "$BACKGROUND" = "light" ]; then
+        theme="flexoki_light.theme"
     fi
 
     local config="$HOME/.config/btop/btop.conf"
