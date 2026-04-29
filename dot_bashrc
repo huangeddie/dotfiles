@@ -30,36 +30,3 @@ elif [ -n "$ZSH_VERSION" ] && [ -f ~/.zsh_aliases ]; then
   . ~/.zsh_aliases
 fi
 
-_sync_theme() {
-    export COLORTERM=truecolor
-    export BACKGROUND="dark"
-
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        # Check macOS dark mode
-        if [ "$(defaults read -g AppleInterfaceStyle 2>/dev/null)" != "Dark" ]; then
-            export BACKGROUND="light"
-        fi
-    else
-        # Fallback: XDG Portal color-scheme: 0=No Preference, 1=Dark, 2=Light
-        local portal_scheme=$(busctl --user call org.freedesktop.portal.Desktop /org/freedesktop/portal/desktop org.freedesktop.portal.Settings Read ss "org.freedesktop.appearance" "color-scheme" 2>/dev/null | awk '{print $NF}')
-        if [ "$portal_scheme" = "2" ] || [ "$portal_scheme" = "0" ]; then
-            export BACKGROUND="light"
-        fi
-    fi
-}
-
-_sync_theme
-
-btop() {
-    local theme="flexoki_dark.theme"
-    if [ "$BACKGROUND" = "light" ]; then
-        theme="flexoki_light.theme"
-    fi
-
-    local config="$HOME/.config/btop/btop.conf"
-    if [ -f "$config" ]; then
-        sed -i "s/^color_theme = .*/color_theme = \"$theme\"/" "$config"
-    fi
-
-    command btop "$@"
-}
