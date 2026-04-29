@@ -38,9 +38,9 @@ _sync_theme() {
     # Query terminal for background color (OSC 11)
     if [ -t 0 ] && [ -t 1 ]; then
         if [ -n "$TMUX" ]; then
-            echo -ne "\ePtmux;\e\e]11;?\a\e\\" > /dev/tty
+            printf "\033Ptmux;\033\033]11;?\a\033\\" > /dev/tty
         else
-            echo -ne "\e]11;?\a" > /dev/tty
+            printf "\033]11;?\a" > /dev/tty
         fi
         read -t 0.1 -s -d $'\a' response < /dev/tty 2>/dev/null
     fi
