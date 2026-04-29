@@ -33,24 +33,10 @@ fi
 _sync_theme() {
     export COLORTERM=truecolor
     export BACKGROUND="dark"
-    local response=""
 
-    # Query terminal for background color (OSC 11)
-    if [ -t 0 ] && [ -t 1 ]; then
-        if [ -n "$TMUX" ]; then
-            printf "\033Ptmux;\033\033]11;?\a\033\\" > /dev/tty
-        else
-            printf "\033]11;?\a" > /dev/tty
-        fi
-        read -t 0.1 -s -d $'\a' response < /dev/tty 2>/dev/null
-    fi
-
-    if [[ "$response" =~ rgb:([0-9a-fA-F]{2})[0-9a-fA-F]*\/([0-9a-fA-F]{2})[0-9a-fA-F]*\/([0-9a-fA-F]{2})[0-9a-fA-F]* ]]; then
-        local r=$((16#${BASH_REMATCH[1]}))
-        local g=$((16#${BASH_REMATCH[2]}))
-        local b=$((16#${BASH_REMATCH[3]}))
-        local lum=$(( (r * 299 + g * 587 + b * 114) / 1000 ))
-        if [ "$lum" -gt 128 ]; then
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # Check macOS dark mode
+        if [ "$(defaults read -g AppleInterfaceStyle 2>/dev/null)" != "Dark" ]; then
             export BACKGROUND="light"
         fi
     else
