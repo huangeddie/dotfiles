@@ -79,6 +79,9 @@
     "enabled": true,
     "autoAllowBashIfSandboxed": true
   },
+  "effortLevel": "high",
   "skipDangerousModePermissionPrompt": true,
-  "effortLevel": "high"
+  "editorMode": "vim",
+  "remoteControlAtStartup": true,
+  "agentPushNotifEnabled": true
 }
