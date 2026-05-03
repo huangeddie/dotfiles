@@ -12,6 +12,9 @@
         "!skills/finishing-a-development-branch",
         "!skills/using-git-worktrees"
       ]
+    },
+    {
+      "source": "file:///usr/local/google/home/huangeddie/.agents/skills/google-tasks"
     }
   ]
 }
