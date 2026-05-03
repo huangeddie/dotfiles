@@ -7,7 +7,7 @@
   "packages": [
     "npm:pi-subagents",
     {
-      "source": "https://github.com/huangeddie/pi-superpowers.git",
+      "source": "~/.agents/packages/superpowers",
       "skills": [
         "!skills/finishing-a-development-branch",
         "!skills/using-git-worktrees"
@@ -15,4 +15,3 @@
     }
   ]
 }
-
