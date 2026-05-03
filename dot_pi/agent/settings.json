@@ -1,0 +1,17 @@
+{
+  "lastChangelogVersion": "0.72.1",
+  "theme": "light",
+  "defaultProvider": "google",
+  "defaultModel": "gemini-3.1-pro-preview",
+  "defaultThinkingLevel": "high",
+  "packages": [
+    "npm:pi-subagents",
+    {
+      "source": "https://github.com/huangeddie/pi-superpowers.git",
+      "skills": [
+        "!skills/finishing-a-development-branch",
+        "!skills/using-git-worktrees"
+      ]
+    }
+  ]
+}
