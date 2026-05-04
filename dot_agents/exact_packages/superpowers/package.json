@@ -1,0 +1,9 @@
+{
+  "name": "pi-superpowers",
+  "version": "1.0.0",
+  "description": "Port of the popular superpowers agent framework plugin",
+  "keywords": ["pi-package"],
+  "pi": {
+    "skills": ["./skills"]
+  }
+}
