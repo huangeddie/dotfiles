@@ -1,8 +1,8 @@
 {
   "lastChangelogVersion": "0.72.1",
-  "theme": "light",
-  "defaultProvider": "google",
-  "defaultModel": "gemini-3.1-pro-preview",
+  "theme": "dark",
+  "defaultProvider": "fireworks",
+  "defaultModel": "accounts/fireworks/models/kimi-k2p6",
   "defaultThinkingLevel": "high",
   "packages": [
     "npm:pi-subagents",
