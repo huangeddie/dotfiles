@@ -31,19 +31,23 @@ A pi skill that instructs the agent to maintain a persistent running document at
 > Review cadence: 30 days
 ```
 
-### 1.2 Module Sections (H2)
+### 1.2 Abstraction Layer Sections (H2)
 
-Each detected module or package gets an H2 heading:
+Each abstraction layer gets an H2 heading. Layer names are **brainstormed with the user at initialization** (see Section 2.2.1) and reflect conceptual groupings, not directory structure:
 
 ```markdown
-## Module: auth-service
+## Layer: Domain Model
+
+## Layer: Application Services
+
+## Layer: Infrastructure
 ```
 
-Modules are initially discovered from directory structure. The agent may propose reorganizations over time.
+The agent proposes layers based on patterns discovered in the codebase (e.g., domain types, service logic, external integrations, API handlers). The user approves, modifies, or rejects each proposal before the doc is written.
 
 ### 1.3 Component Category Subsections (H3)
 
-Within each module, three standard categories:
+Within each layer, three standard categories:
 
 ```markdown
 ### Data Schemas
@@ -76,27 +80,28 @@ Each category contains a markdown table with exactly these columns:
 | **Missing** | 🔴 | Component listed in doc but no longer found in codebase |
 | **Unreviewed** | ⚪ | Component found in codebase but never reviewed (`Last Reviewed: -`) |
 
-### 1.6 Proposed Abstractions Section
+### 1.6 Cross-Cutting Concerns Section
 
-A special section for cross-cutting groupings the agent discovers:
+A special section for concepts that span multiple abstraction layers:
 
 ```markdown
-## Proposed Abstractions
+## Cross-Cutting Concerns
 
-### User Management (proposed 2024-03-22)
-> Groups: `UserSchema` (auth-service) + `IUserService` (user-api) + `user.test.ts` (user-api)
-> Note: These components share the User concept but are scattered across modules.
+### User Management (identified 2024-03-22)
+> Spans layers: `UserSchema` (Domain Model) + `IUserService` (Application Services) + `user.test.ts` (Domain Model)
+> Note: These components share the User concept across layers.
 
-| Component | File | Definition | Last Reviewed | Reviewer | Last Modified | Status |
-|-----------|------|-----------|---------------|----------|---------------|--------|
-| UserSchema | auth-service/types.ts | `interface User` | 2024-01-15 | Eddie | 2024-03-20 | 🟡 stale |
-| IUserService | user-api/service.ts | `interface IUserService` | - | - | 2024-03-18 | ⚪ unreviewed |
+| Component | File | Definition | Layer | Last Reviewed | Reviewer | Last Modified | Status |
+|-----------|------|-----------|-------|---------------|----------|---------------|--------|
+| UserSchema | src/types.ts | `interface User` | Domain Model | 2024-01-15 | Eddie | 2024-03-20 | 🟡 stale |
+| IUserService | src/services.ts | `interface IUserService` | Application Services | - | - | 2024-03-18 | ⚪ unreviewed |
 ```
 
-Rules for Proposed Abstractions:
-- Agent may propose but **never reorganizes canonical structure without user approval**
-- Rejected proposals are kept but annotated: `> Rejected by {name} on {date}`
+Rules for Cross-Cutting Concerns:
+- Agent may identify but **never reorganizes layers without user approval**
+- Rejected identifications are kept but annotated: `> Rejected by {user} on {date}`
 - This section is optional; omit if empty
+- Components listed here also appear in their primary layer section (this is a cross-reference, not a move)
 
 ### 1.7 Document Rules
 
@@ -120,34 +125,62 @@ If `docs/reviews/architecture.md` does not exist:
 3. Set `Last full scan` to today's date
 4. Run a full exploration (Section 2.2)
 
-### 2.2 Exploration
+### 2.2 Exploration & Layer Brainstorming
 
 When the user asks to "review architecture", "check stale components", or the agent is about to make significant code changes:
 
-**Step A — Map modules:**
-- List directory structure
-- Identify top-level packages/modules (top-level dirs, `src/` subdirs, workspace packages, `go.mod` modules, etc.)
-- Create an H2 section per module
+#### Step A — Discover Components (Read-Only)
 
-**Step B — Find Data Schemas:**
-- Search for type definitions using language-agnostic heuristics:
-  - Files with `type`, `interface`, `struct`, `class`, `protocol` declarations
-  - Database schemas, migration files, Protobuf, GraphQL, SQL
-  - DTOs, models, data classes
-- Extract the **public/exported** schemas (surface-level types, not private helpers)
-- Add each to the `### Data Schemas` table with ⚪ unreviewed
+First, the agent explores the codebase **without writing to the doc**:
 
-**Step C — Find Interfaces/Contracts:**
-- Search for public function signatures, abstract methods, service interfaces
-- Exported functions, public methods on classes
-- API endpoint handlers, controller methods
-- Abstract base classes, trait implementations
-- Add each to the `### Interfaces` table with ⚪ unreviewed
+1. **Find Data Schemas:**
+   - Search for type definitions using language-agnostic heuristics:
+     - Files with `type`, `interface`, `struct`, `class`, `protocol` declarations
+     - Database schemas, migration files, Protobuf, GraphQL, SQL
+     - DTOs, models, data classes
+   - Extract the **public/exported** schemas
 
-**Step D — Find Unit Tests:**
-- Identify test files: `*test*`, `*spec*`, `*_test.*`
-- Group by module they test (module-level, not every individual test function)
-- Add each module test suite to the `### Unit Tests` table with ⚪ unreviewed
+2. **Find Interfaces/Contracts:**
+   - Public function signatures, abstract methods, service interfaces
+   - Exported functions, public methods on classes
+   - API endpoint handlers, controller methods
+   - Abstract base classes, trait implementations
+
+3. **Find Unit Tests:**
+   - Identify test files: `*test*`, `*spec*`, `*_test.*`
+   - Group by what they test (layer-level, not every individual test function)
+
+4. **Map directory structure** — note which directories contain which types of components
+
+#### Step B — Propose Abstraction Layers (Brainstorm with User)
+
+Before writing to `architecture.md`, the agent **presents a layer proposal to the user**:
+
+```
+I've discovered ~N components across your codebase. Here's a proposed abstraction layer organization:
+
+**Layer: Domain Model** — core business types (User, Order, Payment)
+**Layer: Application Services** — service logic, use cases (AuthService, BillingProcessor)
+**Layer: API / Controllers** — request handlers, route definitions
+**Layer: Infrastructure** — database access, external API clients, queue consumers
+
+Does this look right? Would you rename, merge, split, or reorder any layers?
+```
+
+The agent:
+- Proposes 3-6 layers based on patterns it found
+- Explains the rationale for each layer (what components belong there)
+- Asks the user to approve, rename, merge, split, or reorder
+- Does **not** create the doc until the user confirms the layer structure
+
+**If the user rejects a proposal**, the agent iterates with a revised proposal.
+
+#### Step C — Catalog Under Approved Layers
+
+Once layers are approved:
+- Create H2 sections for each approved layer
+- Add discovered components to the appropriate `### Data Schemas`, `### Interfaces`, or `### Unit Tests` table under the matching layer
+- Components that don't clearly fit any layer go under the closest match with a `> Note: Categorization uncertain`
 
 ### 2.3 Cataloging
 
@@ -182,14 +215,15 @@ For each row in the doc:
 - Add note: `> Removed from codebase on {today}`
 - Preserve the row; do not delete
 
-### 2.7 Abstraction Proposals
+### 2.7 Layer Reorganization Proposals
 
-After cataloging, scan for cross-cutting patterns:
-- Same schema/interface name in multiple modules → suggest shared abstraction
-- Schema + interface + tests sharing a concept but in different modules → suggest Proposed Abstraction grouping
-- Module tables growing very large → suggest subsystem split
+Over time, the agent may discover that the initial layer structure doesn't fit new components or reveals a better organization. In this case:
 
-Present proposals to the user in the `## Proposed Abstractions` section. Do not reorganize without approval.
+- Propose a new layer or layer split to the user **before modifying the doc**
+- If approved, migrate components to the new structure
+- If rejected, keep the existing structure and add a `> Note: Could belong to {proposed layer}`
+
+The agent never reorganizes layers without explicit user approval.
 
 ---
 
@@ -200,14 +234,15 @@ Present proposals to the user in the `## Proposed Abstractions` section. Do not 
 | **Doc doesn't exist** | Create from template, run full exploration |
 | **Component found in code but not in doc** | Add with ⚪ unreviewed; do not assume reviewer |
 | **Component in doc but not in code** | Mark 🔴 missing; preserve row; note removal date |
-| **Ambiguous module boundaries** | Make best guess; add `> Note: Uncertain boundary — based on {heuristic}` |
+| **Ambiguous layer boundaries** | Make best guess; add `> Note: Uncertain boundary — based on {heuristic}` |
 | **Multiple reviewers over time** | Track most recent in table; append history as `> Previously reviewed by {name} on {date}` if significant |
 | **Agent makes code changes** | After implementing, update `Last Modified` for affected components; do NOT update `Last Reviewed` unless user confirms |
 | **Large codebase (100+ components)** | Focus on **public API surface** first; add `> Additional internals not cataloged` note rather than creating an unreadable doc |
-| **User disagrees with proposed abstraction** | Keep in Proposed Abstractions section; annotate `> Rejected by {user} on {date}` |
+| **User disagrees with proposed cross-cutting concern** | Keep in Cross-Cutting Concerns section; annotate `> Rejected by {user} on {date}` |
+| **User disagrees with proposed layer reorganization** | Do not reorganize; add `> Note: Rejected layer reorganization proposed by agent on {date}` to affected components |
 | **Collaborator edits doc manually** | On next run, parse what is parseable; flag irregular rows with `> Warning: Non-standard row detected` |
 | **Unclear whether something is a schema or interface** | Add to whichever is closer; add `> Note: Categorization uncertain` |
-| **Test file tests multiple modules** | List under the primary module it tests; add cross-reference: `> Also tests: {other module}` |
+| **Test file tests multiple layers** | List under the primary layer it tests; add cross-reference: `> Also tests: {other layer}` |
 
 ### Key Principles for the Agent
 
@@ -233,7 +268,7 @@ Run subagent scenarios WITHOUT the skill first to establish baseline behavior. T
 | T2 | Stale detection — doc has old review dates | Agent may not check dates or understand cadence | Agent must correctly identify stale vs current |
 | T3 | Code change tracking — agent adds new type | Agent may forget to update doc | Agent must update `Last Modified` without touching `Last Reviewed` |
 | T4 | Missing component — file deleted since last scan | Agent may delete row from doc | Agent must mark 🔴 missing and preserve history |
-| T5 | Abstraction proposal — cross-cutting types | Agent may not recognize patterns | Agent must suggest groupings in Proposed Abstractions |
+| T5 | Abstraction proposal — cross-cutting types | Agent may not recognize patterns | Agent must suggest groupings in Cross-Cutting Concerns |
 | T6 | Manual edit resilience — collaborator adds malformed row | Agent may crash or ignore entire doc | Agent must parse what it can, flag irregularities |
 | T7 | Large codebase — 200+ files with types | Agent may catalog everything and create unreadable doc | Agent must focus on public surface, defer internals |
 | T8 | User says "mark as reviewed" | Agent may update wrong field or wrong component | Agent must update correct `Last Reviewed` + `Reviewer` |
@@ -248,7 +283,7 @@ Document expected rationalizations from baseline testing to bulletproof the skil
 | "Code changes are basically a review" | Explicit rule: `Last Modified` ≠ `Last Reviewed`; never conflate |
 | "Missing component should be deleted to keep doc clean" | Explicit rule: never delete rows; mark 🔴 missing |
 | "I'll guess the category rather than ask" | Explicit rule: ask when uncertain; note if forced to guess |
-| "Proposed abstractions are too speculative" | Explicit rule: propose but never reorganize without approval |
+| "Cross-cutting concerns are too speculative" | Explicit rule: identify but never reorganize without approval |
 
 ---
 
