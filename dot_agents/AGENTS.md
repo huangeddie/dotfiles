@@ -1,3 +1,10 @@
+## User Priority
+
+The user cares most about **data schemas, interfaces/contracts, and unit
+tests**. When presenting work or asking for decisions, always lead with these
+core components. Implementation details and concrete code should only be
+surfaced when necessary for a specific decision or when explicitly requested.
+
 ## Commit Classification & TDD Protocol
 
 Before committing, classify changes into two tracks:
