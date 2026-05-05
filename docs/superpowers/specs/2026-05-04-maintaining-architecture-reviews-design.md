@@ -6,7 +6,7 @@
 
 ## Problem
 
-Collaborative codebases grow complex. Data schemas, interfaces, and unit tests span modules and abstraction levels. Over time, components are reviewed ad-hoc or not at all. There is no persistent record of:
+Collaborative codebases grow complex. Data models, interfaces, and unit tests span modules and abstraction levels. Over time, components are reviewed ad-hoc or not at all. There is no persistent record of:
 - What architectural components exist
 - What abstraction level they belong to
 - When they were last reviewed
@@ -15,7 +15,7 @@ Collaborative codebases grow complex. Data schemas, interfaces, and unit tests s
 
 ## Solution
 
-A pi skill that instructs the agent to maintain a persistent running document at `docs/reviews/architecture.md` within any codebase. The document catalogs architectural components (data schemas, interfaces, unit tests) at hierarchical abstraction levels, tracks review history with reviewer names, auto-updates modification timestamps, and identifies stale or missing components.
+A pi skill that instructs the agent to maintain a persistent running document at `docs/reviews/architecture.md` within any codebase. The document catalogs architectural components (data models, interfaces, unit tests) at hierarchical abstraction levels, tracks review history with reviewer names, auto-updates modification timestamps, and identifies stale or missing components.
 
 ---
 
@@ -50,7 +50,7 @@ The agent proposes layers based on patterns discovered in the codebase (e.g., do
 Within each layer, three standard categories:
 
 ```markdown
-### Data Schemas
+### Data Models
 ### Interfaces
 ### Unit Tests
 ```
@@ -133,7 +133,7 @@ When the user asks to "review architecture", "check stale components", or the ag
 
 First, the agent explores the codebase **without writing to the doc**:
 
-1. **Find Data Schemas:**
+1. **Find Data Models:**
    - Search for type definitions using language-agnostic heuristics:
      - Files with `type`, `interface`, `struct`, `class`, `protocol` declarations
      - Database schemas, migration files, Protobuf, GraphQL, SQL
@@ -179,7 +179,7 @@ The agent:
 
 Once layers are approved:
 - Create H2 sections for each approved layer
-- Add discovered components to the appropriate `### Data Schemas`, `### Interfaces`, or `### Unit Tests` table under the matching layer
+- Add discovered components to the appropriate `### Data Models`, `### Interfaces`, or `### Unit Tests` table under the matching layer
 - Components that don't clearly fit any layer go under the closest match with a `> Note: Categorization uncertain`
 
 ### 2.3 Cataloging
@@ -296,7 +296,7 @@ The final `SKILL.md` will follow the standard superpowers skill format:
 ```yaml
 ---
 name: maintaining-architecture-reviews
-description: Use when cataloging, reviewing, or tracking the architectural health of a codebase — data schemas, interfaces, contracts, and unit tests across modules and abstraction levels
+description: Use when cataloging, reviewing, or tracking the architectural health of a codebase — data models, interfaces, contracts, and unit tests across modules and abstraction levels
 ---
 ```
 
