@@ -1,0 +1,23 @@
+# rage
+
+chezmoi supports encrypting files with [rage][rage].
+
+To use rage, set `age.command` to `rage` in your configuration file, for example:
+
+<!-- example-formats -->
+```toml title="~/.config/chezmoi/chezmoi.toml"
+encryption = "age"
+[age]
+    command = "rage"
+```
+<!-- /example-formats -->
+
+!!! note
+
+    Make sure `encryption` is added to the top level section at the beginning of
+    the config, before any other sections.
+
+Then, configure chezmoi as you would for [age][age].
+
+[rage]: https://str4d.xyz/rage
+[age]: /user-guide/encryption/age.md
