@@ -2,3 +2,9 @@ README.md
 CLAUDE.md
 AGENTS.md
 chezmoi-skill-design.md
+
+# maintaining-architecture-reviews skill — development artifacts (not deployed)
+.agents/skills/maintaining-architecture-reviews/baseline-*.md
+.agents/skills/maintaining-architecture-reviews/test-pressure-*.md
+.agents/skills/maintaining-architecture-reviews/final-verification-report.md
+.agents/skills/maintaining-architecture-reviews/baseline-rationalizations.md
