@@ -14,16 +14,16 @@
 
 | File | Purpose | Created/Modified |
 |------|---------|-----------------|
-| `dot_agents/exact_packages/superpowers/exact_skills/maintaining-architecture-reviews/SKILL.md` | Main skill document — agent instructions | Create |
-| `dot_agents/exact_packages/superpowers/exact_skills/maintaining-architecture-reviews/example-architecture.md` | Complete example of architecture.md format | Create |
-| `dot_agents/exact_packages/superpowers/exact_skills/maintaining-architecture-reviews/test-pressure-1.md` | Pressure scenario: cold start | Create |
-| `dot_agents/exact_packages/superpowers/exact_skills/maintaining-architecture-reviews/test-pressure-2.md` | Pressure scenario: stale detection | Create |
-| `dot_agents/exact_packages/superpowers/exact_skills/maintaining-architecture-reviews/test-pressure-3.md` | Pressure scenario: code change tracking | Create |
-| `dot_agents/exact_packages/superpowers/exact_skills/maintaining-architecture-reviews/test-pressure-4.md` | Pressure scenario: missing component | Create |
-| `dot_agents/exact_packages/superpowers/exact_skills/maintaining-architecture-reviews/test-pressure-5.md` | Pressure scenario: abstraction proposal | Create |
-| `dot_agents/exact_packages/superpowers/exact_skills/maintaining-architecture-reviews/test-pressure-6.md` | Pressure scenario: manual edit resilience | Create |
-| `dot_agents/exact_packages/superpowers/exact_skills/maintaining-architecture-reviews/test-pressure-7.md` | Pressure scenario: large codebase | Create |
-| `dot_agents/exact_packages/superpowers/exact_skills/maintaining-architecture-reviews/test-pressure-8.md` | Pressure scenario: review with comments | Create |
+| `dot_agents/exact_skills/maintaining-architecture-reviews/SKILL.md` | Main skill document — agent instructions | Create |
+| `dot_agents/exact_skills/maintaining-architecture-reviews/example-architecture.md` | Complete example of architecture.md format | Create |
+| `dot_agents/exact_skills/maintaining-architecture-reviews/test-pressure-1.md` | Pressure scenario: cold start | Create |
+| `dot_agents/exact_skills/maintaining-architecture-reviews/test-pressure-2.md` | Pressure scenario: stale detection | Create |
+| `dot_agents/exact_skills/maintaining-architecture-reviews/test-pressure-3.md` | Pressure scenario: code change tracking | Create |
+| `dot_agents/exact_skills/maintaining-architecture-reviews/test-pressure-4.md` | Pressure scenario: missing component | Create |
+| `dot_agents/exact_skills/maintaining-architecture-reviews/test-pressure-5.md` | Pressure scenario: abstraction proposal | Create |
+| `dot_agents/exact_skills/maintaining-architecture-reviews/test-pressure-6.md` | Pressure scenario: manual edit resilience | Create |
+| `dot_agents/exact_skills/maintaining-architecture-reviews/test-pressure-7.md` | Pressure scenario: large codebase | Create |
+| `dot_agents/exact_skills/maintaining-architecture-reviews/test-pressure-8.md` | Pressure scenario: review with comments | Create |
 
 ---
 
@@ -32,18 +32,18 @@
 ### Task 1: Create Skill Directory Structure
 
 **Files:**
-- Create: `dot_agents/exact_packages/superpowers/exact_skills/maintaining-architecture-reviews/` (directory)
+- Create: `dot_agents/exact_skills/maintaining-architecture-reviews/` (directory)
 
 - [ ] **Step 1: Create directory**
 
 ```bash
-mkdir -p dot_agents/exact_packages/superpowers/exact_skills/maintaining-architecture-reviews
+mkdir -p dot_agents/exact_skills/maintaining-architecture-reviews
 ```
 
 - [ ] **Step 2: Commit directory creation**
 
 ```bash
-git add dot_agents/exact_packages/superpowers/exact_skills/maintaining-architecture-reviews
+git add dot_agents/exact_skills/maintaining-architecture-reviews
 git commit -m "test: create maintaining-architecture-reviews skill directory
 
 Track A — Contracts & Verification: skill structure and test fixtures.
@@ -55,14 +55,14 @@ Refs: architecture review skill implementation plan"
 ### Task 2: Write All 8 Pressure Scenario Files
 
 **Files:**
-- Create: `dot_agents/exact_packages/superpowers/exact_skills/maintaining-architecture-reviews/test-pressure-1.md`
-- Create: `dot_agents/exact_packages/superpowers/exact_skills/maintaining-architecture-reviews/test-pressure-2.md`
-- Create: `dot_agents/exact_packages/superpowers/exact_skills/maintaining-architecture-reviews/test-pressure-3.md`
-- Create: `dot_agents/exact_packages/superpowers/exact_skills/maintaining-architecture-reviews/test-pressure-4.md`
-- Create: `dot_agents/exact_packages/superpowers/exact_skills/maintaining-architecture-reviews/test-pressure-5.md`
-- Create: `dot_agents/exact_packages/superpowers/exact_skills/maintaining-architecture-reviews/test-pressure-6.md`
-- Create: `dot_agents/exact_packages/superpowers/exact_skills/maintaining-architecture-reviews/test-pressure-7.md`
-- Create: `dot_agents/exact_packages/superpowers/exact_skills/maintaining-architecture-reviews/test-pressure-8.md`
+- Create: `dot_agents/exact_skills/maintaining-architecture-reviews/test-pressure-1.md`
+- Create: `dot_agents/exact_skills/maintaining-architecture-reviews/test-pressure-2.md`
+- Create: `dot_agents/exact_skills/maintaining-architecture-reviews/test-pressure-3.md`
+- Create: `dot_agents/exact_skills/maintaining-architecture-reviews/test-pressure-4.md`
+- Create: `dot_agents/exact_skills/maintaining-architecture-reviews/test-pressure-5.md`
+- Create: `dot_agents/exact_skills/maintaining-architecture-reviews/test-pressure-6.md`
+- Create: `dot_agents/exact_skills/maintaining-architecture-reviews/test-pressure-7.md`
+- Create: `dot_agents/exact_skills/maintaining-architecture-reviews/test-pressure-8.md`
 
 - [ ] **Step 1: Write T1 — Cold Start**
 
@@ -470,7 +470,7 @@ After running this scenario WITHOUT the skill loaded, document:
 - [ ] **Step 9: Commit pressure scenarios**
 
 ```bash
-git add dot_agents/exact_packages/superpowers/exact_skills/maintaining-architecture-reviews/test-pressure-*.md
+git add dot_agents/exact_skills/maintaining-architecture-reviews/test-pressure-*.md
 git commit -m "test: add architecture review skill pressure test scenarios
 
 Track A — Contracts & Verification: test fixtures for T1-T8 baseline tests.
@@ -624,7 +624,7 @@ Create `baseline-rationalizations.md` with this structure:
 - [ ] **Step 3: Commit**
 
 ```bash
-git add dot_agents/exact_packages/superpowers/exact_skills/maintaining-architecture-reviews/baseline-*.md
+git add dot_agents/exact_skills/maintaining-architecture-reviews/baseline-*.md
 git commit -m "test: document baseline rationalizations from T1-T8
 
 Track A — Contracts & Verification: baseline test results and rationalization table.
@@ -638,7 +638,7 @@ Refs: RED phase of architecture review skill TDD"
 ### Task 6: Write SKILL.md — Frontmatter, Overview, When to Use
 
 **Files:**
-- Create: `dot_agents/exact_packages/superpowers/exact_skills/maintaining-architecture-reviews/SKILL.md`
+- Create: `dot_agents/exact_skills/maintaining-architecture-reviews/SKILL.md`
 
 - [ ] **Step 1: Write frontmatter and overview**
 
@@ -674,7 +674,7 @@ Maintain a persistent `docs/reviews/architecture.md` document that catalogs your
 - [ ] **Step 2: Commit**
 
 ```bash
-git add dot_agents/exact_packages/superpowers/exact_skills/maintaining-architecture-reviews/SKILL.md
+git add dot_agents/exact_skills/maintaining-architecture-reviews/SKILL.md
 git commit -m "impl: add SKILL.md frontmatter, overview, and when-to-use
 
 Track B — Implementation: skill document header sections.
@@ -686,7 +686,7 @@ Refs: GREEN phase of architecture review skill TDD"
 ### Task 7: Write SKILL.md — Document Schema Section
 
 **Files:**
-- Modify: `dot_agents/exact_packages/superpowers/exact_skills/maintaining-architecture-reviews/SKILL.md`
+- Modify: `dot_agents/exact_skills/maintaining-architecture-reviews/SKILL.md`
 
 - [ ] **Step 1: Append Document Schema section**
 
@@ -753,7 +753,7 @@ Refs: GREEN phase of architecture review skill TDD"
 ### Task 8: Write SKILL.md — Workflow and Exploration Heuristics
 
 **Files:**
-- Modify: `dot_agents/exact_packages/superpowers/exact_skills/maintaining-architecture-reviews/SKILL.md`
+- Modify: `dot_agents/exact_skills/maintaining-architecture-reviews/SKILL.md`
 
 - [ ] **Step 1: Append Workflow section**
 
@@ -858,7 +858,7 @@ Refs: GREEN phase of architecture review skill TDD"
 ### Task 9: Write SKILL.md — Status, Rules, Common Mistakes, Example
 
 **Files:**
-- Modify: `dot_agents/exact_packages/superpowers/exact_skills/maintaining-architecture-reviews/SKILL.md`
+- Modify: `dot_agents/exact_skills/maintaining-architecture-reviews/SKILL.md`
 
 - [ ] **Step 1: Append Rules, Mistakes, and Example sections**
 
@@ -955,7 +955,7 @@ Refs: GREEN phase of architecture review skill TDD"
 ### Task 10: Write example-architecture.md Supporting File
 
 **Files:**
-- Create: `dot_agents/exact_packages/superpowers/exact_skills/maintaining-architecture-reviews/example-architecture.md`
+- Create: `dot_agents/exact_skills/maintaining-architecture-reviews/example-architecture.md`
 
 - [ ] **Step 1: Write complete example document**
 
@@ -966,7 +966,7 @@ This is a standalone reference that users can copy and adapt.
 - [ ] **Step 2: Commit**
 
 ```bash
-git add dot_agents/exact_packages/superpowers/exact_skills/maintaining-architecture-reviews/example-architecture.md
+git add dot_agents/exact_skills/maintaining-architecture-reviews/example-architecture.md
 git commit -m "impl: add example-architecture.md reference document
 
 Track B — Implementation: standalone example for users to reference.
@@ -1082,7 +1082,7 @@ Verify:
 
 **Files:**
 - Read: `verification-results-t1.md` through `verification-results-t8.md`
-- Modify: `dot_agents/exact_packages/superpowers/exact_skills/maintaining-architecture-reviews/SKILL.md`
+- Modify: `dot_agents/exact_skills/maintaining-architecture-reviews/SKILL.md`
 
 - [ ] **Step 1: Read verification results and identify new rationalizations**
 
@@ -1159,7 +1159,7 @@ If any checkbox fails, return to Task 13 and strengthen further.
 - [ ] **Step 4: Commit final verification report**
 
 ```bash
-git add dot_agents/exact_packages/superpowers/exact_skills/maintaining-architecture-reviews/final-verification-report.md
+git add dot_agents/exact_skills/maintaining-architecture-reviews/final-verification-report.md
 git commit -m "test: final verification report for T1-T8
 
 Track A — Contracts & Verification: all pressure tests pass with skill loaded.
@@ -1173,7 +1173,7 @@ Refs: architecture review skill implementation plan"
 ### Task 15: Commit and Deploy Skill
 
 **Files:**
-- Modify: `dot_agents/exact_packages/superpowers/exact_skills/maintaining-architecture-reviews/SKILL.md`
+- Modify: `dot_agents/exact_skills/maintaining-architecture-reviews/SKILL.md`
 - Read: `final-verification-report.md`
 
 - [ ] **Step 1: Final review of SKILL.md**
@@ -1188,7 +1188,7 @@ Read the complete SKILL.md one more time. Check:
 - [ ] **Step 2: Commit complete skill**
 
 ```bash
-git add dot_agents/exact_packages/superpowers/exact_skills/maintaining-architecture-reviews/
+git add dot_agents/exact_skills/maintaining-architecture-reviews/
 git commit -m "feat: complete maintaining-architecture-reviews skill
 
 Track B — Implementation: pi skill for maintaining architecture review docs.

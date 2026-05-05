@@ -1,7 +1,6 @@
 # Design: Maintaining Architecture Reviews Skill
 
 **Date:** 2026-05-04 **Skill Name:** `maintaining-architecture-reviews`
-**Package:** `superpowers`
 
 ## Problem
 
@@ -430,7 +429,7 @@ description:
 
 4. **Deployment**
    - Place skill in
-     `dot_agents/exact_packages/superpowers/exact_skills/maintaining-architecture-reviews/`
+     `dot_agents/exact_skills/maintaining-architecture-reviews/`
    - Commit to chezmoi
    - Apply chezmoi to deploy
 
