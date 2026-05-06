@@ -1,0 +1,4 @@
+# Ignore generated agent command files
+dot_agents/packages/*/commands/*.toml
+dot_agents/exact_packages/*/commands/*.toml
+dot_agents/exact_packages/*/exact_commands/*.toml
