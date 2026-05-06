@@ -6,9 +6,6 @@
     "base"
   ],
   "pi": {
-    "skills": [
-      "./skills"
-    ],
     "prompts": [
       "./prompts"
     ]
