@@ -15,6 +15,7 @@ export VISUAL=nvim
 export PATH="$HOME/.local/bin:$PATH"
 export PATH="$HOME/.cargo/bin:$PATH"
 export PATH="$HOME/.opencode/bin:$PATH"
+export PATH="$HOME/.npm-global/bin:$PATH"
 
 if [ -f ~/.local/bin/mise ]; then
   if [ -n "$BASH_VERSION" ]; then
@@ -30,3 +31,7 @@ elif [ -n "$ZSH_VERSION" ] && [ -f ~/.zsh_aliases ]; then
   . ~/.zsh_aliases
 fi
 
+# OpenClaw Completion
+if [ -f ~/openclaw/completions/openclaw.bash ]; then
+  source "~/.openclaw/completions/openclaw.bash"
+fi
