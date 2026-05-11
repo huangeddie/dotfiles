@@ -9,12 +9,6 @@
     "roadmaps@roadmaps": true
   },
   "extraKnownMarketplaces": {
-    "roadmaps": {
-      "source": {
-        "source": "github",
-        "repo": "huangeddie/roadmaps"
-      }
-    }
   },
   "sandbox": {
     "enabled": true,
