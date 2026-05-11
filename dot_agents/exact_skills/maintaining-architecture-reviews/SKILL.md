@@ -34,31 +34,37 @@ Maintain a persistent `docs/reviews/architecture.md` document that catalogs your
 
 ### Status values
 
-The `Status` column holds one of:
-
-- **Confidence tiers** (set only by an explicit review):
-  - `1 Broken`
-  - `2 Fragile`
-  - `3 Rough`
-  - `4 Adequate`
-  - `5 Solid`
-  - `6 Polished`
-  - `7 Exemplary`
-- **Meta states:**
-  - `⚪ Unreviewed` — default for new components.
-  - `🔴 Missing` — component no longer exists in code; preserves history. Set only on explicit user request.
+The `Status` column holds either a confidence tier (`1 Broken` through `7 Exemplary`) or a meta state (`⚪ Unreviewed`, `🔴 Missing`). Full definitions of each tier live in the document's own **Rating Scale** section — see the template in step 1 of the Workflow. Reviewers reference that section in the doc itself; the skill writes it there once on initialization rather than duplicating it.
 
 The confidence tier reflects the reviewer's judgment of the component's quality. It is not coupled to time: a rating persists until someone reviews again. Readers compare `Last Reviewed` against `Last Modified` to judge whether they still trust the rating.
 
 ## Workflow
 
 ### 1. Initialization
-If `docs/reviews/architecture.md` doesn't exist, create it from the template and run exploration. The header is minimal:
+If `docs/reviews/architecture.md` doesn't exist, create it from the template and run exploration. The header includes the rating scale so reviewers can reference it inline while rating — they shouldn't have to leave the doc to remember what `4 Adequate` means:
 
 ```markdown
 # Architecture Review Log
 
 > **To collaborators:** When updating this document, use the `maintaining-architecture-reviews` skill.
+
+## Rating Scale
+
+When reviewing a component or layer, pick the tier that best matches your current confidence. Tiers describe quality and trust, not effort spent — a component you barely touched can still be `6 Polished` if it earned the rating.
+
+| Tier | Name | What it means |
+|------|------|---------------|
+| 1 | Broken | Doesn't work, violates its contract, or is fundamentally the wrong shape. Treat as a known liability. |
+| 2 | Fragile | Works in the happy path but breaks under pressure. Hidden coupling, missing error handling, or tests that pass for the wrong reasons. |
+| 3 | Rough | Functional but awkward. Confusing naming, leaky abstractions, or known design flaws. Usable, but easy to misuse. |
+| 4 | Adequate | Meets baseline expectations. No glaring issues; trustworthy for current use. Not yet refined. |
+| 5 | Solid | Well-designed and trustworthy. Reasonable boundaries, clear naming, tests cover the important cases. The default "good" rating. |
+| 6 | Polished | Refined and pleasant to work with. Clean abstractions, thorough tests, robust to edge cases. |
+| 7 | Exemplary | A model for the rest of the codebase. Other components should be measured against it. |
+
+**Meta states** (not confidence tiers):
+- `⚪ Unreviewed` — default for new components; no review has happened yet.
+- `🔴 Missing` — component no longer exists in code; preserved for history. Set only on explicit user request.
 ```
 
 ### 2. Explore (Read-Only First)
