@@ -1,9 +1,9 @@
 ---
 name: obsidian-guidelines
 description: >
-  Enforces Eddie Huang's Obsidian vault conventions based on the kepano (Steph Ango)
+  Enforces writing conventions for the Obsidian notes app based on the kepano (Steph Ango)
   bottom-up methodology. Use when reading, writing, editing, searching, listing, or
-  operating on any vault file, or when the user mentions Obsidian, Second Brain, vault,
+  operating on any Obsidian vault file, or when the user mentions Obsidian, Second Brain, vault,
   notes, note-taking, journal, references, clippings, daily notes, evergreen notes,
   categories, tags, backlinks, or templates. Covers sync rules, folder structure,
   naming conventions, linking practices, note templates, and violation flagging.
@@ -13,8 +13,7 @@ description: >
 
 ## Vault Path
 
-The vault path is documented in **MEMORY.md** under `## Obsidian Vault`. Refer to it for
-the current path and sync command details.
+The vault path is should be documented in memory or context file. If not, ask the user to clarify the vault path.
 
 ## Core Principles
 
