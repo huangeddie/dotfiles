@@ -1,0 +1,8 @@
+{
+  "name": "base",
+  "description": "Universal set of skills and prompts.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Eddie Huang"
+  }
+}
