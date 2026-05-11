@@ -25,6 +25,8 @@ the user to clarify the vault path.
 - **Avoid folders for categorization**: Use `categories:` property (Obsidian
   Bases) and internal links
 - **No nested sub-folders**: Except the documented folder structure below
+- **Follow Stephango's style**: See [his blog](references/vault.md) and
+  [template repo](references/kepano-obsidian) for more info
 
 ## Sync Rules
 
@@ -57,7 +59,7 @@ cd <vault_path> && git pull
 After writing:
 
 ```bash
-cd <vault_path> && git add -A && git commit -m "vault update via Mochi" && git push
+cd <vault_path> && git add -A && git commit -m "<conventional_commit_style>" && git push
 ```
 
 ### Batch Operations
@@ -79,9 +81,6 @@ If sync fails, report the error clearly and stop. Do not proceed.
 | `Templates/`   | Reusable templates                                                 |
 | `Archives/`    | Optional legacy imports from other note-taking systems (exception) |
 
-See [references/vault-structure.md](references/vault-structure.md) for full
-details.
-
 ## Naming Conventions
 
 - **Dates**: Use `YYYY-MM-DD` everywhere (daily notes, journal entries, dated
@@ -92,40 +91,14 @@ details.
 - **Daily notes**: `YYYY-MM-DD.md` in `Daily/`
 - **Avoid non-standard Markdown**
 
-See [references/naming-conventions.md](references/naming-conventions.md) for
-full details.
-
-## Note Types
-
-| Type            | Location      | Purpose                                    |
-| --------------- | ------------- | ------------------------------------------ |
-| Daily notes     | `Daily/`      | Empty linking targets only                 |
-| Journal entries | Root          | Stream of consciousness with profuse links |
-| Evergreen notes | Root          | Atomic ideas, permanently useful           |
-| Reference notes | `References/` | Books, movies, people, places, podcasts    |
-| Clippings       | `Clippings/`  | Web-saved content by others                |
-| Archives        | `Archives/`   | Legacy imported notes                      |
-
-See [references/note-types.md](references/note-types.md) for full details.
-
 ## Linking Rules
 
 - Use internal links profusely
 - Always link the first mention of a concept, person, or thing in a note
 - Navigate via quick switcher, backlinks, and links — not file explorer
 
-See [references/linking.md](references/linking.md) for full details.
-
 ## Violation Flagging
 
-When operating on the vault, flag deviations from these conventions:
-
-- Creating a nested sub-folder (outside the defined structure)
-- Using singular category/tag names
-- Writing prose directly into a daily note
-- Creating a reference note without using the title as filename
-- Using non-standard Markdown syntax
-- Failing to sync before read or after write
-
-Flag the violation, explain the correct convention, and suggest the fix — but
-allow the user to override if they have a specific reason.
+When operating on the vault, flag deviations from the conventions mentioned
+above, flag the violation, explain the correct convention, and suggest the fix —
+but allow the user to override if they have a specific reason.
