@@ -2,12 +2,13 @@
 
 ## Philosophy
 
-The vault follows a bottom-up organization style inspired by kepano (Steph Ango).
-Structure emerges from links and categories, not from folder hierarchies.
+The vault follows a bottom-up organization style inspired by kepano (Steph
+Ango). Structure emerges from links and categories, not from folder hierarchies.
 
 ## Core Rules
 
-1. **Avoid folders for categorization** — use `categories:` frontmatter property and internal links instead
+1. **Avoid folders for categorization** — use `categories:` frontmatter property
+   and internal links instead
 2. **No nested sub-folders** — keep the folder structure flat
 3. **Navigate via links and search** — not the file explorer
 
@@ -45,10 +46,12 @@ Archives/
 
 ## Categories vs Folders
 
-Use Obsidian Bases (`categories:` property in frontmatter) to view notes by category.
-This is preferred over folders because many notes belong to multiple areas of thought.
+Use Obsidian Bases (`categories:` property in frontmatter) to view notes by
+category. This is preferred over folders because many notes belong to multiple
+areas of thought.
 
 Example frontmatter:
+
 ```yaml
 ---
 categories:

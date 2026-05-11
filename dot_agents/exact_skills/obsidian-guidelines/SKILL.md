@@ -28,9 +28,11 @@ the user to clarify the vault path.
 
 ## Sync Rules
 
-Auto-detect sync method based on vault directory contents:
+Auto-detect sync method based on vault directory contents and availability of
+either headless Obsidian CLI (`ob`), Obsidian CLI (`obsidian`), or
+version-control (`git`). If none of these options exist, flag this to the user.
 
-### Obsidian Sync (no `.git/` directory)
+### Obsidian CLI Sync (no `.git/` directory)
 
 Before reading:
 
@@ -67,15 +69,15 @@ If sync fails, report the error clearly and stop. Do not proceed.
 
 ## Folder Structure
 
-| Folder         | Purpose                                                   |
-| -------------- | --------------------------------------------------------- |
-| `Root`         | Personal notes, essays, evergreen notes, journal entries  |
-| `References/`  | External things: Books, Movies, People, Places, Podcasts  |
-| `Clippings/`   | Saved articles and essays by others                       |
-| `Daily/`       | Empty daily notes named `YYYY-MM-DD.md`                   |
-| `Attachments/` | Images, audio, videos, PDFs                               |
-| `Templates/`   | Reusable templates                                        |
-| `Archives/`    | Legacy imports from other note-taking systems (exception) |
+| Folder         | Purpose                                                            |
+| -------------- | ------------------------------------------------------------------ |
+| `Root`         | Personal notes, essays, evergreen notes, journal entries           |
+| `References/`  | External things: Books, Movies, People, Places, Podcasts           |
+| `Clippings/`   | Saved articles and essays by others                                |
+| `Daily/`       | Empty daily notes named `YYYY-MM-DD.md`                            |
+| `Attachments/` | Images, audio, videos, PDFs                                        |
+| `Templates/`   | Reusable templates                                                 |
+| `Archives/`    | Optional legacy imports from other note-taking systems (exception) |
 
 See [references/vault-structure.md](references/vault-structure.md) for full
 details.
@@ -127,12 +129,3 @@ When operating on the vault, flag deviations from these conventions:
 
 Flag the violation, explain the correct convention, and suggest the fix — but
 allow the user to override if they have a specific reason.
-
-## Templates
-
-Available templates in [assets/templates/](assets/templates/):
-
-- `book.md`, `movie.md`, `person.md`, `place.md`, `podcast.md`
-- `journal.md`, `evergreen.md`
-
-Load and use the appropriate template when creating a new note of that type.
