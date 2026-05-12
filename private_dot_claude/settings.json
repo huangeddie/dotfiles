@@ -8,7 +8,10 @@
     "skill-creator@claude-plugins-official": true
   },
   "strictKnownMarketplaces": [
-    { "source": "directory", "path": "~/.agents/packages/" }
+    {
+      "source": "directory",
+      "path": "~/.agents/packages/"
+    }
   ],
   "sandbox": {
     "enabled": true,
@@ -16,6 +19,7 @@
   },
   "effortLevel": "high",
   "skipDangerousModePermissionPrompt": true,
+  "theme": "auto",
   "editorMode": "vim",
   "remoteControlAtStartup": true,
   "agentPushNotifEnabled": true
