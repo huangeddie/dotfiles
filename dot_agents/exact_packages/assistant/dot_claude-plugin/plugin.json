@@ -1,0 +1,8 @@
+{
+  "name": "assistant",
+  "description": "Personal assistant skills and notes (Obsidian guidelines, etc.).",
+  "version": "1.0.0",
+  "author": {
+    "name": "Eddie Huang"
+  }
+}

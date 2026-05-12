@@ -4,8 +4,19 @@
     "code-review@claude-plugins-official": true,
     "feature-dev@claude-plugins-official": true,
     "code-simplifier@claude-plugins-official": true,
-    "superpowers@claude-plugins-official": true,
-    "skill-creator@claude-plugins-official": true
+    "skill-creator@claude-plugins-official": true,
+    "assistant@local-agents": true,
+    "coding@local-agents": true,
+    "devops@local-agents": true,
+    "superpowers@local-agents": true
+  },
+  "extraKnownMarketplaces": {
+    "local-agents": {
+      "source": {
+        "source": "directory",
+        "path": "~/.agents/packages"
+      }
+    }
   },
   "strictKnownMarketplaces": [
     {

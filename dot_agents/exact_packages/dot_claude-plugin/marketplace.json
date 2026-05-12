@@ -1,0 +1,28 @@
+{
+  "name": "local-agents",
+  "owner": {
+    "name": "Eddie Huang"
+  },
+  "plugins": [
+    {
+      "name": "assistant",
+      "source": "./assistant",
+      "description": "Personal assistant skills and notes."
+    },
+    {
+      "name": "coding",
+      "source": "./coding",
+      "description": "Universal set of coding skills and prompts."
+    },
+    {
+      "name": "devops",
+      "source": "./devops",
+      "description": "DevOps skills and prompts."
+    },
+    {
+      "name": "superpowers",
+      "source": "./superpowers",
+      "description": "Port of the obra/superpowers agent framework."
+    }
+  ]
+}

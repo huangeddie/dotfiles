@@ -1,0 +1,8 @@
+{
+  "name": "superpowers",
+  "description": "Port of the obra/superpowers agent framework.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Eddie Huang"
+  }
+}
