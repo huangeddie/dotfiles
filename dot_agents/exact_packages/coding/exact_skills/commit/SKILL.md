@@ -1,6 +1,7 @@
 ---
 description:
   Creates a commit resolving any small issues along the way if applicable.
+disable-model-invocation: true
 ---
 
 Create a new commit for the current changes. Analyze the difference and create a

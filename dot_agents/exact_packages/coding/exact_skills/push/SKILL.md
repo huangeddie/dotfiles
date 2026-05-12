@@ -1,5 +1,6 @@
 ---
 description: Pushes the changes, creating a new commit for it if needed.
+disable-model-invocation: true
 ---
 
 Push the changes, creating a new commit for it if needed. If creating a new
