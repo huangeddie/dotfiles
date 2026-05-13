@@ -1,0 +1,20 @@
+personality = "pragmatic"
+approval_policy = "never"
+sandbox_mode = "danger-full-access"
+
+[tui.model_availability_nux]
+"gpt-5.5" = 4
+
+[[skills.config]]
+path = "/Users/eddiehuang/.codex/skills/.system/imagegen/SKILL.md"
+enabled = false
+
+[[skills.config]]
+path = "/Users/eddiehuang/.codex/skills/.system/openai-docs/SKILL.md"
+enabled = false
+
+[plugins."coding@local-agents"]
+enabled = true
+
+[plugins."superpowers@local-agents"]
+enabled = true
