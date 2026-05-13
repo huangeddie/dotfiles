@@ -23,17 +23,17 @@ When reviewing a component or layer, pick the tier that best matches your curren
 
 ## Layers
 
-### [Domain Model](architecture/domain-model.md) — 5 Solid (reviewed 2024-03-22)
+### [Domain Model](layers/domain-model.md) — 5 Solid (reviewed 2024-03-22)
 
 > Shapes are trustworthy; some interfaces feel weakly typed but no urgent issues.
 
-### [Application Services](architecture/application-services.md) — 3 Rough (reviewed 2024-03-22)
+### [Application Services](layers/application-services.md) — 3 Rough (reviewed 2024-03-22)
 
 > Boundaries are blurry; AuthService and OrderService share too much state.
 
 ## Cross-Cutting Concerns
 
-### [User Management](architecture/cross-cutting-user-management.md) — 4 Adequate (reviewed 2024-03-22)
+### [User Management](cross-cutting/user-management.md) — 4 Adequate (reviewed 2024-03-22)
 
 > Spans: `User` (Domain Model) + `IUserService` (Domain Model) + `AuthService` (Application Services)
 >

@@ -10,11 +10,11 @@ description:
 
 ## Overview
 
-Maintain a small directory of Markdown files under `docs/reviews/architecture/`
+Maintain a small directory of Markdown files under `docs/architecture/`
 that catalogs your codebase's architectural components — data models,
 interfaces, and unit tests — organized by abstraction layers. A root
-`docs/reviews/architecture.md` acts as the dashboard. Track review history and
-capture the reviewer's confidence in each component.
+`docs/architecture/README.md` acts as the dashboard. Track review
+history and capture the reviewer's confidence in each component.
 
 **Core principle:** A reviewed codebase is an understood codebase. Unreviewed
 components are unowned components.
@@ -35,14 +35,14 @@ sufficient for attribution.
 ### File layout
 
 ```
-docs/reviews/architecture.md                                  # root: index + Rating Scale
-docs/reviews/architecture/<layer-slug>.md                     # one per layer
-docs/reviews/architecture/cross-cutting-<concern-slug>.md     # one per cross-cutting concern
+docs/architecture/README.md                           # root: index + Rating Scale
+docs/architecture/layers/<layer-slug>.md              # one per layer
+docs/architecture/cross-cutting/<concern-slug>.md     # one per cross-cutting concern
 ```
 
 - Filenames are stable kebab-case slugs of the layer or concern name (e.g.
-  `domain-model.md`, `cross-cutting-user-management.md`). No rating or date in
-  filenames — that data lives in each file's frontmatter.
+  `domain-model.md`, `user-management.md`). No rating or date in filenames —
+  that data lives in each file's frontmatter.
 - Layer order is defined by the root index's TOC; the directory's alphabetical
   order is incidental.
 - New layer or concern → create file + register it in the root index. Renamed
@@ -52,7 +52,7 @@ docs/reviews/architecture/cross-cutting-<concern-slug>.md     # one per cross-cu
 See `example/` next to this skill for a complete miniature: a root index plus
 two layer files and a cross-cutting concern file.
 
-### Root index shape (`docs/reviews/architecture.md`)
+### Root index shape (`docs/architecture/README.md`)
 
 The root file holds two things readers don't want to chase across files: the
 Rating Scale (so they can interpret tiers inline) and the dashboard of per-layer
@@ -69,16 +69,16 @@ Rating Scale (so they can interpret tiers inline) and the dashboard of per-layer
 
 ## Layers
 
-### [Domain Model](architecture/domain-model.md) — 5 Solid (reviewed 2024-03-22)
+### [Domain Model](layers/domain-model.md) — 5 Solid (reviewed 2024-03-22)
 
 > Shapes are trustworthy; some interfaces feel weakly typed but no urgent
 > issues.
 
-### [Application Services](architecture/application-services.md) — ⚪ Unreviewed
+### [Application Services](layers/application-services.md) — ⚪ Unreviewed
 
 ## Cross-Cutting Concerns
 
-### [User Management](architecture/cross-cutting-user-management.md) — 4 Adequate (reviewed 2024-03-22)
+### [User Management](cross-cutting/user-management.md) — 4 Adequate (reviewed 2024-03-22)
 
 > Spans: `User` (Domain Model) + `IUserService` (Domain Model) + `AuthService`
 > (Application Services)
@@ -242,8 +242,9 @@ reconciliation; the skill corrects only what it touches.
 
 ### 1. Initialization
 
-If `docs/reviews/architecture.md` doesn't exist, create it from this template
-and create an empty `docs/reviews/architecture/` directory. No layer files exist
+If `docs/architecture/README.md` doesn't exist, create it from this
+template and create empty `docs/architecture/layers/` and
+`docs/architecture/cross-cutting/` directories. No layer files exist
 until layers are approved (§3).
 
 ```markdown
@@ -306,11 +307,12 @@ Before writing any layer file, present a layer proposal to the user:
 
 ### 4. Catalog
 
-For each approved layer, create `docs/reviews/architecture/<layer-slug>.md` with
-frontmatter (`rating: ⚪ Unreviewed`, `reviewed: null`, no `note`) and an H1
-matching the layer name. Then add the three category subsections — even if empty
-(use `_None yet._`). Register the file in the root index's `## Layers` section
-as an H3 link.
+For each approved layer, create
+`docs/architecture/layers/<layer-slug>.md` with frontmatter
+(`rating: ⚪ Unreviewed`, `reviewed: null`, no `note`) and an H1 matching the
+layer name. Then add the three category subsections — even if empty (use
+`_None yet._`). Register the file in the root index's `## Layers` section as an
+H3 link.
 
 Add discovered components as bullets using the **Component bullet shape**. New
 components start with status `⚪ Unreviewed` and `—` for `Reviewed`. Cataloging
@@ -357,7 +359,7 @@ never silently fixes.
 ### 7. Propose Cross-Cutting Concerns
 
 Identify patterns across layers. Present to user. On approval, create
-`docs/reviews/architecture/cross-cutting-<slug>.md` and register it in the
+`docs/architecture/cross-cutting/<slug>.md` and register it in the
 root's `## Cross-Cutting Concerns` section. Never reorganize layers without
 approval.
 
@@ -442,6 +444,7 @@ approval.
 ## Example
 
 See the `example/` directory next to this skill for a complete miniature in the
-new shape: a root `architecture.md` plus a few per-layer files and a
-cross-cutting concern file. Refer to it whenever the structure of a file is
+new shape: a root `architecture/README.md`, per-layer files under
+`architecture/layers/`, and cross-cutting concern files under
+`architecture/cross-cutting/`. Refer to it whenever the structure of a file is
 unclear.
