@@ -1,3 +1,11 @@
+#!/bin/sh
+set -eu
+
+current_config="$(mktemp)"
+trap 'rm -f "$current_config"' EXIT
+cat > "$current_config"
+
+cat <<'EOF'
 personality = "pragmatic"
 approval_policy = "never"
 sandbox_mode = "danger-full-access"
@@ -16,5 +24,29 @@ enabled = false
 [plugins."coding@local-agents"]
 enabled = true
 
+[plugins."devops@local-agents"]
+enabled = false
+
 [plugins."superpowers@local-agents"]
 enabled = true
+EOF
+
+awk '
+  /^\[projects\."[^"]+"\]$/ {
+    if (!printed_blank) {
+      print ""
+      printed_blank = 1
+    }
+    in_project = 1
+    print
+    next
+  }
+
+  /^\[/ {
+    in_project = 0
+  }
+
+  in_project {
+    print
+  }
+' "$current_config"
