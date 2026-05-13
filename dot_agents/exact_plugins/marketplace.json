@@ -8,7 +8,7 @@
       "name": "assistant",
       "source": {
         "source": "local",
-        "path": "./packages/assistant"
+        "path": "./.agents/packages/assistant"
       },
       "policy": {
         "installation": "AVAILABLE",
@@ -20,7 +20,7 @@
       "name": "coding",
       "source": {
         "source": "local",
-        "path": "./packages/coding"
+        "path": "./.agents/packages/coding"
       },
       "policy": {
         "installation": "AVAILABLE",
@@ -32,7 +32,7 @@
       "name": "devops",
       "source": {
         "source": "local",
-        "path": "./packages/devops"
+        "path": "./.agents/packages/devops"
       },
       "policy": {
         "installation": "AVAILABLE",
@@ -44,7 +44,7 @@
       "name": "superpowers",
       "source": {
         "source": "local",
-        "path": "./packages/superpowers"
+        "path": "./.agents/packages/superpowers"
       },
       "policy": {
         "installation": "AVAILABLE",
