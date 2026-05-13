@@ -1,4 +1,5 @@
 ---
+name: commit
 description:
   Creates a commit resolving any small issues along the way if applicable.
 disable-model-invocation: true

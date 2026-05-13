@@ -1,4 +1,5 @@
 ---
+name: push
 description: Pushes the changes, creating a new commit for it if needed.
 disable-model-invocation: true
 ---
