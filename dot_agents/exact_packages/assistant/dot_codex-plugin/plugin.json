@@ -1,0 +1,16 @@
+{
+  "name": "assistant",
+  "version": "1.0.0",
+  "description": "Personal assistant skills and notes (Obsidian guidelines, etc.).",
+  "author": {
+    "name": "Eddie Huang"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Assistant",
+    "shortDescription": "Personal assistant skills and notes.",
+    "developerName": "Eddie Huang",
+    "category": "Productivity",
+    "capabilities": ["Read", "Write"]
+  }
+}

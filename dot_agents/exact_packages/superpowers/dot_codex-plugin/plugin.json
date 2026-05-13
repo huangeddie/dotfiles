@@ -1,0 +1,16 @@
+{
+  "name": "superpowers",
+  "version": "1.0.0",
+  "description": "Port of the obra/superpowers agent framework.",
+  "author": {
+    "name": "Eddie Huang"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Superpowers",
+    "shortDescription": "Port of the obra/superpowers agent framework.",
+    "developerName": "Eddie Huang",
+    "category": "Coding",
+    "capabilities": ["Read", "Write"]
+  }
+}

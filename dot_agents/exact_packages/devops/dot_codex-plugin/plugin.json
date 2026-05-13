@@ -1,0 +1,16 @@
+{
+  "name": "devops",
+  "version": "1.0.0",
+  "description": "DevOps skills and prompts.",
+  "author": {
+    "name": "Eddie Huang"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "DevOps",
+    "shortDescription": "DevOps skills and prompts.",
+    "developerName": "Eddie Huang",
+    "category": "DevOps",
+    "capabilities": ["Read", "Write"]
+  }
+}

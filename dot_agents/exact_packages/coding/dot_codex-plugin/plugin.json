@@ -1,0 +1,16 @@
+{
+  "name": "coding",
+  "version": "1.0.0",
+  "description": "Universal set of coding skills and prompts.",
+  "author": {
+    "name": "Eddie Huang"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Coding",
+    "shortDescription": "Universal coding skills and prompts.",
+    "developerName": "Eddie Huang",
+    "category": "Coding",
+    "capabilities": ["Read", "Write"]
+  }
+}
