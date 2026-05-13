@@ -1,0 +1,3 @@
+[plugins."devops@local-agents"]
+enabled = true
+
