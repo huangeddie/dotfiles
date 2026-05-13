@@ -36,6 +36,7 @@ sufficient for attribution.
 
 ```
 docs/architecture/README.md                           # root: index + Rating Scale
+docs/architecture/AGENTS.md                           # folder instruction: use review-architecture here
 docs/architecture/layers/<layer-slug>.md              # one per layer
 docs/architecture/cross-cutting/<concern-slug>.md     # one per cross-cutting concern
 ```
@@ -60,8 +61,6 @@ Rating Scale (so they can interpret tiers inline) and the dashboard of per-layer
 
 ```markdown
 # Architecture Review Log
-
-> When updating this document, use the `maintaining-architecture-reviews` skill.
 
 ## Rating Scale
 
@@ -242,15 +241,25 @@ reconciliation; the skill corrects only what it touches.
 
 ### 1. Initialization
 
-If `docs/architecture/README.md` doesn't exist, create it from this
-template and create empty `docs/architecture/layers/` and
-`docs/architecture/cross-cutting/` directories. No layer files exist
-until layers are approved (§3).
+If `docs/architecture/README.md` doesn't exist, initialize the architecture
+review docs from the repository root:
+
+```bash
+path/to/review-architecture/scripts/init-architecture-docs.sh
+```
+
+The script creates:
+
+- `docs/architecture/README.md` from the template below
+- `docs/architecture/AGENTS.md`, which instructs agents to use the
+  `review-architecture` skill for changes under `docs/architecture/`
+- Empty `docs/architecture/layers/` and
+  `docs/architecture/cross-cutting/` directories
+
+No layer files exist until layers are approved (§3).
 
 ```markdown
 # Architecture Review Log
-
-> When updating this document, use the `maintaining-architecture-reviews` skill.
 
 ## Rating Scale
 
@@ -444,7 +453,7 @@ approval.
 ## Example
 
 See the `example/` directory next to this skill for a complete miniature in the
-new shape: a root `architecture/README.md`, per-layer files under
-`architecture/layers/`, and cross-cutting concern files under
+new shape: a root `architecture/README.md`, `architecture/AGENTS.md`, per-layer
+files under `architecture/layers/`, and cross-cutting concern files under
 `architecture/cross-cutting/`. Refer to it whenever the structure of a file is
 unclear.

@@ -1,7 +1,5 @@
 # Architecture Review Log
 
-> When updating this document, use the `maintaining-architecture-reviews` skill.
-
 ## Rating Scale
 
 When reviewing a component or layer, pick the tier that best matches your current confidence. Tiers describe quality and trust, not effort spent — a component you barely touched can still be `6 Polished` if it earned the rating.
