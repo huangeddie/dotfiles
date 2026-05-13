@@ -14,16 +14,10 @@
     "local-agents": {
       "source": {
         "source": "directory",
-        "path": "~/.agents/packages"
+        "path": "~/.agents"
       }
     }
   },
-  "strictKnownMarketplaces": [
-    {
-      "source": "directory",
-      "path": "~/.agents/packages/"
-    }
-  ],
   "sandbox": {
     "enabled": true,
     "autoAllowBashIfSandboxed": true

@@ -6,22 +6,22 @@
   "plugins": [
     {
       "name": "assistant",
-      "source": "./assistant",
+      "source": "./packages/assistant",
       "description": "Personal assistant skills and notes."
     },
     {
       "name": "coding",
-      "source": "./coding",
+      "source": "./packages/coding",
       "description": "Universal set of coding skills and prompts."
     },
     {
       "name": "devops",
-      "source": "./devops",
+      "source": "./packages/devops",
       "description": "DevOps skills and prompts."
     },
     {
       "name": "superpowers",
-      "source": "./superpowers",
+      "source": "./packages/superpowers",
       "description": "Port of the obra/superpowers agent framework."
     }
   ]
