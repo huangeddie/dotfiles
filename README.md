@@ -17,6 +17,8 @@ Directory structure:
 ```text
 dot_agents/
 ├── AGENTS.md                    # Shared agent instructions; applies to ~/.agents/AGENTS.md.
+├── exact_plugins/               # Shared plugin marketplace; applies to ~/.agents/plugins/.
+│   └── marketplace.json         # Codex marketplace catalog.
 └── exact_packages/              # Shared package registry; applies to ~/.agents/packages/.
     └── <package>/
         ├── exact_skills/        # Shared skills; applies to skills/.

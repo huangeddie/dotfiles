@@ -1,0 +1,56 @@
+{
+  "name": "local-agents",
+  "interface": {
+    "displayName": "Local Agents"
+  },
+  "plugins": [
+    {
+      "name": "assistant",
+      "source": {
+        "source": "local",
+        "path": "./packages/assistant"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    },
+    {
+      "name": "coding",
+      "source": {
+        "source": "local",
+        "path": "./packages/coding"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Coding"
+    },
+    {
+      "name": "devops",
+      "source": {
+        "source": "local",
+        "path": "./packages/devops"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "DevOps"
+    },
+    {
+      "name": "superpowers",
+      "source": {
+        "source": "local",
+        "path": "./packages/superpowers"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Coding"
+    }
+  ]
+}
