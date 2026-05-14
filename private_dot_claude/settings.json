@@ -7,7 +7,8 @@
     "skill-creator@claude-plugins-official": true,
     "assistant@local-agents": true,
     "coding@local-agents": true,
-    "devops@local-agents": true
+    "devops@local-agents": true,
+    "superpowers@local-agents": true
   },
   "extraKnownMarketplaces": {
     "local-agents": {
