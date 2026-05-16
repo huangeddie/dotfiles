@@ -22,7 +22,7 @@ enabled = false
 enabled = true
 
 [plugins."browser@openai-bundled"]
-enabled = true
+enabled = false
 
 [plugins."documents@openai-primary-runtime"]
 enabled = false
