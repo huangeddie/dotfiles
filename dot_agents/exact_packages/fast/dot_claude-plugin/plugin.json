@@ -1,0 +1,8 @@
+{
+  "name": "fast",
+  "description": "Fast variants of skills that dispatch implementer subagents via the pi CLI.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Eddie Huang"
+  }
+}

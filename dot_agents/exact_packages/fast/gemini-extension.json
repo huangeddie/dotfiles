@@ -1,0 +1,5 @@
+{
+  "name": "fast",
+  "version": "1.0.0",
+  "description": "Fast variants of skills that dispatch implementer subagents via the pi CLI."
+}
