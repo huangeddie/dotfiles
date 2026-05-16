@@ -27,5 +27,8 @@
   "theme": "auto",
   "editorMode": "vim",
   "remoteControlAtStartup": true,
-  "agentPushNotifEnabled": true
+  "agentPushNotifEnabled": true,
+  "permissions": {
+    "defaultMode": "bypassPermissions"
+  }
 }
