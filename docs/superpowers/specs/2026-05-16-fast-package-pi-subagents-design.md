@@ -1,48 +1,48 @@
-# Fast package: pi-powered implementer subagents
+# Fast package: pi-orchestrated subagent-driven development
 
 **Date:** 2026-05-16
-**Status:** Design
+**Status:** Design (revised after first implementation)
 
 ## Purpose
 
-Extend `superpowers:subagent-driven-development` so the implementer subagent can
-be dispatched via the `pi` CLI (`pi -p '<prompt>'`) instead of the host
-harness's built-in Task tool. Pi is fast and runs cheap open-source models under
-the hood, which fits the mechanical implementer role well.
+Add a sibling of `superpowers:subagent-driven-development` in which the
+**entire per-task implementation+review loop is delegated to a single `pi -p`
+call**. The host caller's job collapses to: compose one prompt, dispatch once,
+run a final strong-model code review.
 
-Reviewer subagents (spec compliance, code quality) continue to use the host
-harness's Task tool — their job benefits from stronger reasoning.
+This pushes the inner orchestration onto pi (where it can use cheap/fast
+models for the hot loop) while preserving a strong-model quality gate at the
+caller's level.
 
 ## Non-goals
 
-- Replacing the upstream `superpowers:subagent-driven-development` skill. The
-  upstream skill remains the default; this is an opt-in alternative.
-- Changing the orchestration logic (TDD, two-stage review, four-status
-  reporting). Only the implementer dispatch mechanism changes.
-- Pi-dispatch for reviewer subagents.
-- Modifying any upstream files. The new package owns its own copy of the three
-  prompt templates.
+- Replacing `superpowers:subagent-driven-development`. The upstream skill
+  remains the default; this is an opt-in alternative.
+- Prescribing how pi dispatches its own child subagents. The skill is
+  transport-agnostic about pi's internal mechanism.
+- Modifying any upstream files.
 
 ## Architecture
 
-A new chezmoi-managed package named `fast` ships one skill,
-`fast:subagent-driven-development`. The skill is a standalone full skill — it
-contains its own `SKILL.md` and prompt templates, rather than delegating to or
-extending the upstream skill.
+A chezmoi-managed package named `fast` ships one skill,
+`fast:subagent-driven-development`, that is a thin host-side wrapper around a
+single pi call.
 
 **Role split:**
 
-| Role           | Model                  | Transport                         |
-|----------------|------------------------|-----------------------------------|
-| Orchestrator   | Host harness (strong)  | Native (runs the skill)           |
-| Implementer    | Pi (fast/cheap)        | Bash → `pi -p "$(cat tmpfile)"`   |
-| Spec reviewer  | Host harness (strong)  | Native Task tool                  |
-| Quality reviewer | Host harness (strong) | Native Task tool                  |
+| Role                    | Where it runs            | What it does                              |
+|-------------------------|--------------------------|-------------------------------------------|
+| Host caller             | The user's harness       | Compose pi prompt, dispatch once, parse summary, run final code review |
+| Pi orchestrator         | One `pi -p` subprocess   | Read plan + spec, loop tasks, dispatch per-task children, emit summary |
+| Per-task implementer    | Pi's child subagent      | Implement, test, commit one task          |
+| Per-task spec reviewer  | Pi's child subagent      | Verify implementation matches spec        |
+| Per-task quality reviewer | Pi's child subagent    | Cheap-model padding review                |
+| Final code reviewer     | Host's Task tool         | Strong-model gate on the full branch diff |
 
-The orchestrator (a strong reasoning model in the user's current harness) keeps
-its current responsibilities: extracting tasks from the plan, curating per-task
-context, judging implementer reports, and deciding when to re-dispatch. Only
-the implementer's transport changes from in-process Task to a `pi` subprocess.
+The host caller knows nothing about pi's internal dispatch mechanism — it just
+gives pi a prompt and waits. Pi may dispatch children via `pi -p` recursion,
+its own native subagent primitive, or anything else. The skill stays silent on
+this so it doesn't break if pi's API evolves.
 
 ## Package layout
 
@@ -50,23 +50,22 @@ the implementer's transport changes from in-process Task to a `pi` subprocess.
 dot_agents/exact_packages/fast/
 ├── exact_skills/
 │   └── subagent-driven-development/
-│       ├── SKILL.md
-│       ├── implementer-prompt.md            # pi-based dispatch (NEW)
-│       ├── spec-reviewer-prompt.md          # copy of upstream
-│       └── code-quality-reviewer-prompt.md  # copy of upstream
+│       ├── SKILL.md                       # host-facing, ~80 lines
+│       └── pi-orchestrator-prompt.md      # pi-facing template
 ├── dot_claude-plugin/plugin.json
 ├── dot_codex-plugin/plugin.json
 ├── gemini-extension.json
 └── package.json
 ```
 
-The two reviewer prompts are duplicated (not symlinked or referenced) from
-upstream. This costs ~3 KB of duplication for a clean self-contained skill that
-keeps working if upstream relocates or renames its files.
+Two skill files (down from four). The per-task implementer / spec-reviewer /
+code-quality-reviewer prompts have collapsed into embedded sub-templates inside
+`pi-orchestrator-prompt.md`, since pi uses them internally and the host never
+touches them.
 
 ## Marketplace and manifest wiring
 
-The new `fast` package is registered in both marketplace catalogs alongside
+The `fast` package is registered in both marketplace catalogs alongside the
 existing packages (`assistant`, `coding`, `devops`, `superpowers`):
 
 - `dot_agents/exact_plugins/marketplace.json` — Codex marketplace catalog
@@ -74,117 +73,57 @@ existing packages (`assistant`, `coding`, `devops`, `superpowers`):
 - `dot_agents/dot_claude-plugin/marketplace.json` — Claude Code marketplace
   catalog (deploys to `~/.claude-plugin/marketplace.json`)
 
-Each entry follows the format already used by the four existing packages in
-the respective file.
+Package-level manifests mirror the structure already used by `superpowers/`:
+`package.json`, `dot_claude-plugin/plugin.json`, `dot_codex-plugin/plugin.json`,
+`gemini-extension.json`.
 
-Package-level manifests:
+## SKILL.md contract (host-facing)
 
-- `package.json` — pi package manifest: `{"pi": {"skills": ["./skills"]}}`
-- `dot_claude-plugin/plugin.json` — Claude Code plugin manifest
-- `dot_codex-plugin/plugin.json` — Codex plugin manifest
-- `gemini-extension.json` — Gemini extension manifest
+The host caller's workflow has three steps:
 
-All four mirror the structure already used by `superpowers/`.
+1. **Compose** — gather plan path, spec path, and working directory. Write
+   `pi-orchestrator-prompt.md`'s contents (with placeholders substituted) to
+   `$TMPDIR/fast-sdd-<plan-slug>.md`. The plan body is **not** inlined — pi
+   reads it from disk.
+2. **Dispatch** — `pi -p "$(cat $TMPDIR/fast-sdd-<plan-slug>.md)"`. One call.
+   Capture stdout. Parse the `=== PI SDD SUMMARY ===` block at the end.
+3. **Final review** — dispatch a code reviewer via the host's native Task tool
+   against the branch diff (BASE_SHA before pi ran, HEAD_SHA at current).
+   Use the `superpowers:requesting-code-review` template.
 
-## SKILL.md contract
+On `BLOCKED` (pi-level or any task-level), the host **escalates to the human**.
+No automatic fallback to `superpowers:subagent-driven-development`.
 
-**Frontmatter:**
+## Pi orchestrator prompt contract (pi-facing)
 
-```yaml
----
-name: subagent-driven-development
-description: Use when executing implementation plans with independent tasks and you want fast pi-powered implementer subagents. Orchestrator runs in your current harness; implementer subagents are dispatched via `pi -p` for speed/cost.
----
-```
+`pi-orchestrator-prompt.md` contains:
 
-The skill name `subagent-driven-development` matches upstream, but is
-disambiguated by package namespace (`fast:` vs `superpowers:`). The description
-is the trigger — orchestrators select this variant only when speed/cost is the
-deciding factor.
+- **Placeholders** the host substitutes: `{{PLAN_PATH}}`, `{{SPEC_PATH}}`,
+  `{{WORKDIR}}`.
+- **Workflow prose** instructing pi to: read plan + spec, verify clean tree,
+  loop tasks, dispatch per-task children using "whatever subagent dispatch
+  mechanism your harness provides," and emit a structured summary at the end.
+- **Embedded sub-templates** for the three child subagent prompts (implementer,
+  spec reviewer, code-quality reviewer). These are the bodies pi feeds into
+  its own dispatch mechanism. They specify TDD discipline, four-status
+  reporting, and quality-review delimiters.
+- **Final summary block** — the only structured output the host parses:
 
-**Body — three deliberate diffs from upstream `superpowers:subagent-driven-development`:**
+  ```
+  === PI SDD SUMMARY ===
+  status: ALL_DONE | PARTIAL | BLOCKED
+  tasks:
+    - id: <n>
+      title: <task title>
+      status: DONE | DONE_WITH_CONCERNS | BLOCKED
+      commits: [<sha>, ...]
+      files: [<path>, ...]
+      concerns: <text or empty>
+  notes: <free-form orchestrator notes>
+  === END PI SDD SUMMARY ===
+  ```
 
-1. **Opening blurb** — add one sentence: "Implementer subagents are dispatched
-   via `pi -p` (fast, mechanical); spec and code-quality reviewers continue to
-   use the orchestrator's native Task tool (stronger reasoning)."
-
-2. **Model Selection section** — replace the "least powerful model that can
-   handle each role" triage with: "Implementer model is fixed (whatever `pi` is
-   configured to use). Reviewers continue to follow the orchestrator's native
-   model-selection guidance." The complexity-signal triage is irrelevant once
-   the implementer transport is fixed.
-
-3. **Red Flags / Integration** — one new red flag: "Never pipe untrusted task
-   text directly into `pi -p` as a quoted argument — always write the prompt
-   body to a tempfile under `$TMPDIR` and pass via `"$(cat <tmpfile>)"` to
-   avoid shell-escaping bugs." Integration section adds: "Implementer
-   subagents are dispatched via the `pi` CLI (see
-   `./implementer-prompt.md`); reviewers run via the orchestrator's Task tool."
-
-Everything else (process graph, four implementer statuses, two-stage review
-loop, example workflow, advantages, integration with other skills) is copied
-verbatim from upstream.
-
-## Implementer prompt template
-
-The new `implementer-prompt.md` documents the dispatch pattern, not just the
-prompt body. Its contract:
-
-**Dispatch pattern:**
-
-```
-1. Write the prompt body to:
-     $TMPDIR/pi-task-<N>-<slug>.md
-
-   The body is the same prose used in the upstream implementer-prompt.md
-   (task description, context, TDD instructions, self-review checklist,
-   report format), with the two pi-specific adjustments listed below.
-
-2. Dispatch via the Bash tool:
-     pi -p "$(cat $TMPDIR/pi-task-<N>-<slug>.md)"
-
-3. Capture stdout. The implementer's final structured report (status +
-   files changed + concerns) is printed as the LAST thing on stdout.
-   Parse it for the four-status contract.
-```
-
-**Why tempfile + command substitution:**
-
-- Implementer prompts are 3–5 KB and contain backticks, code fences, and
-  quotes. Inline `pi -p '<body>'` is a shell-escaping footgun.
-- `$TMPDIR` is sandbox-writable and auto-cleaned by the host OS.
-- A persisted tempfile is inspectable post-hoc for debugging ("what did we
-  actually send to pi?").
-
-**Prompt body — two adaptations from upstream:**
-
-1. Drop the line `Work from: [directory]`. Pi inherits the orchestrator's
-   shell working directory, so the orchestrator is responsible for running
-   from the correct repo root.
-2. Add: "Print your final report as the LAST thing on stdout. The orchestrator
-   captures your stdout to parse your status." Bash returns the full stdout
-   blob; the orchestrator needs a reliable end-of-output marker.
-
-The rest of the prompt body — preamble, TDD instructions, self-review
-checklist, four-status contract (`DONE | DONE_WITH_CONCERNS | BLOCKED |
-NEEDS_CONTEXT`) — is copied verbatim from upstream.
-
-## Reviewer prompts
-
-`spec-reviewer-prompt.md` and `code-quality-reviewer-prompt.md` are byte-for-byte
-copies of the upstream files. They continue to dispatch via the host harness's
-Task tool. No changes.
-
-## Drift management
-
-The skill duplicates upstream orchestration prose and two prompt templates.
-This is the explicit cost of standalone packaging. Mitigations:
-
-- A header comment in `fast/exact_skills/subagent-driven-development/SKILL.md`:
-  `<!-- Kept in sync with superpowers:subagent-driven-development as of 2026-05-16 -->`.
-- When the upstream skill changes meaningfully (new orchestration step, new
-  status, new red flag), manually port the diff. The implementer-prompt is
-  ours; the other files track upstream.
+  Anything pi prints after `=== END PI SDD SUMMARY ===` is discarded.
 
 ## Open questions resolved during brainstorming
 
@@ -192,26 +131,36 @@ This is the explicit cost of standalone packaging. Mitigations:
 |-------------------------------------------------|-----------------------------------------------------|
 | Replace or coexist?                             | Coexist (opt-in via skill description).             |
 | AGENTS.md memory rule vs. new skill?            | New skill — memory rules are always-on, which contradicts coexist intent; AGENTS.md is harness-agnostic and shouldn't encode Claude-Code-Task-tool-specific swaps. |
-| Which roles get pi-dispatch?                    | Implementer only. Reviewers stay on Task tool.      |
-| Skill naming?                                   | `fast:subagent-driven-development` (same name as upstream, different package). |
-| Pi input method?                                | `pi -p "$(cat $TMPDIR/<file>)"`. Tempfile avoids shell-escaping. |
+| Granularity?                                    | One `pi -p` call per plan. Pi orchestrates the entire inner loop. |
+| How does pi dispatch its own children?          | Skill is silent — pi uses its own mechanism. No assumption about `pi -p` recursion. |
+| Final review at end?                            | Yes — host caller runs a strong-model code review via Task tool on the full branch. Pi's internal per-task quality reviews are cheap-model "padding." |
+| File structure?                                 | Two files: `SKILL.md` (host-facing) + `pi-orchestrator-prompt.md` (pi-facing with embedded child sub-templates). |
+| Summary format?                                 | `=== PI SDD SUMMARY ===` / `=== END PI SDD SUMMARY ===` delimited YAML-ish block. |
+| Recovery on pi-BLOCKED?                         | Escalate to human. No automatic fallback to upstream skill. |
 
 ## Acceptance criteria
 
 - `chezmoi apply` deploys the `fast` package to `~/.agents/packages/fast/` with
-  the four manifests and the three skill files present.
+  the four manifests and two skill files present.
 - Both marketplace catalogs list the `fast` package.
-- The `Skill` tool can invoke `fast:subagent-driven-development` and the
-  orchestrator follows the pi-dispatch pattern for implementer tasks.
-- Spec reviewer and code-quality reviewer subagents continue to dispatch via
-  the host harness's Task tool.
-- The implementer subprocess inherits cwd, reads/edits/commits in the repo,
-  and emits its final four-status report as the last lines of stdout.
+- The host caller invoking `fast:subagent-driven-development` performs exactly
+  three actions: compose tempfile, run `pi -p`, run a final Task-tool code
+  review.
+- The pi orchestrator does not assume a specific child-dispatch mechanism.
+- The host parses the `=== PI SDD SUMMARY ===` block and escalates to the
+  human on any `BLOCKED` status.
 
 ## Out of scope (future work)
 
 - A `fast:executing-plans` parallel-session variant.
-- Pi-dispatch for reviewers (would require benchmarking whether pi's models
-  catch spec/quality issues reliably).
-- A `fast`-wide red-flag skill that documents pi-specific failure modes (rate
-  limits, model degradation, output truncation).
+- Programmatic schema for the summary block (JSON instead of YAML-ish).
+- Mid-plan progress streaming back to the host.
+- Auto-fallback to `superpowers:subagent-driven-development` on pi-BLOCKED.
+
+## Revision history
+
+- **2026-05-16 v1** — first design: pi-dispatched implementer only; host
+  orchestrated each task and dispatched both reviewers via Task tool.
+  Implemented but immediately revised.
+- **2026-05-16 v2 (this doc)** — pi orchestrates the entire inner loop; host
+  caller is thin and runs a single final strong-model code review.

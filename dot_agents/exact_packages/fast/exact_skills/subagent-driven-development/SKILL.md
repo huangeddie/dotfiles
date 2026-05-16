@@ -1,225 +1,105 @@
 ---
 name: subagent-driven-development
-description: Use when executing implementation plans with independent tasks and you want fast pi-powered implementer subagents. Orchestrator runs in your current harness; implementer subagents are dispatched via `pi -p` for speed/cost. Reviewers continue to use the orchestrator's native Task tool.
+description: Use when executing an implementation plan and you want to delegate the entire per-task orchestration (implementer + per-task reviews) to a single `pi` orchestrator call. The host caller composes one prompt, makes one `pi -p` call, then runs a final strong-model code review on the resulting branch.
 ---
 
-<!-- Kept in sync with superpowers:subagent-driven-development as of 2026-05-16 -->
+<!-- Sibling of superpowers:subagent-driven-development. Inverts the responsibility split: pi orchestrates per-task work; host caller is thin. -->
 
 # Subagent-Driven Development (Fast)
 
-Execute plan by dispatching fresh subagent per task, with two-stage review after each: spec compliance review first, then code quality review.
+Delegate the entire per-task implementation+review loop to one `pi -p` call. The host caller's job is to compose, dispatch once, and run a final strong-model code review.
 
-**Implementer subagents are dispatched via `pi -p`** (fast, mechanical). **Spec and code-quality reviewers continue to use the orchestrator's native Task tool** (stronger reasoning catches issues better).
-
-**Why subagents:** You delegate tasks to specialized agents with isolated context. By precisely crafting their instructions and context, you ensure they stay focused and succeed at their task. They should never inherit your session's context or history — you construct exactly what they need. This also preserves your own context for coordination work.
-
-**Core principle:** Fresh subagent per task + two-stage review (spec then quality) = high quality, fast iteration
-
-**Continuous execution:** Do not pause to check in with your human partner between tasks. Execute all tasks from the plan without stopping. The only reasons to stop are: BLOCKED status you cannot resolve, ambiguity that genuinely prevents progress, or all tasks complete. "Should I continue?" prompts and progress summaries waste their time — they asked you to execute the plan, so execute it.
+**Core principle:** One pi call handles the inner loop; the host caller is the outer review gate.
 
 ## When to Use
 
-```dot
-digraph when_to_use {
-    "Have implementation plan?" [shape=diamond];
-    "Tasks mostly independent?" [shape=diamond];
-    "Stay in this session?" [shape=diamond];
-    "Want fast/cheap implementer?" [shape=diamond];
-    "fast:subagent-driven-development" [shape=box];
-    "superpowers:subagent-driven-development" [shape=box];
-    "executing-plans" [shape=box];
-    "Manual execution or brainstorm first" [shape=box];
+Use this skill instead of `superpowers:subagent-driven-development` when:
+- You have an implementation plan with mostly-independent tasks
+- You want to delegate the whole per-task loop (implementer + spec review + code-quality review) to a cheap/fast orchestrator
+- A final strong-model code review on the whole branch is sufficient quality gate
 
-    "Have implementation plan?" -> "Tasks mostly independent?" [label="yes"];
-    "Have implementation plan?" -> "Manual execution or brainstorm first" [label="no"];
-    "Tasks mostly independent?" -> "Stay in this session?" [label="yes"];
-    "Tasks mostly independent?" -> "Manual execution or brainstorm first" [label="no - tightly coupled"];
-    "Stay in this session?" -> "Want fast/cheap implementer?" [label="yes"];
-    "Stay in this session?" -> "executing-plans" [label="no - parallel session"];
-    "Want fast/cheap implementer?" -> "fast:subagent-driven-development" [label="yes"];
-    "Want fast/cheap implementer?" -> "superpowers:subagent-driven-development" [label="no"];
-}
-```
-
-**vs. `superpowers:subagent-driven-development`:**
-- Implementer subagents run via `pi -p` (cheaper, faster, mechanical model)
-- Reviewer subagents unchanged (still Task tool, strong model)
-- Pick this variant when implementer tasks are mechanical and well-specified
+Use `superpowers:subagent-driven-development` instead when:
+- You want the strong model to dispatch and judge every per-task subagent
+- The tasks need per-task judgment from the orchestrator (architectural choices, ambiguous specs)
 
 ## The Process
 
-```dot
-digraph process {
-    rankdir=TB;
+Three steps. That is the whole skill.
 
-    subgraph cluster_per_task {
-        label="Per Task";
-        "Dispatch implementer subagent via pi (./implementer-prompt.md)" [shape=box];
-        "Implementer subagent asks questions?" [shape=diamond];
-        "Answer questions, provide context" [shape=box];
-        "Implementer subagent implements, tests, commits, self-reviews" [shape=box];
-        "Dispatch spec reviewer subagent via Task tool (./spec-reviewer-prompt.md)" [shape=box];
-        "Spec reviewer subagent confirms code matches spec?" [shape=diamond];
-        "Implementer subagent fixes spec gaps" [shape=box];
-        "Dispatch code quality reviewer subagent via Task tool (./code-quality-reviewer-prompt.md)" [shape=box];
-        "Code quality reviewer subagent approves?" [shape=diamond];
-        "Implementer subagent fixes quality issues" [shape=box];
-        "Mark task complete in TodoWrite" [shape=box];
-    }
+### 1. Compose the pi prompt
 
-    "Read plan, extract all tasks with full text, note context, create TodoWrite" [shape=box];
-    "More tasks remain?" [shape=diamond];
-    "Dispatch final code reviewer subagent for entire implementation" [shape=box];
-    "Use superpowers:finishing-a-development-branch" [shape=box style=filled fillcolor=lightgreen];
+You need three pieces of information:
 
-    "Read plan, extract all tasks with full text, note context, create TodoWrite" -> "Dispatch implementer subagent via pi (./implementer-prompt.md)";
-    "Dispatch implementer subagent via pi (./implementer-prompt.md)" -> "Implementer subagent asks questions?";
-    "Implementer subagent asks questions?" -> "Answer questions, provide context" [label="yes"];
-    "Answer questions, provide context" -> "Dispatch implementer subagent via pi (./implementer-prompt.md)";
-    "Implementer subagent asks questions?" -> "Implementer subagent implements, tests, commits, self-reviews" [label="no"];
-    "Implementer subagent implements, tests, commits, self-reviews" -> "Dispatch spec reviewer subagent via Task tool (./spec-reviewer-prompt.md)";
-    "Dispatch spec reviewer subagent via Task tool (./spec-reviewer-prompt.md)" -> "Spec reviewer subagent confirms code matches spec?";
-    "Spec reviewer subagent confirms code matches spec?" -> "Implementer subagent fixes spec gaps" [label="no"];
-    "Implementer subagent fixes spec gaps" -> "Dispatch spec reviewer subagent via Task tool (./spec-reviewer-prompt.md)" [label="re-review"];
-    "Spec reviewer subagent confirms code matches spec?" -> "Dispatch code quality reviewer subagent via Task tool (./code-quality-reviewer-prompt.md)" [label="yes"];
-    "Dispatch code quality reviewer subagent via Task tool (./code-quality-reviewer-prompt.md)" -> "Code quality reviewer subagent approves?";
-    "Code quality reviewer subagent approves?" -> "Implementer subagent fixes quality issues" [label="no"];
-    "Implementer subagent fixes quality issues" -> "Dispatch code quality reviewer subagent via Task tool (./code-quality-reviewer-prompt.md)" [label="re-review"];
-    "Code quality reviewer subagent approves?" -> "Mark task complete in TodoWrite" [label="yes"];
-    "Mark task complete in TodoWrite" -> "More tasks remain?";
-    "More tasks remain?" -> "Dispatch implementer subagent via pi (./implementer-prompt.md)" [label="yes"];
-    "More tasks remain?" -> "Dispatch final code reviewer subagent for entire implementation" [label="no"];
-    "Dispatch final code reviewer subagent for entire implementation" -> "Use superpowers:finishing-a-development-branch";
-}
+- **Plan path** — `docs/superpowers/plans/<plan>.md` (or wherever the plan lives)
+- **Spec path** — `docs/superpowers/specs/<spec>.md` (if a spec exists for context)
+- **Working directory** — repo root or worktree
+
+Write a short prompt to `$TMPDIR/fast-sdd-<plan-slug>.md` that contains:
+
+1. The literal contents of `./pi-orchestrator-prompt.md` (this skill's directory)
+2. Resolved values for the `{{PLAN_PATH}}`, `{{SPEC_PATH}}`, and `{{WORKDIR}}` placeholders
+
+Pi will read the plan and spec files itself — do not inline the plan text.
+
+### 2. Dispatch pi once
+
+```bash
+pi -p "$(cat $TMPDIR/fast-sdd-<plan-slug>.md)"
 ```
 
-## Model Selection
+One call. Capture stdout. Pi returns when every task in the plan is either complete or it has hit a hard block.
 
-**Implementer:** Model is fixed — whatever `pi` is configured to use. No per-task triage needed.
-
-**Reviewers (spec compliance, code quality):** Use the orchestrator's native model-selection guidance. Stronger reasoning catches more issues, and reviewers run only twice per task (cost is small compared to implementer iterations).
-
-**Final code reviewer (after all tasks):** Most capable model available.
-
-## Handling Implementer Status
-
-Implementer subagents report one of four statuses. Handle each appropriately:
-
-**DONE:** Proceed to spec compliance review.
-
-**DONE_WITH_CONCERNS:** The implementer completed the work but flagged doubts. Read the concerns before proceeding. If the concerns are about correctness or scope, address them before review. If they're observations (e.g., "this file is getting large"), note them and proceed to review.
-
-**NEEDS_CONTEXT:** The implementer needs information that wasn't provided. Provide the missing context and re-dispatch.
-
-**BLOCKED:** The implementer cannot complete the task. Assess the blocker:
-1. If it's a context problem, provide more context and re-dispatch via pi
-2. If the task requires more reasoning than pi can handle, fall back to dispatching the implementer via the Task tool (escape hatch to a stronger model)
-3. If the task is too large, break it into smaller pieces
-4. If the plan itself is wrong, escalate to the human
-
-**Never** ignore an escalation or retry pi-dispatch without changes. If the implementer said it's stuck, something needs to change — and a stronger model is a valid lever when pi has reached its ceiling.
-
-## Prompt Templates
-
-- `./implementer-prompt.md` - Dispatch implementer subagent via `pi -p`
-- `./spec-reviewer-prompt.md` - Dispatch spec compliance reviewer subagent via Task tool
-- `./code-quality-reviewer-prompt.md` - Dispatch code quality reviewer subagent via Task tool
-
-## Example Workflow
+The last block of stdout is the structured summary, delimited by:
 
 ```
-You: I'm using fast:subagent-driven-development to execute this plan.
-
-[Read plan file once: docs/superpowers/plans/feature-plan.md]
-[Extract all 5 tasks with full text and context]
-[Create TodoWrite with all tasks]
-
-Task 1: Hook installation script
-
-[Get Task 1 text and context (already extracted)]
-[Write prompt body to $TMPDIR/pi-task-1-hook-install.md]
-[Run: pi -p "$(cat $TMPDIR/pi-task-1-hook-install.md)"]
-
-Implementer (pi): "Before I begin - should the hook be installed at user or system level?"
-
-You: "User level (~/.config/superpowers/hooks/)"
-
-[Re-dispatch with answer appended to the prompt file]
-Implementer (pi):
-  - Implemented install-hook command
-  - Added tests, 5/5 passing
-  - Self-review: Found I missed --force flag, added it
-  - Committed
-  Status: DONE
-
-[Dispatch spec compliance reviewer via Task tool]
-Spec reviewer: ✅ Spec compliant - all requirements met, nothing extra
-
-[Get git SHAs, dispatch code quality reviewer via Task tool]
-Code reviewer: Strengths: Good test coverage, clean. Issues: None. Approved.
-
-[Mark Task 1 complete]
-
-...
+=== PI SDD SUMMARY ===
+status: ALL_DONE | PARTIAL | BLOCKED
+tasks:
+  - id: 1
+    title: <task title>
+    status: DONE | DONE_WITH_CONCERNS | BLOCKED
+    commits: [<sha>, ...]
+    files: [<path>, ...]
+    concerns: <text or empty>
+  - ...
+notes: <free-form orchestrator notes>
+=== END PI SDD SUMMARY ===
 ```
 
-## Advantages
+Parse this block. If `status: BLOCKED` or any task is `BLOCKED`, **escalate to the human** — surface the concerns and stop. Do not silently re-dispatch.
 
-**vs. `superpowers:subagent-driven-development`:**
-- Implementer runs on a cheaper, faster model (pi-configured)
-- Strong reasoning preserved for reviewers (where it catches the most issues)
-- Mechanical work goes to the mechanical-tier model
+### 3. Final code review (strong model)
 
-**Cost:**
-- Same orchestration cost (controller does same prep work)
-- Implementer iterations are much cheaper
-- Pi may need more iterations than a stronger model for ambiguous tasks — be ready to fall back
+After pi returns `ALL_DONE` (or `PARTIAL` with acceptable concerns), dispatch a final code reviewer via the host's native Task tool against the full branch diff:
+
+- `BASE_SHA` = the commit before pi ran
+- `HEAD_SHA` = current `HEAD`
+- Use the `superpowers:requesting-code-review` template
+
+This is the strong-model gate on top of pi's cheap-model internal per-task reviews. If the final reviewer finds critical or important issues, surface them — either re-dispatch pi with targeted fix instructions or escalate to the human.
+
+## Integration with the superpowers framework
+
+This skill sits in the same workflow slot as `superpowers:subagent-driven-development`:
+
+- **Before:** `superpowers:writing-plans` produces the plan this skill executes
+- **After:** `superpowers:finishing-a-development-branch` handles merge / PR
+
+The `pi-orchestrator-prompt.md` instructs pi to follow the superpowers TDD discipline (test-driven-development) and two-stage review (spec → quality) for each task, just at the inner pi-orchestrated layer instead of the host layer.
 
 ## Red Flags
 
-**Never:**
-- Start implementation on main/master branch without explicit user consent
-- Skip reviews (spec compliance OR code quality)
-- Proceed with unfixed issues
-- Dispatch multiple implementation subagents in parallel (conflicts)
-- Make subagent read plan file (provide full text instead)
-- Skip scene-setting context (subagent needs to understand where task fits)
-- Ignore subagent questions (answer before letting them proceed)
-- Accept "close enough" on spec compliance (spec reviewer found issues = not done)
-- Skip review loops (reviewer found issues = implementer fixes = review again)
-- **Start code quality review before spec compliance is ✅** (wrong order)
-- Move to next task while either review has open issues
-- **Pipe untrusted task text directly into `pi -p` as a quoted argument.** Always write the prompt body to a tempfile under `$TMPDIR` and pass via `"$(cat <tmpfile>)"` to avoid shell-escaping bugs with backticks, quotes, and code fences.
-- Fall back to Task tool for the implementer silently — if pi is repeatedly failing on a task, surface that and either retry with more context, escalate to Task tool deliberately, or break the task down.
+- **Inlining the plan body into the pi prompt.** Pass file paths; let pi read. Inlining defeats the "one short prompt" goal and burns shell-escape complexity.
+- **Skipping the final code review.** Pi's internal reviews use cheap models — they're padding, not the gate. The strong-model Task-tool review at the end is the actual gate.
+- **Silently re-dispatching after BLOCKED.** If pi blocked, something needs human input.
+- **Dispatching pi while the working tree is dirty.** Pi will commit on a dirty tree and tangle its commits with yours. Verify clean tree first.
+- **Running on `main`/`master` without explicit user consent.** Same red flag as upstream.
 
-**If subagent asks questions:**
-- Answer clearly and completely
-- Provide additional context if needed
-- Don't rush them into implementation
+## Recovery from pi BLOCKED
 
-**If reviewer finds issues:**
-- Re-dispatch implementer (via pi) with specific fix instructions
-- Reviewer reviews again
-- Repeat until approved
-- Don't skip the re-review
+Escalate to the human. Surface:
+- Which task blocked
+- Pi's BLOCKED report (concerns, what it tried)
+- What's already committed (so the human knows the partial state)
 
-**If subagent fails task:**
-- Re-dispatch with specific instructions (don't fix manually — context pollution)
-- If pi keeps failing on the same task, escalate to Task tool implementer or break the task down
-
-## Integration
-
-**Required workflow skills:**
-- **superpowers:using-git-worktrees** - Ensures isolated workspace (creates one or verifies existing)
-- **superpowers:writing-plans** - Creates the plan this skill executes
-- **superpowers:requesting-code-review** - Code review template for reviewer subagents
-- **superpowers:finishing-a-development-branch** - Complete development after all tasks
-
-**Implementer subagents are dispatched via the `pi` CLI** (see `./implementer-prompt.md`). Reviewer subagents run via the orchestrator's native Task tool (see the two reviewer prompt templates).
-
-**Subagents should use:**
-- **superpowers:test-driven-development** - Subagents follow TDD for each task
-
-**Alternative workflow:**
-- **superpowers:subagent-driven-development** - Use when implementer needs the orchestrator's stronger model
-- **superpowers:executing-plans** - Use for parallel session instead of same-session execution
+Do not fall back to `superpowers:subagent-driven-development` automatically — let the human decide whether to switch orchestration mode, expand the plan, or change the approach.
