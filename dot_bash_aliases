@@ -9,11 +9,7 @@ alias cl='claude'
 alias co='codex'
 
 # Obsidian / Second Brain
-if [[ -d ~/Documents/Second\ Brain/ ]]; then
-    alias vault='cd ~/Documents/Second\ Brain/'
-else
-    alias vault='cd ~/Documents/Obsidian/Notes/ && ls'
-fi
+alias vault='cd ~/Documents/Obsidian/main/ && nvim'
 
 # Navigation
 alias la='ls -a'
