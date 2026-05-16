@@ -9,7 +9,6 @@ return {
 	"nvim-mini/mini.files",
 	config = function(_, opts)
 		local MiniFiles = require("mini.files")
-		MiniFiles.setup(opts)
 		-- ---------- Sort functions ----------
 		-- mini.files passes the whole entry list; we return it sorted.
 		-- Each entry has: fs_type ("file"|"directory"), name, path.
@@ -58,8 +57,12 @@ return {
 			end)
 			return out
 		end
+		-- ---------- Setup with default sort ----------
+		opts = opts or {}
+		opts.content = vim.tbl_extend("force", opts.content or {}, { sort = sorts.modified })
+		MiniFiles.setup(opts)
 		-- ---------- Toggle helper ----------
-		local current_sort = "name"
+		local current_sort = "modified"
 		local function set_sort(name)
 			if not sorts[name] then
 				return
