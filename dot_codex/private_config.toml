@@ -12,6 +12,9 @@ enabled = false
 [plugins."coding@local-agents"]
 enabled = true
 
+[plugins."fast@local-agents"]
+enabled = true
+
 [plugins."devops@local-agents"]
 enabled = false
 
