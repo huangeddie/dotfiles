@@ -18,8 +18,33 @@ enabled = false
 [plugins."superpowers@local-agents"]
 enabled = true
 
+[plugins."browser@openai-bundled"]
+enabled = true
+
+[plugins."documents@openai-primary-runtime"]
+enabled = false
+
+[plugins."spreadsheets@openai-primary-runtime"]
+enabled = false
+
+[plugins."presentations@openai-primary-runtime"]
+enabled = false
+
+[plugins."computer-use@openai-bundled"]
+enabled = true
+
 [projects."/Users/eddiehuang/.local/share/chezmoi"]
 trust_level = "trusted"
 
 [projects."/Users/eddiehuang/Documents/GitHub/Siyi"]
 trust_level = "trusted"
+
+[marketplaces.openai-bundled]
+last_updated = "2026-05-16T16:12:33Z"
+source_type = "local"
+source = "/Users/eddiehuang/.codex/.tmp/bundled-marketplaces/openai-bundled"
+
+[marketplaces.openai-primary-runtime]
+last_updated = "2026-05-16T16:12:55Z"
+source_type = "local"
+source = "/Users/eddiehuang/.cache/codex-runtimes/codex-primary-runtime/plugins/openai-primary-runtime"
