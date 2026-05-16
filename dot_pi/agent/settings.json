@@ -8,10 +8,6 @@
     "npm:pi-subagents",
     {
       "source": "~/.agents/packages/superpowers",
-      "skills": [
-        "!skills/finishing-a-development-branch",
-        "!skills/using-git-worktrees"
-      ]
     }
   ]
 }
