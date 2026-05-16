@@ -2,8 +2,11 @@
 alias lg='lazygit'
 alias lj='lazyjj'
 
-# Claude
-alias c='claude --dangerously-skip-permissions'
+# Claude Code
+alias cl='claude'
+
+# OpenAI Codex
+alias co='codex'
 
 # Obsidian / Second Brain
 if [[ -d ~/Documents/Second\ Brain/ ]]; then
