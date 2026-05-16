@@ -1,28 +1,19 @@
 ---
 name: subagent-driven-development
-description: Use when executing an implementation plan AND speed/cost matters more than per-task strong-model judgment — for plans with mostly-independent, mechanical, well-specified tasks. Delegates the entire per-task loop (implementer + cheap-model spec/quality reviews) to one `pi -p` orchestrator call; the host caller composes the prompt, dispatches once, then runs a final strong-model code review via the Task tool. Trigger this only when the speed/cost differentiator matters — route plans needing strong-model per-task judgment to `superpowers:subagent-driven-development` instead.
+description: Use when the user asks to execute an implementation plan via pi orchestration (or asks for the `fast` variant of subagent-driven-development). Delegates the entire per-task loop (implementer + spec/quality reviews) to one `pi -p` call; the host caller composes the prompt, dispatches once, then runs a final code review via the Task tool. Do not auto-select over `superpowers:subagent-driven-development` — the user dictates which to use.
 ---
 
 <!-- Sibling of superpowers:subagent-driven-development. Inverts the responsibility split: pi orchestrates per-task work; host caller is thin. -->
 
 # Subagent-Driven Development (Fast)
 
-Delegate the entire per-task implementation+review loop to one `pi -p` call. The host caller's job is to compose, dispatch once, and run a final strong-model code review.
+Delegate the entire per-task implementation+review loop to one `pi -p` call. The host caller's job is to compose, dispatch once, and run a final code review.
 
 **Core principle:** One pi call handles the inner loop; the host caller is the outer review gate.
 
 ## When to Use
 
-Use this skill instead of `superpowers:subagent-driven-development` when:
-- You have an implementation plan with mostly-independent tasks
-- The tasks are mechanical and well-specified (no architectural judgment needed per task)
-- Speed/cost matters — pi runs cheap/fast models for the inner loop
-- A single strong-model code review on the final branch is a sufficient quality gate
-
-Use `superpowers:subagent-driven-development` instead when:
-- You want the strong model to judge every per-task subagent report
-- The tasks involve architectural choices or ambiguous specs that need per-task judgment
-- The cost of strong-model orchestration is acceptable
+Use this skill when the user asks for it by name (or asks for "the `fast` variant" / "pi-orchestrated" subagent-driven development). Otherwise prefer `superpowers:subagent-driven-development`. The user decides which orchestration mode fits the task — do not infer it from properties of the plan.
 
 ## The Process
 
@@ -71,7 +62,7 @@ notes: <free-form orchestrator notes>
 
 Parse this block. If overall `status: BLOCKED` or any task is `BLOCKED`, **escalate to the human** — surface the concerns and stop. Do not silently re-dispatch.
 
-### 3. Final code review (strong model)
+### 3. Final code review
 
 After pi returns `ALL_DONE` (or `PARTIAL` with acceptable concerns), dispatch a final code reviewer via the host's native Task tool against the full branch diff:
 
@@ -79,7 +70,7 @@ After pi returns `ALL_DONE` (or `PARTIAL` with acceptable concerns), dispatch a 
 - `HEAD_SHA` = current `HEAD`
 - Use the `superpowers:requesting-code-review` template
 
-This is the strong-model gate on top of pi's cheap-model internal per-task reviews. Pi's internal reviews are padding — they catch obvious issues cheaply — but they are not the actual quality bar. If the final reviewer finds critical or important issues, surface them: either re-dispatch pi with targeted fix instructions or escalate to the human.
+Pi's internal per-task reviews are extra padding; the host caller's final Task-tool review is the gate the user has direct control over. If the final reviewer finds critical or important issues, surface them: either re-dispatch pi with targeted fix instructions or escalate to the human.
 
 ## Integration with the superpowers framework
 
@@ -89,12 +80,12 @@ This skill sits in the same workflow slot as `superpowers:subagent-driven-develo
 - **Before:** `superpowers:using-git-worktrees` produces the isolated workspace pi commits into
 - **After:** `superpowers:finishing-a-development-branch` handles merge / PR
 
-The `pi-orchestrator-prompt.md` instructs pi to follow the superpowers TDD discipline (test-driven-development) and two-stage review (spec → quality) for each task, just at the inner pi-orchestrated layer instead of the host layer.
+The `pi-orchestrator-prompt.md` instructs pi to follow the superpowers TDD discipline (test-driven-development) and two-stage review (spec → quality) for each task at the inner pi-orchestrated layer.
 
 ## Red Flags
 
 - **Inlining the plan body into the pi prompt.** Pass file paths; let pi read. Inlining defeats the "one short prompt" goal and burns shell-escape complexity on backticks and code fences in the plan.
-- **Skipping the final code review.** Pi's internal reviews use cheap models — they're padding, not the gate. The strong-model Task-tool review at the end is the actual gate. Skipping it means no strong-model has audited the work.
+- **Skipping the final code review.** Pi's internal per-task reviews are extra padding; the host caller's final Task-tool review is the gate. Skipping the final review means nothing the user controls has audited the work end-to-end.
 - **Silently re-dispatching after BLOCKED.** If pi blocked, something needs human input. Re-dispatching the same prompt produces the same block.
 - **Dispatching pi on a dirty working tree.** Pi commits as it goes; on a dirty tree those commits will tangle with your uncommitted work. Use a worktree or stash first.
 - **Running on `main`/`master` without explicit user consent.** Pi commits aggressively. Always use a feature branch.
