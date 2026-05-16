@@ -62,15 +62,15 @@ notes: <free-form orchestrator notes>
 
 Parse this block. If overall `status: BLOCKED` or any task is `BLOCKED`, **escalate to the human** — surface the concerns and stop. Do not silently re-dispatch.
 
-### 3. Final code review
+### 3. Final code review (outer)
 
-After pi returns `ALL_DONE` (or `PARTIAL` with acceptable concerns), dispatch a final code reviewer via the host's native Task tool against the full branch diff:
+Pi will already have run its own final whole-implementation reviewer at the end of the inner loop (per the upstream skill) and surfaced its findings in the summary's `notes`. After pi returns `ALL_DONE` (or `PARTIAL` with acceptable concerns), dispatch an **independent** final code reviewer via the host's native Task tool against the full branch diff:
 
 - `BASE_SHA` = the commit before pi ran (capture this before dispatching pi)
 - `HEAD_SHA` = current `HEAD`
 - Use the `superpowers:requesting-code-review` template
 
-Pi's internal per-task reviews are extra padding; the host caller's final Task-tool review is the gate the user has direct control over. If the final reviewer finds critical or important issues, surface them: either re-dispatch pi with targeted fix instructions or escalate to the human.
+This is the outer review on top of pi's inner reviews (per-task + pi's own final whole-implementation). Two layers run by independent agent stacks gives defense-in-depth. If the outer reviewer finds critical or important issues, surface them: either re-dispatch pi with targeted fix instructions or escalate to the human.
 
 ## Integration with the superpowers framework
 
@@ -85,7 +85,7 @@ The `pi-orchestrator-prompt.md` instructs pi to follow the superpowers TDD disci
 ## Red Flags
 
 - **Inlining the plan body into the pi prompt.** Pass file paths; let pi read. Inlining defeats the "one short prompt" goal and burns shell-escape complexity on backticks and code fences in the plan.
-- **Skipping the final code review.** Pi's internal per-task reviews are extra padding; the host caller's final Task-tool review is the gate. Skipping the final review means nothing the user controls has audited the work end-to-end.
+- **Skipping the outer final code review.** Pi runs its own final reviewer at the inner layer; the host caller's Task-tool review is the outer gate. The two layers are independent — skipping the outer one collapses the defense-in-depth into one stack.
 - **Silently re-dispatching after BLOCKED.** If pi blocked, something needs human input. Re-dispatching the same prompt produces the same block.
 - **Dispatching pi on a dirty working tree.** Pi commits as it goes; on a dirty tree those commits will tangle with your uncommitted work. Use a worktree or stash first.
 - **Running on `main`/`master` without explicit user consent.** Pi commits aggressively. Always use a feature branch.

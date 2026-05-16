@@ -31,13 +31,11 @@ That skill assumes a host harness's Task tool for subagent dispatch. **Use your 
 
 ## Overrides from the upstream skill
 
-Three intentional differences from `superpowers:subagent-driven-development`:
+Two intentional differences from `superpowers:subagent-driven-development`. Everything else (including the upstream's "Dispatch final code reviewer subagent for entire implementation" step after the last task) you follow as written.
 
-1. **Do not dispatch a final whole-implementation code reviewer.** The upstream skill ends with "Dispatch final code reviewer subagent for entire implementation"; skip that step. The host caller runs the final code review after you return.
+1. **`NEEDS_CONTEXT` handling.** The upstream skill says to "Provide the missing context and re-dispatch." You are non-interactive and cannot ask the host mid-flight. Try once: re-read the plan and spec to see if the answer is there, and re-dispatch with the additional context. If you still cannot answer, record the question and mark this task `BLOCKED` in your summary, then continue with subsequent independent tasks.
 
-2. **`NEEDS_CONTEXT` handling.** The upstream skill says to "Provide the missing context and re-dispatch." You are non-interactive and cannot ask the host mid-flight. Try once: re-read the plan and spec to see if the answer is there, and re-dispatch with the additional context. If you still cannot answer, record the question and mark this task `BLOCKED` in your summary, then continue with subsequent independent tasks.
-
-3. **Quality review severity rule.** Only loop on `CRITICAL` or `IMPORTANT` findings from the code-quality reviewer; record `MINOR` ones as concerns and move on. Minor style nits should not stall the plan.
+2. **Quality review severity rule.** Only loop on `CRITICAL` or `IMPORTANT` findings from the per-task code-quality reviewer; record `MINOR` ones as concerns and move on. Minor style nits should not stall the plan. (Note: this rule applies to the per-task quality reviewer inside the loop; the upstream skill's final whole-implementation reviewer is unchanged — run it as written and surface its findings in your summary's `notes`.)
 
 ## Final summary
 
@@ -66,7 +64,6 @@ Status semantics:
 ## Red flags — never do these
 
 - Pause to ask the host caller for confirmation between tasks — you are non-interactive
-- Dispatch a final whole-branch code reviewer — that is the host caller's job
 - Emit anything after the `=== END PI SDD SUMMARY ===` marker
 - Silently retry a failing subagent without changes — change the model, the context, or break the task down
 - Skip the upstream skill's red flags (those still apply)
