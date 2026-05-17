@@ -1,2 +1,6 @@
+autoload -U compinit && compinit
+export CARAPACE_BRIDGES='zsh,fish,bash,inshellisense' # optional
+zstyle ':completion:*' format $'\e[2;37mCompleting %d\e[m'
+source <(carapace _carapace)
 # bash is primary; .bashrc is the source of truth and is portable enough to run under zsh.
 [ -f ~/.bashrc ] && . ~/.bashrc
