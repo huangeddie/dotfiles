@@ -4,8 +4,7 @@
     "assistant@local-agents": false,
     "coding@local-agents": true,
     "devops@local-agents": false,
-    "superpowers@local-agents": true,
-    "fast@local-agents": true
+    "superpowers@local-agents": true
   },
   "extraKnownMarketplaces": {
     "local-agents": {

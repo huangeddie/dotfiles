@@ -23,11 +23,6 @@
       "name": "superpowers",
       "source": "./packages/superpowers",
       "description": "Port of the obra/superpowers agent framework."
-    },
-    {
-      "name": "fast",
-      "source": "./packages/fast",
-      "description": "Fast variants of skills that dispatch implementer subagents via the pi CLI."
     }
   ]
 }
