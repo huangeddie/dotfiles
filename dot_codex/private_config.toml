@@ -1,6 +1,8 @@
 personality = "pragmatic"
 approval_policy = "never"
 sandbox_mode = "danger-full-access"
+model = "gpt-5.5"
+model_reasoning_effort = "medium"
 
 [tui.model_availability_nux]
 "gpt-5.5" = 4
@@ -21,9 +23,6 @@ enabled = false
 [plugins."superpowers@local-agents"]
 enabled = true
 
-[plugins."browser@openai-bundled"]
-enabled = false
-
 [plugins."documents@openai-primary-runtime"]
 enabled = false
 
@@ -36,6 +35,9 @@ enabled = false
 [plugins."computer-use@openai-bundled"]
 enabled = true
 
+[plugins."browser@openai-bundled"]
+enabled = false
+
 [projects."/Users/eddiehuang/.local/share/chezmoi"]
 trust_level = "trusted"
 
@@ -43,7 +45,7 @@ trust_level = "trusted"
 trust_level = "trusted"
 
 [marketplaces.openai-bundled]
-last_updated = "2026-05-16T16:12:33Z"
+last_updated = "2026-05-17T16:14:55Z"
 source_type = "local"
 source = "/Users/eddiehuang/.codex/.tmp/bundled-marketplaces/openai-bundled"
 
