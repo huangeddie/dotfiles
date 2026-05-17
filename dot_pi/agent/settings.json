@@ -7,7 +7,7 @@
   "packages": [
     "npm:pi-subagents",
     {
-      "source": "~/.agents/packages/superpowers",
+      "source": "~/.agents/packages/superpowers"
     }
   ]
 }
