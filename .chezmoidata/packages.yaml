@@ -1,4 +1,4 @@
 packages:
   darwin:
-    brews: ["jj"]
+    brews: ["jj", "jjui"]
     casks: []
