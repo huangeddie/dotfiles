@@ -1,6 +1,6 @@
 # Version control
-alias lg='lazygit'
-alias lj='lazyjj'
+alias j='j'
+alias ji='jjui'
 
 # Claude Code
 alias cl='claude'
