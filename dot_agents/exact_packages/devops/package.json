@@ -1,0 +1,17 @@
+{
+  "name": "devtools",
+  "version": "1.0.0",
+  "description": "Development tools and workspace maintenance skills.",
+  "keywords": [
+    "devtools",
+    "pi-package"
+  ],
+  "pi": {
+    "skills": [
+      "./skills"
+    ],
+    "prompts": [
+      "./prompts"
+    ]
+  }
+}
