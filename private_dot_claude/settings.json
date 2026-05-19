@@ -1,4 +1,7 @@
 {
+  "permissions": {
+    "defaultMode": "bypassPermissions"
+  },
   "enabledPlugins": {
     "skill-creator@claude-plugins-official": true,
     "assistant@local-agents": false,
@@ -24,7 +27,5 @@
   "editorMode": "vim",
   "remoteControlAtStartup": true,
   "agentPushNotifEnabled": true,
-  "permissions": {
-    "defaultMode": "bypassPermissions"
-  }
+  "verbose": false
 }
