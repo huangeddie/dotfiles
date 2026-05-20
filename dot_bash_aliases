@@ -10,7 +10,7 @@ alias cl='claude'
 alias co='codex'
 
 # Google Antigravity
-alias a='agy'
+alias a='agy --dangerously-skip-permissions'
 
 # Obsidian / Second Brain
 alias vault='cd ~/Documents/Obsidian/main/ && nvim'
