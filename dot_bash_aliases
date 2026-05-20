@@ -9,6 +9,9 @@ alias cl='claude'
 # OpenAI Codex
 alias co='codex'
 
+# Google Antigravity
+alias a='agy'
+
 # Obsidian / Second Brain
 alias vault='cd ~/Documents/Obsidian/main/ && nvim'
 
