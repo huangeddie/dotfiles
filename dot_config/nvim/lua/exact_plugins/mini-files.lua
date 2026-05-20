@@ -73,6 +73,19 @@ return {
 			MiniFiles.refresh({ content = { sort = sorts[name] } })
 			vim.notify("mini.files: sort by " .. name, vim.log.levels.INFO)
 		end
+		local set_cwd = function()
+			local entry = MiniFiles.get_fs_entry()
+			if entry == nil then
+				return vim.notify("Cursor is not on valid entry")
+			end
+			local path = entry.path
+			if entry.fs_type == "file" then
+				path = vim.fs.dirname(path)
+			end
+			vim.fn.chdir(path)
+			vim.notify("cwd set to " .. path)
+		end
+
 		-- ---------- Buffer-local mappings inside the explorer ----------
 		vim.api.nvim_create_autocmd("User", {
 			pattern = "MiniFilesBufferCreate",
@@ -93,6 +106,7 @@ return {
 				map("gse", function()
 					set_sort("extension")
 				end, "Sort by extension")
+				map("g~", set_cwd, "Set cwd")
 			end,
 		})
 		-- Optional: expose current sort name for statusline etc.
