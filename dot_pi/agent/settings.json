@@ -7,6 +7,12 @@
   "packages": [
     {
       "source": "~/.agents/packages/superpowers"
+    },
+    {
+      "source": "~/.agents/packages/coding"
+    },
+    {
+      "source": "~/.agents/packages/devops"
     }
   ]
 }
