@@ -102,8 +102,8 @@ return {
 			pattern = "MiniFilesBufferCreate",
 			callback = function(args)
 				local buf = args.data.buf_id
-				local map = function(lhs, rhs, desc)
-					vim.keymap.set("n", lhs, rhs, { buffer = buf, desc = desc, nowait = true })
+				local map = function(lhs, rhs, desc, opts)
+					vim.keymap.set("n", lhs, rhs, vim.tbl_extend("force", { buffer = buf, desc = desc }, opts or {}))
 				end
 				map("gsn", function()
 					set_sort("name")
@@ -118,7 +118,41 @@ return {
 					set_sort("extension")
 				end, "Sort by extension")
 				map("g~", set_cwd, "Set cwd")
-				map("g`", yank_relative_dir, "Yank dir path relative to cwd")
+				map("gy", yank_relative_dir, "Yank dir path relative to cwd")
+
+				pcall(function()
+					require("lazy").load({ plugins = { "which-key.nvim" } })
+				end)
+
+				local ok, wk = pcall(require, "which-key")
+				if ok then
+					wk.add({
+						{ "g", group = "mini.files", buffer = buf },
+						{ "gs", group = "sort", buffer = buf },
+						{ "gy", desc = "Yank dir path relative to cwd", buffer = buf },
+					})
+
+					local refresh_which_key = function()
+						local ok_config, wk_config = pcall(require, "which-key.config")
+						if not ok_config or not wk_config.loaded then
+							return
+						end
+
+						local ok_buf, wk_buf = pcall(require, "which-key.buf")
+						if ok_buf then
+							wk_buf.get({ buf = buf, mode = "n", update = true })
+						end
+					end
+
+					if vim.v.vim_did_enter == 1 then
+						refresh_which_key()
+					else
+						vim.api.nvim_create_autocmd("VimEnter", {
+							once = true,
+							callback = refresh_which_key,
+						})
+					end
+				end
 			end,
 		})
 		-- Optional: expose current sort name for statusline etc.
