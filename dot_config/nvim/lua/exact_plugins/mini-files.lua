@@ -57,12 +57,9 @@ return {
 			end)
 			return out
 		end
-		-- ---------- Setup with default sort ----------
-		opts = opts or {}
-		opts.content = vim.tbl_extend("force", opts.content or {}, { sort = sorts.modified })
 		MiniFiles.setup(opts)
 		-- ---------- Toggle helper ----------
-		local current_sort = "modified"
+		local current_sort = "name"
 		local function set_sort(name)
 			if not sorts[name] then
 				return
@@ -84,6 +81,20 @@ return {
 			end
 			vim.fn.chdir(path)
 			vim.notify("cwd set to " .. path)
+		end
+		local yank_relative_dir = function()
+			local entry = MiniFiles.get_fs_entry()
+			if entry == nil then
+				return vim.notify("Cursor is not on valid entry")
+			end
+			local path = entry.path
+			if entry.fs_type == "file" then
+				path = vim.fs.dirname(path)
+			end
+			local rel = vim.fn.fnamemodify(path, ":.")
+			vim.fn.setreg("+", rel)
+			vim.fn.setreg('"', rel)
+			vim.notify("yanked " .. rel)
 		end
 
 		-- ---------- Buffer-local mappings inside the explorer ----------
@@ -107,6 +118,7 @@ return {
 					set_sort("extension")
 				end, "Sort by extension")
 				map("g~", set_cwd, "Set cwd")
+				map("g`", yank_relative_dir, "Yank dir path relative to cwd")
 			end,
 		})
 		-- Optional: expose current sort name for statusline etc.
