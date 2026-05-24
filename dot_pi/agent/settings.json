@@ -1,8 +1,8 @@
 {
-  "lastChangelogVersion": "0.75.4",
+  "lastChangelogVersion": "0.75.5",
   "theme": "light",
-  "defaultProvider": "google",
-  "defaultModel": "gemini-3.5-flash",
+  "defaultProvider": "fireworks",
+  "defaultModel": "accounts/fireworks/models/kimi-k2p6",
   "defaultThinkingLevel": "high",
   "packages": [
     {
