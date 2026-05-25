@@ -84,7 +84,8 @@ so tests compile. Do not include implementation logic in these stubs.
 
 ## Superpowers Preferences
 
-We often use the `superpowers` skill. Whenever we invoke it follow these rules:
+We often use the `superpowers` skill. Follow these rules, which SHALL override
+existing `superpowers` skills.
 
 - You MUST NOT offer the visual companion feature associated with the
   `brainstorming` skill. The user is well-aware of this feature and does not
