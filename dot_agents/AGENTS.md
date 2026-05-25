@@ -81,3 +81,11 @@ so tests compile. Do not include implementation logic in these stubs.
   resort.
 - Bug fixes with trivial test adjustments may use `fix:` with both test and impl
   in one commit if separation adds no clarity.
+
+## Superpowers Preferences
+
+We often use the `superpowers` skill. Whenever we invoke it follow these rules:
+
+- You MUST NOT offer the visual companion feature associated with the
+  `brainstorming` skill. The user is well-aware of this feature and does not
+  like it. You MAY use it if the user explicitly asks for it
