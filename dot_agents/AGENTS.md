@@ -89,3 +89,6 @@ We often use the `superpowers` skill. Whenever we invoke it follow these rules:
 - You MUST NOT offer the visual companion feature associated with the
   `brainstorming` skill. The user is well-aware of this feature and does not
   like it. You MAY use it if the user explicitly asks for it
+- You MUST NOT ask for approval on the spec. The user has built trust over the
+  brainstorming conversation and trusts the spec to be well-written. Skip
+  straight to writing the plan or implementation.
