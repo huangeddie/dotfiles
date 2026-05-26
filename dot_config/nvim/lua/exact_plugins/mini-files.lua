@@ -7,6 +7,21 @@
 --   gse -> by extension
 return {
 	"nvim-mini/mini.files",
+	opts = {
+		content = {
+			filter = function(entry)
+				-- hide files by extension
+				if vim.endswith(entry.name, ".orig") then
+					return false
+				end
+
+				-- Default filter: show everything else
+				-- (LazyVim's default behavior is to show/hide dotfiles based on a toggle,
+				-- so we typically want to return true here to let it pass)
+				return true
+			end,
+		},
+	},
 	config = function(_, opts)
 		local MiniFiles = require("mini.files")
 		-- ---------- Sort functions ----------
@@ -117,7 +132,7 @@ return {
 				map("gse", function()
 					set_sort("extension")
 				end, "Sort by extension")
-				map("g~", set_cwd, "Set cwd")
+				map("g.", set_cwd, "Set cwd")
 				map("gy", yank_relative_dir, "Yank dir path relative to cwd")
 
 				pcall(function()
