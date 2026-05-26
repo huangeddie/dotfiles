@@ -5,6 +5,11 @@ tests**. When presenting work or asking for decisions, always lead with these
 core components. Implementation details and concrete code should only be
 surfaced when necessary for a specific decision or when explicitly requested.
 
+## Creating commits
+
+All commit messages MUST follow the
+<https://www.conventionalcommits.org/en/v1.0.0/> specification.
+
 ## Commit Classification & TDD Protocol
 
 Before committing, classify changes into two tracks:
