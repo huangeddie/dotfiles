@@ -1,6 +1,7 @@
 [".agents/packages/superpowers/skills"]
     type = "archive"
-    url = "https://github.com/obra/superpowers/archive/refs/tags/v5.1.0.tar.gz"
+    url = "https://github.com/huangeddie/superpowers/archive/refs/heads/main.tar.gz"
     exact = true
+    refreshPeriod = "168h"
     stripComponents = 2
     include = ["*/skills/**"]
