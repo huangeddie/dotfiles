@@ -1,3 +1,6 @@
+# NVIM
+alias n='nvim'
+
 # Version control
 alias lg='lazygit'
 alias j='jj'
