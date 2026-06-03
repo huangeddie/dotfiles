@@ -37,5 +37,7 @@ if [ -f ~/openclaw/completions/openclaw.bash ]; then
 fi
 
 # Carapace
-export CARAPACE_BRIDGES='zsh,fish,bash,inshellisense' # optional
-source <(carapace _carapace)
+if command -v carapace &> /dev/null; then
+  export CARAPACE_BRIDGES='zsh,fish,bash,inshellisense' # optional
+  source <(carapace _carapace)
+fi
