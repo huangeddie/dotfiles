@@ -10,3 +10,4 @@ diff-formatter = ":git"
 
 [aliases]
 l = ["log"]
+g = ["git"]
