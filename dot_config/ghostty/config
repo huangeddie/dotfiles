@@ -56,3 +56,12 @@ custom-shader = shaders/ripple_rectangle_cursor.glsl
 keybind = alt+backspace=text:\x1b\x7f
 keybind = shift+enter=text:\x1b\r
 
+keybind = alt+super+h=goto_split:left
+keybind = alt+super+j=goto_split:down
+keybind = alt+super+k=goto_split:up
+keybind = alt+super+l=goto_split:right
+
+keybind = super+alt+arrow_left=unbind
+keybind = super+alt+arrow_down=unbind
+keybind = super+alt+arrow_up=unbind
+keybind = super+alt+arrow_right=unbind
