@@ -5,6 +5,7 @@ alias n='nvim'
 alias lg='lazygit'
 alias j='jj'
 alias ji='jjui'
+alias jd='jj diff'
 
 # Claude Code
 alias cl='claude'
