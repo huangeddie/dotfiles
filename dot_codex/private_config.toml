@@ -41,6 +41,9 @@ trust_level = "trusted"
 [projects."/Users/eddiehuang/Documents/GitHub/Siyi"]
 trust_level = "trusted"
 
+[projects."/Users/eddiehuang/Documents/GitHub/LearnLingo"]
+trust_level = "trusted"
+
 [marketplaces.openai-bundled]
 last_updated = "2026-05-17T16:14:55Z"
 source_type = "local"
