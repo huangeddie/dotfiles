@@ -7,3 +7,6 @@ email = "aigagror@gmail.com"
 [ui]
 pager = ["hunk", "pager"]
 diff-formatter = ":git"
+
+[aliases]
+l ="log"
