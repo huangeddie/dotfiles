@@ -9,4 +9,4 @@ pager = ["hunk", "pager"]
 diff-formatter = ":git"
 
 [aliases]
-l ="log"
+l = ["log"]
