@@ -4,6 +4,10 @@ sandbox_mode = "danger-full-access"
 model = "gpt-5.5"
 model_reasoning_effort = "medium"
 
+[tui]
+status_line = ["model-with-reasoning", "current-dir", "context-remaining"]
+status_line_use_colors = true
+
 [tui.model_availability_nux]
 "gpt-5.5" = 4
 
