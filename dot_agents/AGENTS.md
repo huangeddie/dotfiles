@@ -64,9 +64,7 @@ directly to it. Complete the RED-GREEN pair locally first, then publish.
 ### Framework Reference
 
 - **pytest**: `@pytest.mark.xfail` — use expected-failure
-- **AVA**: `test.failing()` — use expected-failure
 - **Python unittest**: `@unittest.expectedFailure` — use expected-failure
-- **Jest, Mocha, Vitest, Jasmine** — no expected-failure; use local red-green
 - **Go testing** — no expected-failure; use local red-green (or `t.Skip()` as a
   secondary fallback)
 - **Rust** — `#[should_panic]` for panic tests only; general expected-failure
