@@ -16,6 +16,9 @@ When dependency injection is used, prefer wiring concrete implementations at the
 outermost composition root. Keep business logic dependent on abstractions and
 free from construction details. In unit tests, treat each test as a small
 composition root that constructs the unit under test with practical fakes.
+Prefer practical fakes over mocks. Use mocks only when a practical fake cannot
+be created. Flag when affected tests introduce new mocks or retain existing
+ones.
 
 ## Creating commits
 
@@ -38,12 +41,6 @@ Before committing, classify changes into two tracks:
 - Concrete implementations of interfaces
 - Business logic, algorithms, service code
 - UI frontend code (components, styles, templates)
-
-### Test Doubles
-
-Prefer fakes over mocks. Use mocks when a practical fake cannot be created. Flag
-the user when a change introduces new mocks or retains existing mocks in
-affected tests.
 
 ### Red-Green Across Commits
 
