@@ -27,6 +27,12 @@ Before committing, classify changes into two tracks:
 - Business logic, algorithms, service code
 - UI frontend code (components, styles, templates)
 
+### Test Doubles
+
+Prefer fakes over mocks. Use mocks when a practical fake cannot be created. Flag
+the user when a change introduces new mocks or retains existing mocks in
+affected tests.
+
 ### Red-Green Across Commits
 
 When performing TDD, determine whether your test framework supports
