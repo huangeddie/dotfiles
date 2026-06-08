@@ -1,0 +1,10 @@
+{{- if eq .chezmoi.os "linux" -}}
+#!/bin/bash
+set -eu
+
+# television
+if ! command -v tv >/dev/null 2>&1; then
+  echo "🚀 Installing television..."
+  curl -fsSL https://alexpasmantier.github.io/television/install.sh | bash
+fi
+{{- end }}
