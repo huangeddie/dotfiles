@@ -7,4 +7,16 @@ if ! command -v tv >/dev/null 2>&1; then
   echo "🚀 Installing television..."
   curl -fsSL https://alexpasmantier.github.io/television/install.sh | bash
 fi
+
+# sesh
+if ! command -v sesh >/dev/null 2>&1; then
+  echo "🚀 Installing sesh..."
+  go install github.com/joshmedeski/sesh/v2@latest
+fi
+
+# zoxide
+if ! command -v zoxide >/dev/null 2>&1; then
+  echo "🚀 Installing zoxide..."
+  curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh
+fi
 {{- end }}

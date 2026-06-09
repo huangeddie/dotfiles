@@ -17,8 +17,4 @@ cask {{ . | quote }}
 {{ end -}}
 EOF
 
-if ! command -v antigravity >/dev/null 2>&1; then
-  echo "==> Installing Antigravity CLI"
-  curl -fsSL https://antigravity.google/cli/install.sh | bash
-fi
 {{- end }}

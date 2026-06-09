@@ -1,4 +1,4 @@
 packages:
   darwin:
-    brews: ["jj", "jjui", "modem-dev/tap/hunk", "television"]
+    brews: ["jj", "jjui", "modem-dev/tap/hunk", "sesh", "television", "zoxide"]
     casks: []
