@@ -36,3 +36,4 @@ if [ -f ~/openclaw/completions/openclaw.bash ]; then
   source "~/.openclaw/completions/openclaw.bash"
 fi
 
+eval "$(zoxide init bash)"
