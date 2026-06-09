@@ -48,7 +48,7 @@
 # # Just for example:
 # resize-overlay-duration = 4s 200ms
 
-theme = dark:Flexoki Dark,light:Flexoki Light
+theme = dark:Catppuccin Frappe,light:Catppuccin Latte
 
 custom-shader = shaders/cursor_warp.glsl
 custom-shader = shaders/ripple_rectangle_cursor.glsl
