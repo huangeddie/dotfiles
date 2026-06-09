@@ -1,12 +1,11 @@
 return {
 	{ "ellisonleao/gruvbox.nvim" },
 	{ "kepano/flexoki-neovim" },
-
-	-- Configure LazyVim to load gruvbox
+	{ "projekt0n/github-nvim-theme" },
 	{
 		"LazyVim/LazyVim",
 		opts = {
-			colorscheme = "catppuccin",
+			colorscheme = "github_light",
 		},
 	},
 }
