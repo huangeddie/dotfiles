@@ -25,7 +25,8 @@
   "skipDangerousModePermissionPrompt": true,
   "theme": "auto",
   "editorMode": "vim",
+  "verbose": false,
   "remoteControlAtStartup": true,
   "agentPushNotifEnabled": true,
-  "verbose": false
+  "model": "claude-fable-5[1m]"
 }
