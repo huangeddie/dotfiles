@@ -1,2 +1,4 @@
 # bash is primary; .bashrc is the source of truth and is portable enough to run under zsh.
 [ -f ~/.bashrc ] && . ~/.bashrc
+
+eval "$(zoxide init zsh)"
