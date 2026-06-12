@@ -9,5 +9,6 @@ packages:
         "television",
         "zoxide",
         "universal-ctags",
+        "bat",
       ]
     casks: []
