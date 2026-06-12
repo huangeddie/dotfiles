@@ -27,6 +27,5 @@
   "editorMode": "vim",
   "verbose": false,
   "remoteControlAtStartup": true,
-  "agentPushNotifEnabled": true,
-  "model": "claude-fable-5[1m]"
+  "agentPushNotifEnabled": true
 }
