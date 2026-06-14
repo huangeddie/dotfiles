@@ -20,6 +20,9 @@ Prefer practical fakes over mocks. Use mocks only when a practical fake cannot
 be created. Flag when affected tests introduce new mocks or retain existing
 ones.
 
+When designing data schemas, prefer 3NF. Performance optimization should be the
+only reason to deviate from normalization.
+
 ## Creating commits
 
 All commit messages MUST follow the
