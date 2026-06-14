@@ -94,6 +94,8 @@ so tests compile. Do not include implementation logic in these stubs.
 ### Exceptions
 
 - Pure refactors may be single commits.
+- Data migrations are exempt from red-green testing. Schema/data migration
+  scripts may be committed without a preceding RED test commit.
 - If the framework has no expected-failure, skip, or todo mechanism, temporarily
   comment out test blocks in Track A and uncomment them in Track B as a last
   resort.
