@@ -8,6 +8,15 @@ email = "aigagror@gmail.com"
 pager = ["hunk", "pager"]
 diff-formatter = ":git"
 
+[[--scope]]
+--when.environments = ["JJUI"]
+[--scope.ui]
+diff-formatter = "delta"
+[--scope.merge-tools.delta]
+program = "delta"
+diff-args = ["--light", "$left", "$right"]
+diff-expected-exit-codes = [0, 1]
+
 [aliases]
 l = ["log"]
 g = ["git"]
