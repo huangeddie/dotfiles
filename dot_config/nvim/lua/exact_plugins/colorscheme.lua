@@ -9,7 +9,7 @@ return {
 		opts = {
 			set_dark_mode = function()
 				vim.o.background = "dark"
-				vim.cmd.colorscheme("github_dark")
+				vim.cmd.colorscheme("github_dark_default")
 			end,
 			set_light_mode = function()
 				vim.o.background = "light"
