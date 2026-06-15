@@ -3,9 +3,17 @@ return {
 	{ "kepano/flexoki-neovim" },
 	{ "projekt0n/github-nvim-theme" },
 	{
-		"LazyVim/LazyVim",
+		"f-person/auto-dark-mode.nvim",
+		event = "VeryLazy",
 		opts = {
-			colorscheme = "github_light",
+			set_dark_mode = function()
+				vim.o.background = "dark"
+				vim.cmd.colorscheme("github_dark")
+			end,
+			set_light_mode = function()
+				vim.o.background = "light"
+				vim.cmd.colorscheme("github_light")
+			end,
 		},
 	},
 }
