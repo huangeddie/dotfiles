@@ -4,3 +4,6 @@ AGENTS.md
 LICENSE
 docs/
 tests/
+{{ if ne .chezmoi.os "darwin" }}
+Library/Application Support/lazygit/config.yml
+{{ end }}
