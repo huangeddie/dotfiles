@@ -4,7 +4,8 @@ return {
 	{ "projekt0n/github-nvim-theme" },
 	{
 		"f-person/auto-dark-mode.nvim",
-		event = "VeryLazy",
+		lazy = false,
+		priority = 1000,
 		opts = {
 			set_dark_mode = function()
 				vim.o.background = "dark"
