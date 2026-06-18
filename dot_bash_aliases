@@ -7,6 +7,9 @@ alias j='jj'
 alias ji='jjui'
 alias jd='jj diff'
 
+# Diff
+alias h='hunk'
+
 # Claude Code
 alias cl='claude'
 
