@@ -28,6 +28,11 @@ only reason to deviate from normalization.
 All commit messages MUST follow the
 <https://www.conventionalcommits.org/en/v1.0.0/> specification.
 
+### Version control
+
+Git and Jujutsu are our two preferred methods of VCS. _Only use Jujutsu for
+Jujutsu native repos even though it's compatible with Git._
+
 ## Commit Classification & TDD Protocol
 
 Before committing, classify changes into two tracks:
