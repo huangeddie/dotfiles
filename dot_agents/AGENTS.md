@@ -79,6 +79,12 @@ expected-failure, use this approach:
 If the current branch has already been published, do not add raw RED commits
 directly to it. Complete the RED-GREEN pair locally first, then publish.
 
+### Compilation Dependencies
+
+If new tests reference interfaces or schemas that do not yet exist, include
+minimal stubs (empty functions, interface shells, type placeholders) in Track A
+so tests compile. Do not include implementation logic in these stubs.
+
 ### Framework Reference
 
 - **pytest**: `@pytest.mark.xfail` — use expected-failure
@@ -88,19 +94,28 @@ directly to it. Complete the RED-GREEN pair locally first, then publish.
 - **Rust** — `#[should_panic]` for panic tests only; general expected-failure
   not supported; use local red-green
 
-### Compilation Dependencies
+If the framework has no expected-failure, skip, or todo mechanism, temporarily
+comment out test blocks in Track A and uncomment them in Track B as a last
+resort.
 
-If new tests reference interfaces or schemas that do not yet exist, include
-minimal stubs (empty functions, interface shells, type placeholders) in Track A
-so tests compile. Do not include implementation logic in these stubs.
+### Exceptions to Red-Green TDD
 
-### Exceptions
+The following code changes SHOULD NOT use red-green TDD.
 
+- UI development
 - Pure refactors may be single commits.
-- Data migrations are exempt from red-green testing. Schema/data migration
-  scripts may be committed without a preceding RED test commit.
-- If the framework has no expected-failure, skip, or todo mechanism, temporarily
-  comment out test blocks in Track A and uncomment them in Track B as a last
-  resort.
+- Data schema migrations
 - Bug fixes with trivial test adjustments may use `fix:` with both test and impl
   in one commit if separation adds no clarity.
+
+## Testing Preferences
+
+All tests should have the following properties
+
+- **Fast and cheap**: Keep tests focused; setup the bare minimum required and
+  assert only what's within test's scope and no more. We do NOT accept UI or
+  system tests.
+- **Deterministic**: If logic depends on random noise or concurrency, fix or
+  fake them. You MUST NOT depend on sampling of any size to assert correctness.
+
+Any tests discovered to violate these properties MUST be flagged to the user.
