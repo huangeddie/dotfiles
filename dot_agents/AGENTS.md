@@ -14,11 +14,7 @@ unnecessary abstractions.
 
 When dependency injection is used, prefer wiring concrete implementations at the
 outermost composition root. Keep business logic dependent on abstractions and
-free from construction details. In unit tests, treat each test as a small
-composition root that constructs the unit under test with practical fakes.
-Prefer practical fakes over mocks. Use mocks only when a practical fake cannot
-be created. Flag when affected tests introduce new mocks or retain existing
-ones.
+free from construction details.
 
 When designing data schemas, prefer 3NF. Performance optimization should be the
 only reason to deviate from normalization.
@@ -110,8 +106,11 @@ The following code changes SHOULD NOT use red-green TDD.
 
 ## Testing Preferences
 
-All tests should have the following properties
+All unit tests should have the following properties
 
+- **Fakes over mocks**: Used for decoupling from hard-to-test entities such as
+  network calls, UI, or anything slow / expensive. Prefer practical fakes over
+  mocks. Use mocks only when a practical fake cannot be created.
 - **Fast and cheap**: Keep tests focused; setup the bare minimum required and
   assert only what's within test's scope and no more. We do NOT accept UI or
   system tests.
@@ -119,3 +118,16 @@ All tests should have the following properties
   fake them. You MUST NOT depend on sampling of any size to assert correctness.
 
 Any tests discovered to violate these properties MUST be flagged to the user.
+
+### QA
+
+QA tests complement unit tests by covering the hard-to-test entities. Recall
+that unit tests covers our own domain logic, with hard-to-test entities
+decoupled with fakes.
+
+QA tests are often scripts that test our integration of domain logic with the
+production hard-to-test entities such as network calls or UI code.
+
+QA tests MUST NOT be included in pre-commit, pre-push, or CI/CD pipelines. They
+should only be invoked manually and it is up to our discretion to determine when
+we should run our QA tests.
