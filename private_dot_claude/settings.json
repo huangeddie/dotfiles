@@ -27,5 +27,6 @@
   "editorMode": "vim",
   "verbose": false,
   "remoteControlAtStartup": true,
-  "agentPushNotifEnabled": true
+  "agentPushNotifEnabled": true,
+  "model": "opus"
 }
