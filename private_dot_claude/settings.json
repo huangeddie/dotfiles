@@ -2,6 +2,7 @@
   "permissions": {
     "defaultMode": "bypassPermissions"
   },
+  "model": "opus",
   "enabledPlugins": {
     "skill-creator@claude-plugins-official": true,
     "assistant@local-agents": false,
@@ -28,5 +29,5 @@
   "verbose": false,
   "remoteControlAtStartup": true,
   "agentPushNotifEnabled": true,
-  "model": "opus"
+  "tui": "fullscreen"
 }
