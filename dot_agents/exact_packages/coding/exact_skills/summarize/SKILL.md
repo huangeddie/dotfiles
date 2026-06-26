@@ -1,5 +1,5 @@
 ---
-name: Summarize
+name: summarize
 description: "Summarize the work done and copy it to clipboard."
 ---
 
