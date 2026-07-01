@@ -25,12 +25,11 @@ free from construction details.
 Prefer to design schema in Third Normal Form (3NF). Only consider deviating from
 data normalization for significant performance optimizations.
 
-## Creating commits
+## Committing & TDD Protocol
 
 All commit messages MUST follow the
-<https://www.conventionalcommits.org/en/v1.0.0/> specification.
-
-## Commit Classification & TDD Protocol
+[Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/)
+specification.
 
 Before committing, classify changes into two tracks:
 
