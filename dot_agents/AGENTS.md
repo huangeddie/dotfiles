@@ -136,3 +136,11 @@ production hard-to-test entities such as network calls or UI code.
 QA tests MUST NOT be included in pre-commit, pre-push, or CI/CD pipelines. They
 should only be invoked manually and it is up to our discretion to determine when
 we should run our QA tests.
+
+## Debugging
+
+1. Start with reproducing the bug as closely aligned to the environment of the
+   bug report, excluding UI components. If UI interaction is needed, ask the
+   user for assistance.
+2. Then try narrow the scope of the bug and distill it into a RED-GREEN unit
+   test. If this cannot be done easily, flag and seek guidance from the user.
