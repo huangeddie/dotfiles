@@ -4,6 +4,10 @@ The user cares most about **data schemas, interfaces/contracts, and unit
 tests**. When presenting work or asking for decisions, always lead with these
 core components. Implementation details and concrete code should only be
 surfaced when necessary for a specific decision or when explicitly requested.
+Never consider the development cost; always prefer quality, simplicity,
+robustness, scalability, and long-term maintainability.
+
+### Boundaries
 
 Proactively identify boundaries between deterministic, easy-to-test logic and
 hard-to-test effects such as network calls, filesystem access, databases,
@@ -16,8 +20,10 @@ When dependency injection is used, prefer wiring concrete implementations at the
 outermost composition root. Keep business logic dependent on abstractions and
 free from construction details.
 
-When designing data schemas, prefer 3NF. Performance optimization should be the
-only reason to deviate from normalization.
+### Data schemas
+
+Prefer to design schema in Third Normal Form (3NF). Only consider deviating from
+data normalization for significant performance optimizations.
 
 ## Creating commits
 
