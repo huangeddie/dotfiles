@@ -10,5 +10,6 @@ packages:
         "zoxide",
         "universal-ctags",
         "bat",
+        "herdr",
       ]
     casks: []
