@@ -1,7 +1,7 @@
 ---
 name: handoff
 description:
-  "Write a path-free handoff prompt for another agent and copy it to clipboard."
+  "Write a handoff prompt for another agent and copy it to clipboard."
 ---
 
 # Handoff
@@ -39,8 +39,6 @@ The prompt must:
   solved, over-scoped, or better handled differently.
 - Assume the agent starts in the repo, a parent directory, a workspace
   directory, or a home directory and can find the repo itself.
-- Avoid filesystem paths. No absolute paths, home-directory paths, checkout
-  names, or repo-relative file paths unless the user explicitly requests them.
 - Use portable anchors instead: repo owner/name, product/module names, issue/PR
   URLs, branch names, package/plugin names, public symbols, command names,
   config keys, exact error text, docs titles, and search terms.
@@ -106,7 +104,5 @@ If `pbcopy` is unavailable, use the obvious platform clipboard tool (`wl-copy`,
 ## Quality Bar
 
 - No invented facts. Mark reviewed facts as such only after checking them.
-- No path leakage. Rewrite any accidental path as a symbol, module, command,
-  issue/PR URL, or search term.
 - Enough context for a fresh agent to orient; no giant brain dump.
 - First real instruction to the receiving agent: review, discuss, assess.
