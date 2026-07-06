@@ -2,6 +2,32 @@
 #!/bin/bash
 set -eu
 
+apt_packages=(
+{{- range .packages.linux.apt }}
+  {{ . | quote }}
+{{- end }}
+)
+
+if [ ${#apt_packages[@]} -gt 0 ]; then
+  if ! command -v apt-get >/dev/null 2>&1; then
+    echo "apt-get not found; skipping apt packages: ${apt_packages[*]}" >&2
+  else
+    missing_apt_packages=()
+
+    for package in "${apt_packages[@]}"; do
+      if ! dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q "install ok installed"; then
+        missing_apt_packages+=("$package")
+      fi
+    done
+
+    if [ ${#missing_apt_packages[@]} -gt 0 ]; then
+      echo "==> Installing apt packages: ${missing_apt_packages[*]}"
+      sudo apt-get update
+      sudo apt-get install -y "${missing_apt_packages[@]}"
+    fi
+  fi
+fi
+
 # television
 if ! command -v tv >/dev/null 2>&1; then
   echo "🚀 Installing television..."
