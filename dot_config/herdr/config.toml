@@ -1,6 +1,10 @@
+onboarding = false
 [keys]
 prefix = "ctrl+space"
 
 [theme]
 name = "catppuccin"
 auto_switch = false
+
+[ui]
+agent_panel_sort = "spaces"
