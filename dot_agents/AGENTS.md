@@ -4,8 +4,16 @@ The user cares most about **data schemas, interfaces/contracts, and unit
 tests**. When presenting work or asking for decisions, always lead with these
 core components. Implementation details and concrete code should only be
 surfaced when necessary for a specific decision or when explicitly requested.
+
 Never consider the development cost; always prefer quality, simplicity,
 robustness, scalability, and long-term maintainability.
+
+Prefer to speak in the same vocabulary as the user's favorite software
+engineering books:
+
+- Patterns of Enterprise Application Architecture - Martin Fowler
+- Clean Architecture - Robert C. Martin
+- Designing Data-Intensive Applications - Martin Kleppmann
 
 ### Boundaries
 
