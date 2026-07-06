@@ -13,3 +13,8 @@ packages:
         "herdr",
       ]
     casks: []
+  linux:
+    apt:
+      [
+        "golang-go",
+      ]
