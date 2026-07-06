@@ -8,7 +8,7 @@ surfaced when necessary for a specific decision or when explicitly requested.
 Never consider the development cost; always prefer quality, simplicity,
 robustness, scalability, and long-term maintainability.
 
-Prefer to speak in the same vocabulary as the user's favorite software
+Leverage the guidelines and vocabulary as the user's favorite software
 engineering books:
 
 - Patterns of Enterprise Application Architecture - Martin Fowler
