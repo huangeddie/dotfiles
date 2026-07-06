@@ -1,33 +1,47 @@
 {
-  "permissions": {
-    "defaultMode": "bypassPermissions"
-  },
-  "model": "opus",
+  "agentPushNotifEnabled": true,
+  "editorMode": "vim",
+  "effortLevel": "high",
   "enabledPlugins": {
-    "skill-creator@claude-plugins-official": true,
     "assistant@local-agents": false,
     "coding@local-agents": true,
     "devops@local-agents": false,
+    "skill-creator@claude-plugins-official": true,
     "superpowers@local-agents": true
   },
   "extraKnownMarketplaces": {
     "local-agents": {
       "source": {
-        "source": "directory",
-        "path": "/Users/eddiehuang/.agents"
+        "path": "/Users/eddiehuang/.agents",
+        "source": "directory"
       }
     }
   },
-  "sandbox": {
-    "enabled": true,
-    "autoAllowBashIfSandboxed": true
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "command": "bash '/Users/eddiehuang/.claude/hooks/herdr-agent-state.sh' session",
+            "timeout": 10,
+            "type": "command"
+          }
+        ],
+        "matcher": "*"
+      }
+    ]
   },
-  "effortLevel": "high",
+  "model": "opus",
+  "permissions": {
+    "defaultMode": "bypassPermissions"
+  },
+  "remoteControlAtStartup": true,
+  "sandbox": {
+    "autoAllowBashIfSandboxed": true,
+    "enabled": true
+  },
   "skipDangerousModePermissionPrompt": true,
   "theme": "auto",
-  "editorMode": "vim",
-  "verbose": false,
-  "remoteControlAtStartup": true,
-  "agentPushNotifEnabled": true,
-  "tui": "fullscreen"
+  "tui": "fullscreen",
+  "verbose": false
 }
