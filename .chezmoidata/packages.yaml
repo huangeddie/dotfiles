@@ -15,8 +15,4 @@ packages:
       ]
     casks: []
   linux:
-    apt:
-      [
-        "golang-go",
-        "fd",
-      ]
+    apt: ["golang-go", "fd-find"]
