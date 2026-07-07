@@ -18,4 +18,5 @@ packages:
     apt:
       [
         "golang-go",
+        "fd",
       ]
