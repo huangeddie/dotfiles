@@ -11,6 +11,7 @@ packages:
         "universal-ctags",
         "bat",
         "herdr",
+        "fd",
       ]
     casks: []
   linux:
