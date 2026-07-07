@@ -8,3 +8,9 @@ auto_switch = false
 
 [ui]
 agent_panel_sort = "spaces"
+
+[[keys.command]]
+key = "prefix+alt+g"
+type = "pane"
+command = "lazygit"
+description = "run lazygit"
