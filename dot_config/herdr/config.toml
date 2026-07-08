@@ -21,5 +21,6 @@ agent_panel_sort = "spaces"
 [[keys.command]]
 key = "ctrl+alt+g"
 type = "pane"
-command = "lazygit"
-description = "run lazygit"
+command = "bash -c 'jj root >/dev/null 2>&1 && jjui || lazygit'"
+description = "run lazygit or jjui"
+
