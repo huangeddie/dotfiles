@@ -5,8 +5,8 @@ chezmoi skill for more info.
 
 ## Agent Harness Config
 
-There're many terminal agent harnesses e.g. Gemini CLI, Codex CLI, Claude Code,
-Pi. _We aim to decouple as much of our agent configuration from specific harness
+There're many terminal agent harnesses e.g. Codex CLI, Claude Code, Pi. _We aim
+to decouple as much of our agent configuration from specific harness
 implemenations as much as possible_.
 
 As such, we make it an effort to put most of our agent configs including skills,
