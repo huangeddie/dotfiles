@@ -1,11 +1,11 @@
 [core]
-    pager = hunk pager
+  pager = hunk pager
 
 [delta]
-    navigate = true  # use n and N to move between diff sections
+  navigate = true  # use n and N to move between diff sections
 
 [merge]
-    conflictStyle = zdiff3
+  conflictStyle = zdiff3
 	tool = nvimdiff
 
 [user]
