@@ -19,8 +19,8 @@ auto_switch = false
 agent_panel_sort = "spaces"
 
 [[keys.command]]
-key = "ctrl+alt+g"
+key = "ctrl+alt+v"
 type = "pane"
-command = "bash -c 'jj root >/dev/null 2>&1 && jjui || lazygit'"
+command = "bash -c 'if command -v lazygit >/dev/null 2>&1; then lazygit; elif command -v jjui >/dev/null 2>&1; then jjui; else echo \"Error: Neither lazygit nor jjui is setup.\"; read -p \"Press Enter to exit...\"; fi'"
 description = "run lazygit or jjui"
 
