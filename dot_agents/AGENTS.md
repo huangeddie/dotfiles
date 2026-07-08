@@ -111,11 +111,11 @@ resort.
 
 The following code changes SHOULD NOT use red-green TDD.
 
-- UI development
-- Pure refactors may be single commits.
+- UI development; too hard to test
+- Pure refactors may be single commits; covered by existing tests
 - Data schema migrations
-- Bug fixes with trivial test adjustments may use `fix:` with both test and impl
-  in one commit if separation adds no clarity.
+- Bug fixes with trivial test adjustments; trivial
+- Config changes; too shallow to have meaningful tests
 
 ## Testing Preferences
 
