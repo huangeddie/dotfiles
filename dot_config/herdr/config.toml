@@ -21,6 +21,6 @@ agent_panel_sort = "spaces"
 [[keys.command]]
 key = "ctrl+alt+v"
 type = "pane"
-command = "bash -c 'if command -v lazygit >/dev/null 2>&1; then lazygit; elif command -v jjui >/dev/null 2>&1; then jjui; else echo \"Error: Neither lazygit nor jjui is setup.\"; read -p \"Press Enter to exit...\"; fi'"
-description = "run lazygit or jjui"
+command = "bash -c 'if jj root >/dev/null 2>&1; then if command -v jjui >/dev/null 2>&1; then jjui; elif command -v lazyjj >/dev/null 2>&1; then lazyjj; else echo \"Error: jj repository detected, but neither jjui nor lazyjj is installed.\"; read -p \"Press Enter to exit...\"; fi; elif git rev-parse --is-inside-work-tree >/dev/null 2>&1; then if command -v lazygit >/dev/null 2>&1; then lazygit; else echo \"Error: git repository detected, but lazygit is not installed.\"; read -p \"Press Enter to exit...\"; fi; else if command -v lazygit >/dev/null 2>&1; then lazygit; elif command -v jjui >/dev/null 2>&1; then jjui; elif command -v lazyjj >/dev/null 2>&1; then lazyjj; else echo \"Error: Neither lazygit nor jjui nor lazyjj is setup.\"; read -p \"Press Enter to exit...\"; fi; fi'"
+description = "run lazygit or jj UI"
 
