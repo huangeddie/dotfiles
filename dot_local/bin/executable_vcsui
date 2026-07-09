@@ -1,0 +1,39 @@
+#!/bin/bash
+
+# 1. If inside a Git repository and lazygit is available, run lazygit
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  if command -v lazygit >/dev/null 2>&1; then
+    exec lazygit "$@"
+  fi
+fi
+
+# 2. If inside a Jujutsu repository and jjui is available, run jjui
+if jj root >/dev/null 2>&1; then
+  if command -v jjui >/dev/null 2>&1; then
+    exec jjui "$@"
+  fi
+fi
+
+# 3. If we are in a repository but the corresponding tool was not found
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  echo "Error: Git repository detected, but lazygit is not installed." >&2
+  read -p "Press Enter to exit..."
+  exit 1
+fi
+
+if jj root >/dev/null 2>&1; then
+  echo "Error: Jujutsu repository detected, but jjui is not installed." >&2
+  read -p "Press Enter to exit..."
+  exit 1
+fi
+
+# 4. If outside a repository, try running whatever is installed
+if command -v lazygit >/dev/null 2>&1; then
+  exec lazygit "$@"
+elif command -v jjui >/dev/null 2>&1; then
+  exec jjui "$@"
+else
+  echo "Error: Neither lazygit nor jjui is installed." >&2
+  read -p "Press Enter to exit..."
+  exit 1
+fi
