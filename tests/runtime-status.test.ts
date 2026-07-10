@@ -110,6 +110,12 @@ test("counts overlapping ordinary tools as a wall-clock union", () => {
   expect(ledger.project(15)).toEqual({ generatingMillis: 0, toolWaitMillis: 15, idleMillis: 0 });
 });
 
+test.todo("reattributes a child report proportionally to observed over parent duration");
+test.todo("publishChildReport resolves even when store write rejects");
+test.todo("consuming a valid report removes the managed report directory");
+test.todo("removes the managed report directory when a report is malformed");
+test.todo("removes temp file and report directory when atomic rename fails");
+
 describe("subagent command detection", () => {
   test("isPiSubagentCommand recognizes only a leading pi-subagent executable token", () => {
     expect(isPiSubagentCommand("pi-subagent 'inspect this'")).toBe(true);
