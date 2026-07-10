@@ -1,6 +1,6 @@
 # Runtime status: recursive subagent telemetry
 
-**Date:** 2026-07-10  
+**Date:** 2026-07-10<br>
 **Status:** Approved
 
 ## Goal
