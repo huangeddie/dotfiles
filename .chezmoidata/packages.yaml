@@ -12,7 +12,13 @@ packages:
         "bat",
         "herdr",
         "fd",
+        "fzf",
       ]
     casks: []
   linux:
-    apt: ["golang-go", "fd-find"]
+    apt: 
+      [
+        "golang-go",
+        "fd-find",
+        "fzf",
+      ]
