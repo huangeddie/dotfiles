@@ -13,6 +13,20 @@ import {
   recordToolExecutionStart,
 } from "../dot_pi/agent/exact_extensions/runtime-status";
 
+import {
+  ToolIntervalLedger,
+  scaleReport,
+  validateRuntimeStatusReport,
+} from "../dot_pi/agent/runtime-status-core";
+
+
+test.todo("accepts only a v1 report with finite non-negative integer durations that sum exactly");
+test.todo("scales report categories with deterministic total-preserving rounding");
+test.todo("keeps a missing or invalid subagent report as ordinary tool time");
+test.todo("reclassifies a complete subagent interval without changing root elapsed time");
+test.todo("gives overlapping subagents start-order ownership without double-counting");
+test.todo("counts overlapping ordinary tools as a wall-clock union");
+
 describe("runtime status contracts", () => {
   test("TPS uses total output tokens over completed model-call time", () => {
     const state = createRuntimeStatusState();
