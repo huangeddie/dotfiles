@@ -389,7 +389,11 @@ export function createSubagentTelemetryAdapter(
     },
     async cleanup() {
       for (const reportPath of pendingReportPaths.values()) {
-        await store.remove(reportPath);
+        try {
+          await store.remove(reportPath);
+        } catch {
+          // best-effort cleanup; continue with the remaining paths
+        }
       }
       pendingReportPaths.clear();
     },
@@ -447,10 +451,15 @@ class NodeReportStore implements ReportStore {
     try {
       const data = await readFile(path, "utf-8");
       const parsed = JSON.parse(data);
-      await rm(path, { force: true });
       return parsed;
     } catch {
       return null;
+    } finally {
+      try {
+        await rm(path, { force: true });
+      } catch {
+        // best-effort removal even when the report is malformed or missing
+      }
     }
   }
 
@@ -459,15 +468,27 @@ class NodeReportStore implements ReportStore {
       throw new Error("Invalid report path");
     }
     const tempPath = `${path}.tmp`;
-    await writeFile(tempPath, JSON.stringify(report), { mode: 0o600 });
-    await rename(tempPath, path);
+    try {
+      await writeFile(tempPath, JSON.stringify(report), { mode: 0o600 });
+      await rename(tempPath, path);
+    } finally {
+      try {
+        await rm(tempPath, { force: true });
+      } catch {
+        // best-effort cleanup of the sibling temporary file
+      }
+    }
   }
 
   async remove(path: string): Promise<void> {
     if (!isManagedReportPath(path)) {
       return;
     }
-    await rm(path, { force: true });
+    try {
+      await rm(path, { force: true });
+    } catch {
+      // best-effort removal
+    }
   }
 }
 
