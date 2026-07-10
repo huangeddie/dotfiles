@@ -143,7 +143,8 @@ production hard-to-test entities such as network calls or UI code.
 
 QA tests MUST NOT be included in pre-commit, pre-push, or CI/CD pipelines. They
 should only be invoked manually and it is up to our discretion to determine when
-we should run our QA tests.
+we should run our QA tests. Generally speaking, maintain and run QA tests
+related to any code changes, also in red-green fashion.
 
 ## Debugging
 
