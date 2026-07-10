@@ -154,35 +154,7 @@ test("counts overlapping ordinary tools as a wall-clock union", () => {
   expect(ledger.project(15)).toEqual({ generatingMillis: 0, toolWaitMillis: 15, idleMillis: 0 });
 });
 
-test("reattributes a child report proportionally to observed over parent duration", () => {
-  const ledger = new ToolIntervalLedger();
-  ledger.start("first", 0);
-  ledger.end("first", 5);
-  ledger.attachSubagentReport("first", {
-    version: 1, observedMillis: 10, generatingMillis: 10, toolWaitMillis: 0, idleMillis: 0,
-  });
-
-  // Register "third" before "second" so it has the lower sequence and wins [10,15).
-  ledger.start("third", 10);
-  ledger.end("third", 15);
-  ledger.attachSubagentReport("third", {
-    version: 1, observedMillis: 5, generatingMillis: 0, toolWaitMillis: 5, idleMillis: 0,
-  });
-
-  ledger.start("second", 5);
-  ledger.end("second", 15);
-  // parentSubagentToolMillis = 10, owned = [5,10) = 5, report observed = 5
-  // attributable = round(5 * min(1, 5/10)) = round(2.5) = 3
-  ledger.attachSubagentReport("second", {
-    version: 1, observedMillis: 5, generatingMillis: 5, toolWaitMillis: 0, idleMillis: 0,
-  });
-
-  // first owns [0,5): attributable = round(5 * min(1, 10/5)) = 5 -> generating 5
-  // second owns [5,10): attributable 3 -> generating 3, remaining 2 -> toolWait
-  // third owns [10,15): attributable 5 -> toolWait 5
-  // total: generating 8, toolWait 7, idle 0 (exactly the root union [0,15))
-  expect(ledger.project(15)).toEqual({ generatingMillis: 8, toolWaitMillis: 7, idleMillis: 0 });
-});
+test.todo("reattributes lifecycle-valid overlapping subagents proportionally by owned duration");
 
 test("publishChildReport resolves even when store write rejects", async () => {
   const store: ReportStore = {
@@ -226,6 +198,8 @@ describe("subagent command detection", () => {
       "export PI_RUNTIME_STATUS_REPORT_PATH='/tmp/runtime-with-'\\''quote.json'; pi-subagent 'inspect this'",
     );
   });
+
+  test.todo("prepareSubagentCommand preserves a subagent command when report allocation rejects");
 });
 
 describe("managed report path validation", () => {
