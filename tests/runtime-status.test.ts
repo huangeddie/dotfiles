@@ -2,9 +2,13 @@ import { describe, expect, test } from "bun:test";
 
 import {
   createRuntimeStatusState,
+  createSubagentTelemetryAdapter,
   distributionSnapshot,
   formatStatus,
   handleAssistantMessageEnd,
+  isManagedReportPath,
+  isPiSubagentCommand,
+  prepareSubagentCommand,
   recordAfterProviderResponse,
   recordAgentEnd,
   recordAgentStart,
@@ -13,11 +17,39 @@ import {
   recordToolExecutionStart,
 } from "../dot_pi/agent/exact_extensions/runtime-status";
 
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import {
+  type ReportStore,
+  type RuntimeStatusReport,
   ToolIntervalLedger,
   scaleReport,
   validateRuntimeStatusReport,
 } from "../dot_pi/agent/runtime-status-core";
+
+class FakeReportStore implements ReportStore {
+  readonly reports = new Map<string, unknown>();
+  readonly removed: string[] = [];
+  private next = 0;
+
+  async create(): Promise<string> {
+    return `/tmp/runtime-${this.next++}.json`;
+  }
+  async readAndRemove(path: string): Promise<unknown | null> {
+    const value = this.reports.get(path) ?? null;
+    this.reports.delete(path);
+    this.removed.push(path);
+    return value;
+  }
+  async writeAtomically(path: string, report: RuntimeStatusReport): Promise<void> {
+    this.reports.set(path, report);
+  }
+  async remove(path: string): Promise<void> {
+    this.reports.delete(path);
+    this.removed.push(path);
+  }
+}
 
 
 test("accepts only a v1 report with finite non-negative integer durations that sum exactly", () => {
@@ -72,6 +104,152 @@ test("counts overlapping ordinary tools as a wall-clock union", () => {
   ledger.start("one", 0); ledger.start("two", 5);
   ledger.end("one", 10); ledger.end("two", 15);
   expect(ledger.project(15)).toEqual({ generatingMillis: 0, toolWaitMillis: 15, idleMillis: 0 });
+});
+
+describe("subagent command detection", () => {
+  test("isPiSubagentCommand recognizes only a leading pi-subagent executable token", () => {
+    expect(isPiSubagentCommand("pi-subagent 'inspect this'")).toBe(true);
+    expect(isPiSubagentCommand("pi-subagent")).toBe(true);
+    expect(isPiSubagentCommand("  pi-subagent  ")).toBe(true);
+    expect(isPiSubagentCommand("git status")).toBe(false);
+    expect(isPiSubagentCommand("pi-subagent-extra")).toBe(false);
+    expect(isPiSubagentCommand("echo pi-subagent")).toBe(false);
+  });
+
+  test("prepareSubagentCommand injects a private report path only for a pi-subagent bash command", async () => {
+    const store = new FakeReportStore();
+    const result = await prepareSubagentCommand("pi-subagent 'inspect this'", store);
+    expect(result.command).toBe(
+      "export PI_RUNTIME_STATUS_REPORT_PATH='/tmp/runtime-0.json'; pi-subagent 'inspect this'",
+    );
+    expect(result.reportPath).toBe("/tmp/runtime-0.json");
+    expect((await prepareSubagentCommand("git status", store)).command).toBe("git status");
+    expect((await prepareSubagentCommand("git status", store)).reportPath).toBeNull();
+  });
+
+  test("prepareSubagentCommand escapes single quotes in the report path", async () => {
+    const store = new FakeReportStore();
+    store.create = async () => "/tmp/runtime-with-'quote.json";
+    const result = await prepareSubagentCommand("pi-subagent 'inspect this'", store);
+    expect(result.command).toBe(
+      "export PI_RUNTIME_STATUS_REPORT_PATH='/tmp/runtime-with-'\\''quote.json'; pi-subagent 'inspect this'",
+    );
+  });
+});
+
+describe("managed report path validation", () => {
+  test("isManagedReportPath accepts only absolute report.json paths under a pi-runtime-status temp dir", () => {
+    const tmp = tmpdir();
+    expect(isManagedReportPath(join(tmp, "pi-runtime-status-abc123", "report.json"))).toBe(true);
+    expect(isManagedReportPath(join(tmp, "pi-runtime-status-abc123", "report.json").replace(/\\/g, "/"))).toBe(true);
+    expect(isManagedReportPath(join("/not-tmp", "pi-runtime-status-abc123", "report.json"))).toBe(false);
+    expect(isManagedReportPath(join(tmp, "other-dir", "report.json"))).toBe(false);
+    expect(isManagedReportPath(join(tmp, "pi-runtime-status-abc123", "other.json"))).toBe(false);
+    expect(isManagedReportPath(join(tmp, "pi-runtime-status-abc123", "report.json", "extra"))).toBe(false);
+    expect(isManagedReportPath("pi-runtime-status-abc123/report.json")).toBe(false);
+  });
+});
+
+describe("subagent telemetry adapter", () => {
+  test("prepare stores a pending report path and injects the export", async () => {
+    const store = new FakeReportStore();
+    const adapter = createSubagentTelemetryAdapter(store);
+    const { command } = await adapter.prepare("tc-1", "pi-subagent 'inspect this'");
+    expect(command).toBe(
+      "export PI_RUNTIME_STATUS_REPORT_PATH='/tmp/runtime-0.json'; pi-subagent 'inspect this'",
+    );
+  });
+
+  test("attachReportIfPresent reads and validates a report for the matching tool call", async () => {
+    const store = new FakeReportStore();
+    const adapter = createSubagentTelemetryAdapter(store);
+    await adapter.prepare("tc-1", "pi-subagent 'inspect this'");
+    const reportPath = "/tmp/runtime-0.json";
+    const report = { version: 1, observedMillis: 10, generatingMillis: 4, toolWaitMillis: 3, idleMillis: 3 };
+    await store.writeAtomically(reportPath, report);
+    const ledger = new ToolIntervalLedger();
+    ledger.start("tc-1", 0);
+    ledger.end("tc-1", 10);
+    await adapter.attachReportIfPresent("tc-1", ledger);
+    expect(ledger.project(10)).toEqual({ generatingMillis: 4, toolWaitMillis: 3, idleMillis: 3 });
+  });
+
+  test("attachReportIfPresent ignores a missing or invalid report", async () => {
+    const store = new FakeReportStore();
+    const adapter = createSubagentTelemetryAdapter(store);
+    await adapter.prepare("tc-1", "pi-subagent 'inspect this'");
+    const ledger = new ToolIntervalLedger();
+    ledger.start("tc-1", 0);
+    ledger.end("tc-1", 10);
+    await adapter.attachReportIfPresent("tc-1", ledger);
+    expect(ledger.project(10)).toEqual({ generatingMillis: 0, toolWaitMillis: 10, idleMillis: 0 });
+  });
+
+  test("cleanup removes all still-pending report paths", async () => {
+    const store = new FakeReportStore();
+    const adapter = createSubagentTelemetryAdapter(store);
+    await adapter.prepare("tc-1", "pi-subagent 'one'");
+    await adapter.prepare("tc-2", "pi-subagent 'two'");
+    await adapter.cleanup();
+    expect(store.removed).toEqual(["/tmp/runtime-0.json", "/tmp/runtime-1.json"]);
+    expect(store.reports.size).toBe(0);
+  });
+});
+
+describe("ledger reconciliation", () => {
+  test("distributionSnapshot adds subagent generating time to root model time", () => {
+    const state = createRuntimeStatusState();
+    const ledger = new ToolIntervalLedger();
+
+    recordAgentStart(state, 0);
+    recordTurnStart(state, 1_000);
+    recordAfterProviderResponse(state, 1_200);
+    handleAssistantMessageEnd(state, 2_000, 100);
+
+    ledger.start("subagent", 2_000);
+    ledger.end("subagent", 5_000);
+    ledger.attachSubagentReport("subagent", {
+      version: 1,
+      observedMillis: 3_000,
+      generatingMillis: 3_000,
+      toolWaitMillis: 0,
+      idleMillis: 0,
+    });
+
+    recordAgentEnd(state, 5_000);
+
+    expect(distributionSnapshot(state, 5_000, ledger)).toMatchObject({
+      generatingMillis: 4_000,
+      toolWaitMillis: 0,
+      idleMillis: 1_000,
+    });
+  });
+
+  test("formatStatus reflects reconciled subagent time", () => {
+    const state = createRuntimeStatusState();
+    const ledger = new ToolIntervalLedger();
+
+    recordAgentStart(state, 0);
+    recordTurnStart(state, 1_000);
+    recordAfterProviderResponse(state, 1_200);
+    handleAssistantMessageEnd(state, 2_000, 100);
+
+    ledger.start("subagent", 2_000);
+    ledger.end("subagent", 5_000);
+    ledger.attachSubagentReport("subagent", {
+      version: 1,
+      observedMillis: 3_000,
+      generatingMillis: 3_000,
+      toolWaitMillis: 0,
+      idleMillis: 0,
+    });
+
+    recordAgentEnd(state, 5_000);
+
+    expect(formatStatus(state, false, 5_000, ledger)).toBe(
+      "✓ 100.0 t/s | gen 4.0s 80% | tools 0.0s 0% | idle 1.0s 20%",
+    );
+  });
 });
 
 describe("runtime status contracts", () => {

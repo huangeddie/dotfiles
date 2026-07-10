@@ -1,4 +1,13 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { isAbsolute, join } from "node:path";
+import {
+  type ReportStore,
+  type RuntimeStatusReport,
+  ToolIntervalLedger,
+  validateRuntimeStatusReport,
+} from "../runtime-status-core";
 
 export const OUTPUT_IDLE_CUTOFF_MS = 750;
 const RENDER_INTERVAL_MS = 200;
@@ -315,14 +324,26 @@ export function rate(accumulation: TokenAccumulation | null): number {
   return accumulation.tokens / (accumulation.activeMillis / 1000);
 }
 
-export function distributionSnapshot(state: RuntimeStatusState, now: number): TimeDistribution {
-  const generatingMillis = state.timeDistribution.generatingMillis + currentProviderResponseMillis(state, now);
-  const toolWaitMillis = state.timeDistribution.toolWaitMillis + currentToolWaitMillis(state, now);
+export function distributionSnapshot(
+  state: RuntimeStatusState,
+  now: number,
+  ledger?: ToolIntervalLedger,
+): TimeDistribution {
+  const completedRootModelMillis = state.timeDistribution.generatingMillis + currentProviderResponseMillis(state, now);
+  const ledgerProjection = ledger?.project(now) ?? {
+    generatingMillis: 0,
+    toolWaitMillis: 0,
+    idleMillis: 0,
+  };
+  const generatingMillis = completedRootModelMillis + ledgerProjection.generatingMillis;
+  const toolWaitMillis = ledger
+    ? ledgerProjection.toolWaitMillis
+    : state.timeDistribution.toolWaitMillis + currentToolWaitMillis(state, now);
   const snapshot: TimeDistribution = {
     ...state.timeDistribution,
     generatingMillis,
     toolWaitMillis,
-    idleMillis: idleMillisSnapshot(state, now),
+    idleMillis: Math.max(0, observedRuntimeMillis(state, now) - generatingMillis - toolWaitMillis),
   };
   return snapshot;
 }
@@ -338,9 +359,126 @@ function formatPercent(millis: number, totalMillis: number): string {
   return `${Math.round((millis / totalMillis) * 100)}%`;
 }
 
-export function formatStatus(state: RuntimeStatusState, streaming: boolean, now = Date.now()): string {
+export function createSubagentTelemetryAdapter(
+  store: ReportStore,
+): {
+  prepare(toolCallId: string, command: string): Promise<{ command: string }>;
+  attachReportIfPresent(toolCallId: string, ledger: ToolIntervalLedger): Promise<void>;
+  cleanup(): Promise<void>;
+} {
+  const pendingReportPaths = new Map<string, string>();
+  return {
+    async prepare(toolCallId: string, command: string) {
+      const prepared = await prepareSubagentCommand(command, store);
+      if (prepared.reportPath) {
+        pendingReportPaths.set(toolCallId, prepared.reportPath);
+      }
+      return { command: prepared.command };
+    },
+    async attachReportIfPresent(toolCallId: string, ledger: ToolIntervalLedger) {
+      const reportPath = pendingReportPaths.get(toolCallId);
+      if (!reportPath) {
+        return;
+      }
+      pendingReportPaths.delete(toolCallId);
+      const report = await store.readAndRemove(reportPath);
+      const validated = report ? validateRuntimeStatusReport(report) : null;
+      if (validated) {
+        ledger.attachSubagentReport(toolCallId, validated);
+      }
+    },
+    async cleanup() {
+      for (const reportPath of pendingReportPaths.values()) {
+        await store.remove(reportPath);
+      }
+      pendingReportPaths.clear();
+    },
+  };
+}
+
+export function isPiSubagentCommand(command: string): boolean {
+  const trimmed = command.trim();
+  if (trimmed.length === 0) {
+    return false;
+  }
+  const token = trimmed.split(/\s+/)[0];
+  return token === "pi-subagent";
+}
+
+function shellQuoteSingle(value: string): string {
+  return `'${value.replace(/'/g, "'\\''")}'`;
+}
+
+export async function prepareSubagentCommand(
+  command: string,
+  store: ReportStore,
+): Promise<{ command: string; reportPath: string | null }> {
+  if (!isPiSubagentCommand(command)) {
+    return { command, reportPath: null };
+  }
+  const reportPath = await store.create();
+  const preparedCommand = `export PI_RUNTIME_STATUS_REPORT_PATH=${shellQuoteSingle(reportPath)}; ${command}`;
+  return { command: preparedCommand, reportPath };
+}
+
+export function isManagedReportPath(path: string): boolean {
+  if (!isAbsolute(path)) {
+    return false;
+  }
+  const normalized = path.replace(/\\/g, "/");
+  const tmp = tmpdir().replace(/\\/g, "/");
+  if (!normalized.startsWith(tmp)) {
+    return false;
+  }
+  const suffix = normalized.slice(tmp.length);
+  return /^\/pi-runtime-status-[^/]+\/report\.json$/.test(suffix);
+}
+
+class NodeReportStore implements ReportStore {
+  async create(): Promise<string> {
+    const dir = await mkdtemp(join(tmpdir(), "pi-runtime-status-"));
+    return join(dir, "report.json");
+  }
+
+  async readAndRemove(path: string): Promise<unknown | null> {
+    if (!isManagedReportPath(path)) {
+      return null;
+    }
+    try {
+      const data = await readFile(path, "utf-8");
+      const parsed = JSON.parse(data);
+      await rm(path, { force: true });
+      return parsed;
+    } catch {
+      return null;
+    }
+  }
+
+  async writeAtomically(path: string, report: RuntimeStatusReport): Promise<void> {
+    if (!isManagedReportPath(path)) {
+      throw new Error("Invalid report path");
+    }
+    const tempPath = `${path}.tmp`;
+    await writeFile(tempPath, JSON.stringify(report), { mode: 0o600 });
+    await rename(tempPath, path);
+  }
+
+  async remove(path: string): Promise<void> {
+    if (!isManagedReportPath(path)) {
+      return;
+    }
+    await rm(path, { force: true });
+  }
+}
+
+export function formatStatus(
+  state: RuntimeStatusState,
+  streaming: boolean,
+  now = Date.now(),
+  ledger?: ToolIntervalLedger,
+): string {
   const tps = rate(state.sessionAccumulation).toFixed(1);
-  const distribution = distributionSnapshot(state, now);
+  const distribution = distributionSnapshot(state, now, ledger);
   const totalMillis =
     distribution.generatingMillis + distribution.toolWaitMillis + distribution.idleMillis;
   const icon = streaming ? "●" : "✓";
@@ -352,8 +490,8 @@ export function formatStatus(state: RuntimeStatusState, streaming: boolean, now 
   ].join(" | ");
 }
 
-function renderStatus(state: RuntimeStatusState, theme: Theme, streaming: boolean): string {
-  const status = formatStatus(state, streaming);
+function renderStatus(state: RuntimeStatusState, theme: Theme, streaming: boolean, ledger?: ToolIntervalLedger): string {
+  const status = formatStatus(state, streaming, Date.now(), ledger);
   const [icon, ...rest] = status.split(" ");
   const iconColor = streaming ? "accent" : "success";
   return theme.fg(iconColor, icon) + theme.fg("dim", ` ${rest.join(" ")}`);
@@ -361,6 +499,9 @@ function renderStatus(state: RuntimeStatusState, theme: Theme, streaming: boolea
 
 export default function (pi: ExtensionAPI) {
   const state = createRuntimeStatusState();
+  const ledger = new ToolIntervalLedger();
+  const store = new NodeReportStore();
+  const adapter = createSubagentTelemetryAdapter(store);
   let interval: ReturnType<typeof setInterval> | null = null;
 
   function stopInterval() {
@@ -374,7 +515,7 @@ export default function (pi: ExtensionAPI) {
     if (!ctx.hasUI) {
       return;
     }
-    ctx.ui.setStatus(STATUS_KEY, renderStatus(state, ctx.ui.theme, streaming));
+    ctx.ui.setStatus(STATUS_KEY, renderStatus(state, ctx.ui.theme, streaming, ledger));
   }
 
   function startInterval(ctx: ExtensionContext) {
@@ -424,14 +565,19 @@ export default function (pi: ExtensionAPI) {
     }
   });
 
-  pi.on("tool_execution_start", async (_event, ctx) => {
-    recordToolExecutionStart(state, Date.now());
-    setStatus(ctx, state.active);
+  pi.on("tool_call", async (event) => {
+    if (event.toolName !== "bash" || !isPiSubagentCommand(event.input.command)) return;
+    const prepared = await adapter.prepare(event.toolCallId, event.input.command);
+    event.input.command = prepared.command;
   });
 
-  pi.on("tool_execution_end", async (_event, ctx) => {
-    recordToolExecutionEnd(state, Date.now());
-    setStatus(ctx, state.active);
+  pi.on("tool_execution_start", (event) => {
+    ledger.start(event.toolCallId, Date.now());
+  });
+
+  pi.on("tool_execution_end", async (event) => {
+    ledger.end(event.toolCallId, Date.now());
+    await adapter.attachReportIfPresent(event.toolCallId, ledger);
   });
 
   pi.on("message_end", async (event, ctx) => {
@@ -452,6 +598,20 @@ export default function (pi: ExtensionAPI) {
     stopInterval();
     handleAssistantMessageEnd(state, Date.now(), undefined);
     recordAgentEnd(state, Date.now());
+    await adapter.cleanup();
+    const envReportPath = process.env.PI_RUNTIME_STATUS_REPORT_PATH;
+    if (envReportPath && isManagedReportPath(envReportPath)) {
+      const now = Date.now();
+      const distribution = distributionSnapshot(state, now, ledger);
+      const report: RuntimeStatusReport = {
+        version: 1,
+        observedMillis: distribution.generatingMillis + distribution.toolWaitMillis + distribution.idleMillis,
+        generatingMillis: distribution.generatingMillis,
+        toolWaitMillis: distribution.toolWaitMillis,
+        idleMillis: distribution.idleMillis,
+      };
+      await store.writeAtomically(envReportPath, report);
+    }
     if (ctx.hasUI) {
       ctx.ui.setStatus(STATUS_KEY, undefined);
     }
