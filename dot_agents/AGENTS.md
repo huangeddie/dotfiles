@@ -136,7 +136,7 @@ Any tests discovered to violate these properties MUST be flagged to the user.
 
 QA tests complement unit tests by covering the hard-to-test entities. Recall
 that unit tests covers our own domain logic, with hard-to-test entities
-decoupled with fakes.
+decoupled using fakes.
 
 QA tests are often scripts that test our integration of domain logic with the
 production hard-to-test entities such as network calls or UI code.
