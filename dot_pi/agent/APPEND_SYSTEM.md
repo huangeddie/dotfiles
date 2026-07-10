@@ -1,2 +1,2 @@
-You can spawn yourself as a sub-agent via `bash` using the non-interactive `pi`
-command `pi -p <prompt>`.
+You can spawn sub-agents via `bash` using the non-interactive `pi-subagent`
+command `pi-subagent "<prompt>"`.
