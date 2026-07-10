@@ -2,6 +2,23 @@
 -- Default keymaps that are always set: https://github.com/LazyVim/LazyVim/blob/main/lua/lazyvim/config/keymaps.lua
 -- Add any additional keymaps here
 
+local function copy_to_os_clipboard(text)
+  -- 1. Always set the internal registers.
+  vim.fn.setreg("+", text)
+  vim.fn.setreg("*", text)
+
+  -- 2. Use OSC 52 for SSH or Tmux sessions (copies to your local machine's clipboard).
+  -- This is fast and won't hang like xclip/wl-copy can over SSH.
+  if vim.env.SSH_TTY or vim.env.TMUX or vim.env.SSH_CONNECTION or vim.env.HERDR_ENV then
+    local ok, osc52 = pcall(require, "vim.ui.clipboard.osc52")
+    if ok and osc52 then
+      osc52.copy("*")({ text })
+      osc52.copy("+")({ text })
+    end
+  end
+end
+
+
 vim.api.nvim_create_autocmd("FileType", {
   pattern = "markdown",
   callback = function()
