@@ -31,6 +31,7 @@ import {
 class FakeReportStore implements ReportStore {
   readonly reports = new Map<string, unknown>();
   readonly removed: string[] = [];
+  readonly failRemovals = new Set<string>();
   private next = 0;
 
   async create(): Promise<string> {
@@ -46,6 +47,9 @@ class FakeReportStore implements ReportStore {
     this.reports.set(path, report);
   }
   async remove(path: string): Promise<void> {
+    if (this.failRemovals.has(path)) {
+      throw new Error(`remove failed for ${path}`);
+    }
     this.reports.delete(path);
     this.removed.push(path);
   }
@@ -193,6 +197,21 @@ describe("subagent telemetry adapter", () => {
     await adapter.cleanup();
     expect(store.removed).toEqual(["/tmp/runtime-0.json", "/tmp/runtime-1.json"]);
     expect(store.reports.size).toBe(0);
+  });
+
+  test("cleanup isolates a removal failure and still attempts every pending path", async () => {
+    const store = new FakeReportStore();
+    const adapter = createSubagentTelemetryAdapter(store);
+    await adapter.prepare("tc-1", "pi-subagent 'one'");
+    await adapter.prepare("tc-2", "pi-subagent 'two'");
+    await adapter.prepare("tc-3", "pi-subagent 'three'");
+    store.failRemovals.add("/tmp/runtime-1.json");
+
+    await adapter.cleanup(); // resolves despite the isolated failure
+
+    expect(store.removed).toEqual(["/tmp/runtime-0.json", "/tmp/runtime-2.json"]);
+    await adapter.cleanup(); // second cleanup has no paths left to retry
+    expect(store.removed).toEqual(["/tmp/runtime-0.json", "/tmp/runtime-2.json"]);
   });
 });
 
