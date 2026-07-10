@@ -16,6 +16,7 @@
 - Prompt runs must reject missing or stale selections before launching a child Pi agent.
 - Automated tests must fake `pi`, `fzf`, and state storage; real integration checks belong only in manual QA documentation.
 - Bun has no general expected-failure facility. Keep the raw RED test commit local until the implementation commit makes the branch tip green.
+- The deployed wrapper uses `/bin/bash`; its source is mode `0644` because chezmoi derives executable mode from the `executable_` filename. Tests must invoke the source via `/bin/bash`, and the implementation must support macOS Bash 3.2.
 
 ---
 
@@ -66,7 +67,7 @@ async function writeExecutable(path: string, content: string): Promise<void> {
 }
 
 async function run(args: string[], extraEnv: Record<string, string> = {}) {
-  const result = Bun.spawnSync([wrapper, ...args], {
+  const result = Bun.spawnSync(["/bin/bash", wrapper, ...args], {
     env: {
       ...process.env,
       PATH: `${bin}:${process.env.PATH}`,
@@ -294,18 +295,28 @@ model_is_available() {
 }
 
 read_selection() {
-  local -a lines
+  local selection extra
 
   if [[ ! -r "$STATE_FILE" ]]; then
     die "no model is selected; run ${0##*/} to choose one"
   fi
 
-  mapfile -t lines <"$STATE_FILE"
-  if ((${#lines[@]} != 1)) || [[ -z "${lines[0]}" ]]; then
+  exec 3<"$STATE_FILE" || die "could not read model selection"
+  if ! IFS= read -r selection <&3; then
+    exec 3<&-
+    die "model selection is invalid; run ${0##*/} to choose one"
+  fi
+  if IFS= read -r extra <&3; then
+    exec 3<&-
+    die "model selection is invalid; run ${0##*/} to choose one"
+  fi
+  exec 3<&-
+
+  if [[ -z "$selection" ]]; then
     die "model selection is invalid; run ${0##*/} to choose one"
   fi
 
-  printf '%s\n' "${lines[0]}"
+  printf '%s\n' "$selection"
 }
 
 write_selection() {
