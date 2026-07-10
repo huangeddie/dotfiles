@@ -421,7 +421,12 @@ export async function prepareSubagentCommand(
   if (!isPiSubagentCommand(command)) {
     return { command, reportPath: null };
   }
-  const reportPath = await store.create();
+  let reportPath: string;
+  try {
+    reportPath = await store.create();
+  } catch {
+    return { command, reportPath: null };
+  }
   const preparedCommand = `export PI_RUNTIME_STATUS_REPORT_PATH=${shellQuoteSingle(reportPath)}; ${command}`;
   return { command: preparedCommand, reportPath };
 }

@@ -154,7 +154,22 @@ test("counts overlapping ordinary tools as a wall-clock union", () => {
   expect(ledger.project(15)).toEqual({ generatingMillis: 0, toolWaitMillis: 15, idleMillis: 0 });
 });
 
-test.todo("reattributes lifecycle-valid overlapping subagents proportionally by owned duration");
+test("reattributes lifecycle-valid overlapping subagents proportionally by owned duration", () => {
+  const ledger = new ToolIntervalLedger();
+  ledger.start("first", 0);
+  ledger.start("second", 5);
+  ledger.end("first", 10);
+  ledger.end("second", 15);
+  ledger.attachSubagentReport("first", {
+    version: 1, observedMillis: 10, generatingMillis: 10, toolWaitMillis: 0, idleMillis: 0,
+  });
+  ledger.attachSubagentReport("second", {
+    version: 1, observedMillis: 5, generatingMillis: 5, toolWaitMillis: 0, idleMillis: 0,
+  });
+
+  // first owns [0,10); second owns [10,15), but its report covers half its parent duration.
+  expect(ledger.project(15)).toEqual({ generatingMillis: 13, toolWaitMillis: 2, idleMillis: 0 });
+});
 
 test("publishChildReport resolves even when store write rejects", async () => {
   const store: ReportStore = {
@@ -199,7 +214,22 @@ describe("subagent command detection", () => {
     );
   });
 
-  test.todo("prepareSubagentCommand preserves a subagent command when report allocation rejects");
+  test("prepareSubagentCommand preserves a subagent command when report allocation rejects", async () => {
+    class RejectingReportStore extends FakeReportStore {
+      async create(): Promise<string> {
+        throw new Error("temporary directory allocation failed");
+      }
+    }
+
+    const store = new RejectingReportStore();
+    const command = "pi-subagent 'inspect this'";
+    await expect(prepareSubagentCommand(command, store)).resolves.toEqual({ command, reportPath: null });
+
+    const adapter = createSubagentTelemetryAdapter(store);
+    await expect(adapter.prepare("tc-1", command)).resolves.toEqual({ command });
+    await adapter.cleanup();
+    expect(store.removed).toEqual([]);
+  });
 });
 
 describe("managed report path validation", () => {
