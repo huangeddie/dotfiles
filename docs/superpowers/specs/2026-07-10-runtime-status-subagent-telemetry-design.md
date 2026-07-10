@@ -36,10 +36,12 @@ invariant is:
 observedMillis = generatingMillis + toolWaitMillis + idleMillis
 ```
 
-The child writes a report only when the environment variable is present. It
-writes atomically with restrictive permissions. Reports are private files; they
-must not be printed to stdout or stderr, added to a tool result, appended to
-Pi session entries, or otherwise placed in LLM context.
+The child writes a report only when the environment variable contains a managed
+report path: an absolute `report.json` below the operating-system temporary
+directory in a `pi-runtime-status-*` directory. It writes atomically with
+restrictive permissions. Reports are private files; they must not be printed to
+stdout or stderr, added to a tool result, appended to Pi session entries, or
+otherwise placed in LLM context.
 
 A missing, unreadable, malformed, unsupported-version, or invariant-violating
 report is ignored. That failure changes neither subagent execution nor its
@@ -109,8 +111,10 @@ user-visible output changes are required.
 
 ## Error handling and security
 
-- Use an absolute unique path under the operating system temporary directory,
-  created with mode `0600`.
+- The parent creates an absolute unique `report.json` path in a mode-`0700`
+  `pi-runtime-status-*` directory under the operating system temporary
+  directory; the child accepts only this managed path shape and writes files
+  with mode `0600`.
 - Never follow an arbitrary report path supplied by tool output; the parent
   reads only a path it created and associated with a tool-call ID.
 - Delete report files in success, validation failure, cancellation, and session
