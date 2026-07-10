@@ -20,12 +20,59 @@ import {
 } from "../dot_pi/agent/runtime-status-core";
 
 
-test.todo("accepts only a v1 report with finite non-negative integer durations that sum exactly");
-test.todo("scales report categories with deterministic total-preserving rounding");
-test.todo("keeps a missing or invalid subagent report as ordinary tool time");
-test.todo("reclassifies a complete subagent interval without changing root elapsed time");
-test.todo("gives overlapping subagents start-order ownership without double-counting");
-test.todo("counts overlapping ordinary tools as a wall-clock union");
+test("accepts only a v1 report with finite non-negative integer durations that sum exactly", () => {
+  const valid = {
+    version: 1,
+    observedMillis: 10,
+    generatingMillis: 4,
+    toolWaitMillis: 3,
+    idleMillis: 3,
+  };
+
+  expect(validateRuntimeStatusReport(valid)).toEqual(valid);
+  expect(validateRuntimeStatusReport({ ...valid, version: 2 })).toBeNull();
+  expect(validateRuntimeStatusReport({ ...valid, idleMillis: -1 })).toBeNull();
+  expect(validateRuntimeStatusReport({ ...valid, generatingMillis: 4.5 })).toBeNull();
+  expect(validateRuntimeStatusReport({ ...valid, observedMillis: 11 })).toBeNull();
+});
+
+test("scales report categories with deterministic total-preserving rounding", () => {
+  expect(scaleReport({ version: 1, observedMillis: 3, generatingMillis: 1, toolWaitMillis: 1, idleMillis: 1 }, 10))
+    .toEqual({ generatingMillis: 4, toolWaitMillis: 3, idleMillis: 3 });
+});
+
+test("keeps a missing or invalid subagent report as ordinary tool time", () => {
+  const ledger = new ToolIntervalLedger();
+  ledger.start("subagent", 0);
+  ledger.end("subagent", 10);
+  expect(ledger.project(10)).toEqual({ generatingMillis: 0, toolWaitMillis: 10, idleMillis: 0 });
+});
+
+test("reclassifies a complete subagent interval without changing root elapsed time", () => {
+  const ledger = new ToolIntervalLedger();
+  ledger.start("subagent", 0);
+  ledger.end("subagent", 12);
+  ledger.attachSubagentReport("subagent", {
+    version: 1, observedMillis: 10, generatingMillis: 5, toolWaitMillis: 3, idleMillis: 2,
+  });
+  expect(ledger.project(12)).toEqual({ generatingMillis: 5, toolWaitMillis: 5, idleMillis: 2 });
+});
+
+test("gives overlapping subagents start-order ownership without double-counting", () => {
+  const ledger = new ToolIntervalLedger();
+  ledger.start("first", 0); ledger.start("second", 5);
+  ledger.end("first", 10); ledger.end("second", 15);
+  ledger.attachSubagentReport("first", { version: 1, observedMillis: 10, generatingMillis: 10, toolWaitMillis: 0, idleMillis: 0 });
+  ledger.attachSubagentReport("second", { version: 1, observedMillis: 10, generatingMillis: 0, toolWaitMillis: 10, idleMillis: 0 });
+  expect(ledger.project(15)).toEqual({ generatingMillis: 10, toolWaitMillis: 5, idleMillis: 0 });
+});
+
+test("counts overlapping ordinary tools as a wall-clock union", () => {
+  const ledger = new ToolIntervalLedger();
+  ledger.start("one", 0); ledger.start("two", 5);
+  ledger.end("one", 10); ledger.end("two", 15);
+  expect(ledger.project(15)).toEqual({ generatingMillis: 0, toolWaitMillis: 15, idleMillis: 0 });
+});
 
 describe("runtime status contracts", () => {
   test("TPS uses total output tokens over completed model-call time", () => {
