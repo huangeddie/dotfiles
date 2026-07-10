@@ -95,6 +95,19 @@ export function scaleReport(
   };
 }
 
+export async function publishChildReport(
+  store: ReportStore,
+  path: string,
+  report: RuntimeStatusReport,
+): Promise<void> {
+  try {
+    await store.writeAtomically(path, report);
+  } catch {
+    // A child report write failure is intentionally non-fatal and must not alter
+    // Pi's exit code or response.
+  }
+}
+
 export class ToolIntervalLedger {
   private intervals: Map<string, ToolInterval> = new Map();
   private sequence = 0;
@@ -178,19 +191,21 @@ export class ToolIntervalLedger {
       }
 
       const report = interval.subagentReport;
-      if (owned >= report.observedMillis) {
-        totals.generatingMillis += report.generatingMillis;
-        totals.toolWaitMillis += report.toolWaitMillis;
-        totals.idleMillis += report.idleMillis;
-        if (owned > report.observedMillis) {
-          totals.toolWaitMillis += owned - report.observedMillis;
-        }
-      } else {
-        const scaled = scaleReport(report, owned);
-        totals.generatingMillis += scaled.generatingMillis;
-        totals.toolWaitMillis += scaled.toolWaitMillis;
-        totals.idleMillis += scaled.idleMillis;
+      const effectiveEnd = interval.endedAt ?? now;
+      const parentSubagentToolMillis = effectiveEnd - interval.startedAt;
+      if (parentSubagentToolMillis <= 0) {
+        totals.toolWaitMillis += owned;
+        continue;
       }
+
+      const attributable = Math.round(
+        owned * Math.min(1, report.observedMillis / parentSubagentToolMillis),
+      );
+      const scaled = scaleReport(report, attributable);
+      totals.generatingMillis += scaled.generatingMillis;
+      totals.toolWaitMillis += scaled.toolWaitMillis;
+      totals.idleMillis += scaled.idleMillis;
+      totals.toolWaitMillis += owned - attributable;
     }
 
     return totals;

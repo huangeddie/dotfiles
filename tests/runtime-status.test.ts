@@ -8,6 +8,7 @@ import {
   handleAssistantMessageEnd,
   isManagedReportPath,
   isPiSubagentCommand,
+  NodeReportStore,
   prepareSubagentCommand,
   recordAfterProviderResponse,
   recordAgentEnd,
@@ -15,14 +16,16 @@ import {
   recordTurnStart,
   recordToolExecutionEnd,
   recordToolExecutionStart,
+  type FileOperations,
 } from "../dot_pi/agent/exact_extensions/runtime-status";
 
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import {
   type ReportStore,
   type RuntimeStatusReport,
+  publishChildReport,
   ToolIntervalLedger,
   scaleReport,
   validateRuntimeStatusReport,
@@ -51,6 +54,47 @@ class FakeReportStore implements ReportStore {
       throw new Error(`remove failed for ${path}`);
     }
     this.reports.delete(path);
+    this.removed.push(path);
+  }
+}
+
+class FakeFileOperations implements FileOperations {
+  readonly dirs = new Set<string>();
+  readonly files = new Map<string, string>();
+  readonly removed: string[] = [];
+  failNextRename: Error | null = null;
+
+  async mkdtemp(prefix: string): Promise<string> {
+    const dir = `${prefix}fake`;
+    this.dirs.add(dir);
+    return dir;
+  }
+
+  async readFile(path: string, _encoding: "utf-8"): Promise<string> {
+    const data = this.files.get(path);
+    if (data === undefined) throw new Error("file not found");
+    return data;
+  }
+
+  async writeFile(path: string, data: string, _options?: { mode?: number }): Promise<void> {
+    this.files.set(path, data);
+  }
+
+  async rename(oldPath: string, newPath: string): Promise<void> {
+    if (this.failNextRename) {
+      const err = this.failNextRename;
+      this.failNextRename = null;
+      throw err;
+    }
+    const data = this.files.get(oldPath);
+    if (data === undefined) throw new Error("temp file not found");
+    this.files.delete(oldPath);
+    this.files.set(newPath, data);
+  }
+
+  async rm(path: string, _options?: { force?: boolean; recursive?: boolean }): Promise<void> {
+    this.files.delete(path);
+    this.dirs.delete(path);
     this.removed.push(path);
   }
 }
@@ -110,11 +154,48 @@ test("counts overlapping ordinary tools as a wall-clock union", () => {
   expect(ledger.project(15)).toEqual({ generatingMillis: 0, toolWaitMillis: 15, idleMillis: 0 });
 });
 
-test.todo("reattributes a child report proportionally to observed over parent duration");
-test.todo("publishChildReport resolves even when store write rejects");
-test.todo("consuming a valid report removes the managed report directory");
-test.todo("removes the managed report directory when a report is malformed");
-test.todo("removes temp file and report directory when atomic rename fails");
+test("reattributes a child report proportionally to observed over parent duration", () => {
+  const ledger = new ToolIntervalLedger();
+  ledger.start("first", 0);
+  ledger.end("first", 5);
+  ledger.attachSubagentReport("first", {
+    version: 1, observedMillis: 10, generatingMillis: 10, toolWaitMillis: 0, idleMillis: 0,
+  });
+
+  // Register "third" before "second" so it has the lower sequence and wins [10,15).
+  ledger.start("third", 10);
+  ledger.end("third", 15);
+  ledger.attachSubagentReport("third", {
+    version: 1, observedMillis: 5, generatingMillis: 0, toolWaitMillis: 5, idleMillis: 0,
+  });
+
+  ledger.start("second", 5);
+  ledger.end("second", 15);
+  // parentSubagentToolMillis = 10, owned = [5,10) = 5, report observed = 5
+  // attributable = round(5 * min(1, 5/10)) = round(2.5) = 3
+  ledger.attachSubagentReport("second", {
+    version: 1, observedMillis: 5, generatingMillis: 5, toolWaitMillis: 0, idleMillis: 0,
+  });
+
+  // first owns [0,5): attributable = round(5 * min(1, 10/5)) = 5 -> generating 5
+  // second owns [5,10): attributable 3 -> generating 3, remaining 2 -> toolWait
+  // third owns [10,15): attributable 5 -> toolWait 5
+  // total: generating 8, toolWait 7, idle 0 (exactly the root union [0,15))
+  expect(ledger.project(15)).toEqual({ generatingMillis: 8, toolWaitMillis: 7, idleMillis: 0 });
+});
+
+test("publishChildReport resolves even when store write rejects", async () => {
+  const store: ReportStore = {
+    async create() { return "/tmp/report.json"; },
+    async readAndRemove() { return null; },
+    async writeAtomically() { throw new Error("write failed"); },
+    async remove() {},
+  };
+  const report: RuntimeStatusReport = {
+    version: 1, observedMillis: 10, generatingMillis: 10, toolWaitMillis: 0, idleMillis: 0,
+  };
+  await expect(publishChildReport(store, "/tmp/report.json", report)).resolves.toBeUndefined();
+});
 
 describe("subagent command detection", () => {
   test("isPiSubagentCommand recognizes only a leading pi-subagent executable token", () => {
@@ -157,6 +238,43 @@ describe("managed report path validation", () => {
     expect(isManagedReportPath(join(tmp, "pi-runtime-status-abc123", "other.json"))).toBe(false);
     expect(isManagedReportPath(join(tmp, "pi-runtime-status-abc123", "report.json", "extra"))).toBe(false);
     expect(isManagedReportPath("pi-runtime-status-abc123/report.json")).toBe(false);
+  });
+});
+
+describe("report store directory cleanup", () => {
+  test("consuming a valid report removes the managed report directory", async () => {
+    const fs = new FakeFileOperations();
+    const store = new NodeReportStore(fs);
+    const path = await store.create();
+    const report: RuntimeStatusReport = {
+      version: 1, observedMillis: 10, generatingMillis: 10, toolWaitMillis: 0, idleMillis: 0,
+    };
+    await store.writeAtomically(path, report);
+    await store.readAndRemove(path);
+    expect(fs.dirs.has(dirname(path))).toBe(false);
+    expect(fs.removed).toContain(dirname(path));
+  });
+
+  test("removes the managed report directory when a report is malformed", async () => {
+    const fs = new FakeFileOperations();
+    const store = new NodeReportStore(fs);
+    const path = await store.create();
+    fs.files.set(path, "not-json");
+    await store.readAndRemove(path);
+    expect(fs.dirs.has(dirname(path))).toBe(false);
+  });
+
+  test("removes temp file and report directory when atomic rename fails", async () => {
+    const fs = new FakeFileOperations();
+    const store = new NodeReportStore(fs);
+    const path = await store.create();
+    const report: RuntimeStatusReport = {
+      version: 1, observedMillis: 10, generatingMillis: 10, toolWaitMillis: 0, idleMillis: 0,
+    };
+    fs.failNextRename = new Error("rename failed");
+    await expect(store.writeAtomically(path, report)).rejects.toThrow("rename failed");
+    expect(fs.files.has(`${path}.tmp`)).toBe(false);
+    expect(fs.dirs.has(dirname(path))).toBe(false);
   });
 });
 

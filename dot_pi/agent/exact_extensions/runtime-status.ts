@@ -1,10 +1,11 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { isAbsolute, join } from "node:path";
+import { dirname, isAbsolute, join } from "node:path";
 import {
   type ReportStore,
   type RuntimeStatusReport,
+  publishChildReport,
   ToolIntervalLedger,
   validateRuntimeStatusReport,
 } from "../runtime-status-core";
@@ -425,6 +426,22 @@ export async function prepareSubagentCommand(
   return { command: preparedCommand, reportPath };
 }
 
+export type FileOperations = {
+  mkdtemp(prefix: string): Promise<string>;
+  readFile(path: string, encoding: "utf-8"): Promise<string>;
+  writeFile(path: string, data: string, options?: { mode?: number }): Promise<void>;
+  rename(oldPath: string, newPath: string): Promise<void>;
+  rm(path: string, options?: { force?: boolean; recursive?: boolean }): Promise<void>;
+};
+
+const nodeFileOperations: FileOperations = {
+  mkdtemp: (prefix) => mkdtemp(prefix),
+  readFile: (path, encoding) => readFile(path, encoding),
+  writeFile: (path, data, options) => writeFile(path, data, options),
+  rename: (oldPath, newPath) => rename(oldPath, newPath),
+  rm: (path, options) => rm(path, options),
+};
+
 export function isManagedReportPath(path: string): boolean {
   if (!isAbsolute(path)) {
     return false;
@@ -438,9 +455,11 @@ export function isManagedReportPath(path: string): boolean {
   return /^\/pi-runtime-status-[^/]+\/report\.json$/.test(suffix);
 }
 
-class NodeReportStore implements ReportStore {
+export class NodeReportStore implements ReportStore {
+  constructor(private readonly fs: FileOperations) {}
+
   async create(): Promise<string> {
-    const dir = await mkdtemp(join(tmpdir(), "pi-runtime-status-"));
+    const dir = await this.fs.mkdtemp(join(tmpdir(), "pi-runtime-status-"));
     return join(dir, "report.json");
   }
 
@@ -448,17 +467,18 @@ class NodeReportStore implements ReportStore {
     if (!isManagedReportPath(path)) {
       return null;
     }
+    const dir = dirname(path);
     try {
-      const data = await readFile(path, "utf-8");
+      const data = await this.fs.readFile(path, "utf-8");
       const parsed = JSON.parse(data);
       return parsed;
     } catch {
       return null;
     } finally {
       try {
-        await rm(path, { force: true });
+        await this.fs.rm(dir, { force: true, recursive: true });
       } catch {
-        // best-effort removal even when the report is malformed or missing
+        // best-effort recursive removal of the managed report directory
       }
     }
   }
@@ -467,16 +487,23 @@ class NodeReportStore implements ReportStore {
     if (!isManagedReportPath(path)) {
       throw new Error("Invalid report path");
     }
+    const dir = dirname(path);
     const tempPath = `${path}.tmp`;
     try {
-      await writeFile(tempPath, JSON.stringify(report), { mode: 0o600 });
-      await rename(tempPath, path);
-    } finally {
+      await this.fs.writeFile(tempPath, JSON.stringify(report), { mode: 0o600 });
+      await this.fs.rename(tempPath, path);
+    } catch (error) {
       try {
-        await rm(tempPath, { force: true });
+        await this.fs.rm(tempPath, { force: true });
       } catch {
         // best-effort cleanup of the sibling temporary file
       }
+      try {
+        await this.fs.rm(dir, { force: true, recursive: true });
+      } catch {
+        // best-effort cleanup of the managed report directory
+      }
+      throw error;
     }
   }
 
@@ -484,10 +511,11 @@ class NodeReportStore implements ReportStore {
     if (!isManagedReportPath(path)) {
       return;
     }
+    const dir = dirname(path);
     try {
-      await rm(path, { force: true });
+      await this.fs.rm(dir, { force: true, recursive: true });
     } catch {
-      // best-effort removal
+      // best-effort recursive removal of the managed report directory
     }
   }
 }
@@ -521,7 +549,7 @@ function renderStatus(state: RuntimeStatusState, theme: Theme, streaming: boolea
 export default function (pi: ExtensionAPI) {
   const state = createRuntimeStatusState();
   const ledger = new ToolIntervalLedger();
-  const store = new NodeReportStore();
+  const store = new NodeReportStore(nodeFileOperations);
   const adapter = createSubagentTelemetryAdapter(store);
   let interval: ReturnType<typeof setInterval> | null = null;
 
@@ -631,7 +659,7 @@ export default function (pi: ExtensionAPI) {
         toolWaitMillis: distribution.toolWaitMillis,
         idleMillis: distribution.idleMillis,
       };
-      await store.writeAtomically(envReportPath, report);
+      await publishChildReport(store, envReportPath, report);
     }
     if (ctx.hasUI) {
       ctx.ui.setStatus(STATUS_KEY, undefined);
