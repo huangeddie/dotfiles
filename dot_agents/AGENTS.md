@@ -153,3 +153,8 @@ related to any code changes, also in red-green fashion.
    user for assistance.
 2. Then try narrow the scope of the bug and distill it into a RED-GREEN unit
    test. If this cannot be done easily, flag and seek guidance from the user.
+
+## Flagging
+
+Flag any code smells you discover that misalign with our preferences stated
+above.
