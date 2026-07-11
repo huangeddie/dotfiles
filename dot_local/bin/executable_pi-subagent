@@ -121,6 +121,7 @@ select_and_save_model() {
   fi
 
   write_selection "$model"
+  printf '%s\n' "$model"
 }
 
 run_prompt() {
