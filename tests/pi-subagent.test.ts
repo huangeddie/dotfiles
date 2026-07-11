@@ -104,7 +104,7 @@ describe("pi-subagent", () => {
     );
   });
 
-  test.skip("prints the persisted model without invoking Pi", async () => {
+  test("prints the persisted model without invoking Pi", async () => {
     await mkdir(join(stateHome, "pi"), { recursive: true });
     await writeFile(join(stateHome, "pi", "subagent-model"), "anthropic/claude-sonnet-5\n");
 
@@ -115,7 +115,7 @@ describe("pi-subagent", () => {
     await expect(readFile(callPath, "utf8")).rejects.toThrow();
   });
 
-  test.skip("rejects status when no model is selected without invoking Pi", async () => {
+  test("rejects status when no model is selected without invoking Pi", async () => {
     const result = await run(["--status"]);
 
     expect(result.exitCode).not.toBe(0);
@@ -123,7 +123,7 @@ describe("pi-subagent", () => {
     await expect(readFile(callPath, "utf8")).rejects.toThrow();
   });
 
-  test.skip("rejects status when the persisted selection is malformed", async () => {
+  test("rejects status when the persisted selection is malformed", async () => {
     await mkdir(join(stateHome, "pi"), { recursive: true });
     await writeFile(
       join(stateHome, "pi", "subagent-model"),

@@ -11,6 +11,7 @@ usage() {
   cat >&2 <<EOF
 usage:
   ${0##*/}                         Select and persist a Pi model
+  ${0##*/} --status                Display the persisted Pi model
   ${0##*/} <prompt>                Run with the persisted model
   ${0##*/} --model <provider/model> <prompt>
                                    Run once with a live Pi model
@@ -143,6 +144,9 @@ case "$#" in
   case "$1" in
   -h | --help)
     usage
+    ;;
+  --status)
+    read_selection
     ;;
   --list-models)
     pi --list-models
