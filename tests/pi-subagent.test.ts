@@ -86,6 +86,7 @@ describe("pi-subagent", () => {
     });
 
     expect(result.exitCode).toBe(0);
+    expect(result.stdout).toBe("anthropic/claude-sonnet-5\n");
     await expect(readFile(join(stateHome, "pi", "subagent-model"), "utf8")).resolves.toBe(
       "anthropic/claude-sonnet-5\n",
     );
@@ -173,6 +174,7 @@ describe("pi-subagent", () => {
     });
 
     expect(result.exitCode).toBe(130);
+    expect(result.stdout).toBe("");
     await expect(readFile(join(stateHome, "pi", "subagent-model"), "utf8")).rejects.toThrow();
   });
 });

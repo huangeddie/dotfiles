@@ -26,7 +26,7 @@ Run this procedure manually after applying the chezmoi source changes. It is not
 
 3. Run `pi-subagent` with no arguments, select a visible model in `fzf`, and accept it.
 
-   Expected: the picker closes successfully and `${XDG_STATE_HOME:-$HOME/.local/state}/pi/subagent-model` contains exactly the selected `provider/model` plus newline.
+   Expected: the picker closes successfully, prints exactly the selected `provider/model` selector plus newline, and `${XDG_STATE_HOME:-$HOME/.local/state}/pi/subagent-model` contains that same selector plus newline.
 
 4. Verify the persisted model can be displayed without starting Pi:
 
