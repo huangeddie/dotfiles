@@ -28,7 +28,15 @@ Run this procedure manually after applying the chezmoi source changes. It is not
 
    Expected: the picker closes successfully and `${XDG_STATE_HOME:-$HOME/.local/state}/pi/subagent-model` contains exactly the selected `provider/model` plus newline.
 
-4. Verify the saved model is usable:
+4. Verify the persisted model can be displayed without starting Pi:
+
+   ```bash
+   pi-subagent --status
+   ```
+
+   Expected: it prints exactly the selected `provider/model` selector and exits successfully; no model request is made.
+
+5. Verify the saved model is usable:
 
    ```bash
    pi-subagent "Reply with exactly: selected model works"
@@ -36,7 +44,7 @@ Run this procedure manually after applying the chezmoi source changes. It is not
 
    Expected: Pi runs with the selected model and prints `selected model works`.
 
-5. Verify the one-call override leaves persisted state unchanged:
+6. Verify the one-call override leaves persisted state unchanged:
 
    ```bash
    before="$(cat "${XDG_STATE_HOME:-$HOME/.local/state}/pi/subagent-model")"
