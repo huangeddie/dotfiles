@@ -11,12 +11,10 @@ MODEL_ROWS=()
 usage() {
   cat >&2 <<EOF
 usage:
-  ${0##*/}                         Select and persist a Pi model
+  ${0##*/}                         Select and persist the Pi model (user only).
   ${0##*/} --status                Display the persisted Pi model
   ${0##*/} <prompt>                Run with the persisted model
   ${0##*/} --list-models           List models currently available in Pi
-
-Only the user may change the persisted Pi model.
 EOF
 }
 
