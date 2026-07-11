@@ -157,14 +157,12 @@ describe("pi-subagent", () => {
     await expect(readFile(callPath, "utf8")).rejects.toThrow();
   });
 
-  test("uses a valid --model override without changing persisted state", async () => {
+  test("rejects --model without invoking Pi", async () => {
     const result = await run(["--model", "openai-codex/gpt-5.6-luna", "inspect this repository"]);
 
-    expect(result.exitCode).toBe(0);
-    await expect(readFile(callPath)).resolves.toEqual(
-      Buffer.from("--model\0openai-codex/gpt-5.6-luna\0-p\0inspect this repository\0"),
-    );
-    await expect(readFile(join(stateHome, "pi", "subagent-model"), "utf8")).rejects.toThrow();
+    expect(result.exitCode).not.toBe(0);
+    expect(result.stderr).toContain("usage:");
+    await expect(readFile(callPath, "utf8")).rejects.toThrow();
   });
 
   test("fails when the picker is cancelled and writes no selection", async () => {

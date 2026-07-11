@@ -43,13 +43,3 @@ Run this procedure manually after applying the chezmoi source changes. It is not
    ```
 
    Expected: Pi runs with the selected model and prints `selected model works`.
-
-6. Verify the one-call override leaves persisted state unchanged:
-
-   ```bash
-   before="$(cat "${XDG_STATE_HOME:-$HOME/.local/state}/pi/subagent-model")"
-   pi-subagent --model "$before" "Reply with exactly: override works"
-   test "$before" = "$(cat "${XDG_STATE_HOME:-$HOME/.local/state}/pi/subagent-model")"
-   ```
-
-   Expected: Pi prints `override works`; the final `test` exits zero.

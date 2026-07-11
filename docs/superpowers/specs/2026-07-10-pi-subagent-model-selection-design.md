@@ -53,7 +53,6 @@ The parent directory is created as needed. Updates use a temporary file in that 
 ```text
 pi-subagent
 pi-subagent <prompt>
-pi-subagent --model <provider/model> <prompt>
 pi-subagent --list-models
 pi-subagent --help
 ```
@@ -62,7 +61,6 @@ pi-subagent --help
 | --- | --- |
 | No arguments | Load the live Pi catalog, show an `fzf` picker, and persist the chosen selector. Do not start an agent. |
 | `<prompt>` | Require that persisted selector to be in the live Pi catalog, then invoke Pi with it. |
-| `--model <selector> <prompt>` | Require the selector to be in the live Pi catalog, invoke Pi with it, and leave state unchanged. |
 | `--list-models` | Print the current live Pi catalog without invoking `fzf` or an agent. |
 | `--help` | Print usage and exit successfully. |
 
@@ -88,7 +86,7 @@ The provider flag is intentionally not sent separately: the provider-qualified s
 For a prompt run, the flow is:
 
 ```text
-arguments → selector (state or override) → live Pi catalog validation
+arguments → persisted selector → live Pi catalog validation
           → pi --model <selector> -p <prompt>
 ```
 
@@ -104,7 +102,7 @@ The wrapper exits nonzero and never starts a child agent for:
 
 - no persisted selection when a prompt is supplied;
 - a persisted selection no longer present in the live Pi catalog;
-- an override absent from the live Pi catalog;
+- an unsupported invocation, including `--model`;
 - an empty catalog or malformed catalog row;
 - unavailable `fzf` for interactive selection;
 - canceled picker;
@@ -123,5 +121,6 @@ The actual `pi --list-models`, `fzf`, and child Pi integration is covered by a m
 
 - Maintaining a duplicate or wrapper-specific model allowlist.
 - Changing Pi's global interactive model preference.
+- Overriding the persisted selection for one invocation.
 - Persisting per-project selections.
 - Changing `models.json`, authentication, provider configuration, or Pi's model registry.
