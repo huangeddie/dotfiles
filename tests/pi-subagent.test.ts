@@ -105,6 +105,14 @@ describe("pi-subagent", () => {
     );
   });
 
+  test("documents that only the user may change the persisted model", async () => {
+    const result = await run(["--help"]);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toContain("Only the user may change the persisted Pi model.");
+    await expect(readFile(callPath, "utf8")).rejects.toThrow();
+  });
+
   test("prints the persisted model without invoking Pi", async () => {
     await mkdir(join(stateHome, "pi"), { recursive: true });
     await writeFile(join(stateHome, "pi", "subagent-model"), "anthropic/claude-sonnet-5\n");
