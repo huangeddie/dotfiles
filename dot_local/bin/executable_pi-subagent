@@ -13,8 +13,6 @@ usage:
   ${0##*/}                         Select and persist a Pi model
   ${0##*/} --status                Display the persisted Pi model
   ${0##*/} <prompt>                Run with the persisted model
-  ${0##*/} --model <provider/model> <prompt>
-                                   Run once with a live Pi model
   ${0##*/} --list-models           List models currently available in Pi
 EOF
 }
@@ -157,13 +155,6 @@ case "$#" in
     run_prompt "$model" "$1"
     ;;
   esac
-  ;;
-3)
-  if [[ "$1" != "--model" ]]; then
-    usage
-    exit 2
-  fi
-  run_prompt "$2" "$3"
   ;;
 *)
   usage
