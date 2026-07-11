@@ -2,6 +2,7 @@
 alias n='nvim'
 
 # Version control
+alias g='git'
 alias lg='lazygit'
 alias j='jj'
 alias ji='jjui'
