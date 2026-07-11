@@ -109,7 +109,7 @@ describe("pi-subagent", () => {
     const result = await run(["--help"]);
 
     expect(result.exitCode).toBe(0);
-    expect(result.stderr).toContain("Only the user may change the persisted Pi model.");
+    expect(result.stderr).toContain("Select and persist the Pi model (user only)");
     await expect(readFile(callPath, "utf8")).rejects.toThrow();
   });
 
