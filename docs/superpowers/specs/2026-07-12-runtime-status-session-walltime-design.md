@@ -1,7 +1,7 @@
 # Runtime status: explicit session walltime accounting
 
 **Date:** 2026-07-12  
-**Status:** Approved
+**Status:** Superseded by `2026-07-12-runtime-status-unified-tools-design.md`
 
 ## Goal
 
