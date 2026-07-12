@@ -112,6 +112,16 @@ test("accepts strict four-category v2 reports", () => {
     unaccountedMillis: 1,
   };
   expect(validateRuntimeStatusReport(valid)).toEqual(valid);
+  expect(validateRuntimeStatusReport({ ...valid, version: 1 })).toBeNull();
+  expect(validateRuntimeStatusReport({ ...valid, modelMillis: -1, toolWaitMillis: 8 })).toBeNull();
+  expect(validateRuntimeStatusReport({ ...valid, modelMillis: 3.5, toolWaitMillis: 3.5 })).toBeNull();
+  expect(validateRuntimeStatusReport({
+    version: 2,
+    observedMillis: 10,
+    modelMillis: 4,
+    toolWaitMillis: 3,
+    idleMillis: 2,
+  })).toBeNull();
   expect(validateRuntimeStatusReport({ ...valid, ["fileOps" + "Millis"]: 0 })).toBeNull();
   expect(validateRuntimeStatusReport({ ...valid, observedMillis: 11 })).toBeNull();
 });
