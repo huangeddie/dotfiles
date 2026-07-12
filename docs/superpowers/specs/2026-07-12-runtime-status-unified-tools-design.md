@@ -122,10 +122,15 @@ Fast deterministic unit tests cover:
 7. TPS remaining provider/model-only;
 8. every snapshot summing exactly to session walltime.
 
-The manual QA procedure must describe all ordinary tools under `tools`, remove
-file-operation observations, and use a target-scoped chezmoi apply command so
-unrelated deployed drift is not overwritten. Interactive Pi/provider QA remains
-user-assisted and outside automated tests, hooks, and CI.
+The manual QA procedure must describe all ordinary tools under `tools` and
+remove file-operation observations. `~/.pi/agent/runtime-status-core.ts` and
+`~/.pi/agent/extensions/runtime-status.ts` are one deployment unit: before
+applying, it must run a target-scoped `chezmoi diff` for each target; it must
+apply both targets together with a target-scoped command; and after applying,
+it must run a target-scoped `chezmoi diff` for each target and require both to
+be empty. It must never use global `chezmoi apply`, so unrelated deployed drift
+is not overwritten. Interactive Pi/provider QA remains user-assisted and
+outside automated tests, hooks, and CI.
 
 ## Out of scope
 

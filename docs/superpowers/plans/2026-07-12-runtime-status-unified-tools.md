@@ -18,7 +18,7 @@
 - TPS uses only provider/model duration.
 - Unit tests use explicit timestamps and practical fakes; no real clocks, timers, filesystem, network, UI, or sampling.
 - Manual QA stays outside Bun, hooks, and CI.
-- Chezmoi deployment must target only `~/.pi/agent/extensions/runtime-status.ts` so unrelated target drift is not overwritten.
+- `~/.pi/agent/runtime-status-core.ts` and `~/.pi/agent/extensions/runtime-status.ts` are one deployment unit. Run target-scoped pre-diffs for both, apply both together with a target-scoped command, then run target-scoped post-diffs for both; both post-apply diffs must be empty. Never use global `chezmoi apply`, so unrelated target drift is not overwritten.
 - Use Bun `test.failing` for RED contracts and separate Conventional Commits for Track A and Track B.
 
 ---
@@ -210,11 +210,11 @@ git commit -m "refactor: unify runtime tool distribution"
 
 ---
 
-### Task 2: Align QA and deploy the extension safely
+### Task 2: Align QA and deploy the runtime-status pair safely
 
 **Files:**
 - Modify: `docs/qa/runtime-status-subagent-telemetry.md`
-- Apply target: `~/.pi/agent/extensions/runtime-status.ts`
+- Apply targets: `~/.pi/agent/runtime-status-core.ts` and `~/.pi/agent/extensions/runtime-status.ts` (one deployment unit)
 
 **Interfaces:**
 - Consumes final four-category status and strict v2 report from Task 1.
@@ -230,12 +230,18 @@ model generation + tool wait + idle + other = stopwatch walltime
 
 Remove the separate `files` observation. State that `read`, `write`, `edit`, Bash, and all other ordinary root tools increase `tools`; generating tool arguments and processing results remain `gen`.
 
-Replace global deployment with drift-safe commands:
+Treat the core and extension as one deployment unit. Replace global deployment
+with drift-safe commands:
 
 ```bash
+chezmoi diff ~/.pi/agent/runtime-status-core.ts
 chezmoi diff ~/.pi/agent/extensions/runtime-status.ts
-chezmoi apply ~/.pi/agent/extensions/runtime-status.ts
+chezmoi apply ~/.pi/agent/runtime-status-core.ts ~/.pi/agent/extensions/runtime-status.ts
+chezmoi diff ~/.pi/agent/runtime-status-core.ts
+chezmoi diff ~/.pi/agent/extensions/runtime-status.ts
 ```
+
+Both post-apply diffs must be empty.
 
 Retain direct/nested subagent, privacy, bounded totals, and manual-only requirements.
 
@@ -246,12 +252,16 @@ Run:
 ```bash
 git diff --check
 bun test tests/runtime-status.test.ts tests/pi-subagent.test.ts
+chezmoi diff ~/.pi/agent/runtime-status-core.ts
 chezmoi diff ~/.pi/agent/extensions/runtime-status.ts
-chezmoi apply ~/.pi/agent/extensions/runtime-status.ts
+chezmoi apply ~/.pi/agent/runtime-status-core.ts ~/.pi/agent/extensions/runtime-status.ts
+chezmoi diff ~/.pi/agent/runtime-status-core.ts
 chezmoi diff ~/.pi/agent/extensions/runtime-status.ts
 ```
 
-Expected: tests pass; the first scoped diff shows only runtime-status changes; apply succeeds; final scoped diff is empty. Do not run global `chezmoi apply`.
+Expected: tests pass; the scoped pre-diffs show only runtime-status changes;
+the one scoped apply deploys the core and extension together; both final scoped
+diffs are empty. Do not run global `chezmoi apply`.
 
 - [ ] **Step 3: Commit QA documentation**
 

@@ -10,26 +10,29 @@ pre-commit hooks, CI, or the `pi-subagent` wrapper.
 
 ## Prerequisites
 
-- The `runtime-status` extension can be deployed with the target-scoped commands below.
+- The `runtime-status` core and extension are one deployment unit and can be deployed with the target-scoped commands below.
 - The `pi-subagent` wrapper is available on `PATH`.
 - Pi is installed and configured with a provider that supports tool use.
 
 ## Procedure
 
-1. Inspect and deploy only the extension target, then move to a scratch directory:
+1. Inspect and deploy the runtime-status core and extension as one deployment
+   unit, then move to a scratch directory:
 
    ```bash
+   chezmoi diff ~/.pi/agent/runtime-status-core.ts
    chezmoi diff ~/.pi/agent/extensions/runtime-status.ts
-   chezmoi apply ~/.pi/agent/extensions/runtime-status.ts
+   chezmoi apply ~/.pi/agent/runtime-status-core.ts ~/.pi/agent/extensions/runtime-status.ts
+   chezmoi diff ~/.pi/agent/runtime-status-core.ts
    chezmoi diff ~/.pi/agent/extensions/runtime-status.ts
    cd /tmp
    pi
    ```
 
-   Do not use global `chezmoi apply`: the initial scoped diff must show only
-   `runtime-status` changes so unrelated target drift is preserved. After the
-   scoped apply, the second scoped diff must exit successfully with empty
-   output.
+   Do not use global `chezmoi apply`: each initial scoped diff must show only
+   its runtime-status changes so unrelated target drift is preserved. The one
+   scoped apply deploys both targets as one unit. After it, both scoped
+   post-apply diffs must exit successfully with empty output.
 
 2. Leave Pi waiting at the editor for at least five seconds. Confirm that the
    stopwatch and `idle` duration increase while `other` does not.
