@@ -1,10 +1,12 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  classifyRootTool,
   createRuntimeStatusState,
   createSubagentTelemetryAdapter,
   distributionSnapshot,
   formatStatus,
+  formatStopwatch,
   handleAssistantMessageEnd,
   isManagedReportPath,
   isPiSubagentCommand,
@@ -12,7 +14,10 @@ import {
   prepareSubagentCommand,
   recordAfterProviderResponse,
   recordAgentEnd,
+  recordAgentSettled,
   recordAgentStart,
+  recordProcessingStart,
+  recordSessionStart,
   recordTurnStart,
   recordToolExecutionEnd,
   recordToolExecutionStart,
@@ -27,7 +32,6 @@ import {
   type RuntimeStatusReport,
   publishChildReport,
   RuntimeTimeline,
-  ToolIntervalLedger,
   scaleReport,
   validateRuntimeStatusReport,
 } from "../dot_pi/agent/runtime-status-core";
@@ -468,66 +472,6 @@ test("falls back to a root tool classification for an invalid child report", () 
   });
 });
 
-test("keeps a missing or invalid subagent report as ordinary tool time", () => {
-  const ledger = new ToolIntervalLedger();
-  ledger.start("subagent", 0);
-  ledger.end("subagent", 10);
-  expect(ledger.project(10)).toEqual({
-    modelMillis: 0, fileOpsMillis: 0, toolWaitMillis: 10, idleMillis: 0, unaccountedMillis: 0,
-  });
-});
-
-test("reclassifies a complete subagent interval without changing root elapsed time", () => {
-  const ledger = new ToolIntervalLedger();
-  ledger.start("subagent", 0);
-  ledger.end("subagent", 12);
-  ledger.attachSubagentReport("subagent", {
-    version: 2, observedMillis: 10, modelMillis: 5, fileOpsMillis: 0, toolWaitMillis: 3, idleMillis: 2, unaccountedMillis: 0,
-  });
-  expect(ledger.project(12)).toEqual({
-    modelMillis: 5, fileOpsMillis: 0, toolWaitMillis: 5, idleMillis: 2, unaccountedMillis: 0,
-  });
-});
-
-test("gives overlapping subagents start-order ownership without double-counting", () => {
-  const ledger = new ToolIntervalLedger();
-  ledger.start("first", 0); ledger.start("second", 5);
-  ledger.end("first", 10); ledger.end("second", 15);
-  ledger.attachSubagentReport("first", { version: 2, observedMillis: 10, modelMillis: 10, fileOpsMillis: 0, toolWaitMillis: 0, idleMillis: 0, unaccountedMillis: 0 });
-  ledger.attachSubagentReport("second", { version: 2, observedMillis: 10, modelMillis: 0, fileOpsMillis: 0, toolWaitMillis: 10, idleMillis: 0, unaccountedMillis: 0 });
-  expect(ledger.project(15)).toEqual({
-    modelMillis: 10, fileOpsMillis: 0, toolWaitMillis: 5, idleMillis: 0, unaccountedMillis: 0,
-  });
-});
-
-test("counts overlapping ordinary tools as a wall-clock union", () => {
-  const ledger = new ToolIntervalLedger();
-  ledger.start("one", 0); ledger.start("two", 5);
-  ledger.end("one", 10); ledger.end("two", 15);
-  expect(ledger.project(15)).toEqual({
-    modelMillis: 0, fileOpsMillis: 0, toolWaitMillis: 15, idleMillis: 0, unaccountedMillis: 0,
-  });
-});
-
-test("reattributes lifecycle-valid overlapping subagents proportionally by owned duration", () => {
-  const ledger = new ToolIntervalLedger();
-  ledger.start("first", 0);
-  ledger.start("second", 5);
-  ledger.end("first", 10);
-  ledger.end("second", 15);
-  ledger.attachSubagentReport("first", {
-    version: 2, observedMillis: 10, modelMillis: 10, fileOpsMillis: 0, toolWaitMillis: 0, idleMillis: 0, unaccountedMillis: 0,
-  });
-  ledger.attachSubagentReport("second", {
-    version: 2, observedMillis: 5, modelMillis: 5, fileOpsMillis: 0, toolWaitMillis: 0, idleMillis: 0, unaccountedMillis: 0,
-  });
-
-  // first owns [0,10); second owns [10,15), but its report covers half its parent duration.
-  expect(ledger.project(15)).toEqual({
-    modelMillis: 13, fileOpsMillis: 0, toolWaitMillis: 2, idleMillis: 0, unaccountedMillis: 0,
-  });
-});
-
 test("publishChildReport resolves even when store write rejects", async () => {
   const store: ReportStore = {
     async create() { return "/tmp/report.json"; },
@@ -656,12 +600,20 @@ describe("subagent telemetry adapter", () => {
     const reportPath = "/tmp/runtime-0.json";
     const report = { version: 2, observedMillis: 10, modelMillis: 4, fileOpsMillis: 0, toolWaitMillis: 3, idleMillis: 3, unaccountedMillis: 0 };
     await store.writeAtomically(reportPath, report);
-    const ledger = new ToolIntervalLedger();
-    ledger.start("tc-1", 0);
-    ledger.end("tc-1", 10);
-    await adapter.attachReportIfPresent("tc-1", ledger);
-    expect(ledger.project(10)).toEqual({
-      modelMillis: 4, fileOpsMillis: 0, toolWaitMillis: 3, idleMillis: 3, unaccountedMillis: 0,
+    const timeline = new RuntimeTimeline();
+    timeline.startSession(0);
+    timeline.startProcessing(0);
+    timeline.startTool("tc-1", "toolWait", 0);
+    timeline.endTool("tc-1", 10);
+    await adapter.attachReportIfPresent("tc-1", timeline);
+    timeline.settle(10);
+    expect(timeline.snapshot(10)).toEqual({
+      wallMillis: 10,
+      modelMillis: 4,
+      fileOpsMillis: 0,
+      toolWaitMillis: 3,
+      idleMillis: 3,
+      unaccountedMillis: 0,
     });
   });
 
@@ -669,12 +621,20 @@ describe("subagent telemetry adapter", () => {
     const store = new FakeReportStore();
     const adapter = createSubagentTelemetryAdapter(store);
     await adapter.prepare("tc-1", "pi-subagent 'inspect this'");
-    const ledger = new ToolIntervalLedger();
-    ledger.start("tc-1", 0);
-    ledger.end("tc-1", 10);
-    await adapter.attachReportIfPresent("tc-1", ledger);
-    expect(ledger.project(10)).toEqual({
-      modelMillis: 0, fileOpsMillis: 0, toolWaitMillis: 10, idleMillis: 0, unaccountedMillis: 0,
+    const timeline = new RuntimeTimeline();
+    timeline.startSession(0);
+    timeline.startProcessing(0);
+    timeline.startTool("tc-1", "toolWait", 0);
+    timeline.endTool("tc-1", 10);
+    await adapter.attachReportIfPresent("tc-1", timeline);
+    timeline.settle(10);
+    expect(timeline.snapshot(10)).toEqual({
+      wallMillis: 10,
+      modelMillis: 0,
+      fileOpsMillis: 0,
+      toolWaitMillis: 10,
+      idleMillis: 0,
+      unaccountedMillis: 0,
     });
   });
 
@@ -704,154 +664,74 @@ describe("subagent telemetry adapter", () => {
   });
 });
 
-describe("ledger reconciliation", () => {
-  test("distributionSnapshot adds subagent generating time to root model time", () => {
-    const state = createRuntimeStatusState();
-    const ledger = new ToolIntervalLedger();
+test.failing("classifies Pi read, write, and edit tools as file operations", () => {
+  expect(classifyRootTool("read")).toBe("fileOps");
+  expect(classifyRootTool("write")).toBe("fileOps");
+  expect(classifyRootTool("edit")).toBe("fileOps");
+  expect(classifyRootTool("bash")).toBe("toolWait");
+  expect(classifyRootTool("grep")).toBe("toolWait");
+  expect(classifyRootTool("find")).toBe("toolWait");
+  expect(classifyRootTool("unknown")).toBe("toolWait");
+});
 
-    recordAgentStart(state, 0);
-    recordTurnStart(state, 1_000);
-    recordAfterProviderResponse(state, 1_200);
-    handleAssistantMessageEnd(state, 2_000, 100);
+test.failing("keeps whole-session settled time idle and active gaps other", () => {
+  const state = createRuntimeStatusState();
+  recordSessionStart(state, 0);
+  recordProcessingStart(state, 1_000);
+  recordTurnStart(state, 2_000);
+  handleAssistantMessageEnd(state, 3_000, 100);
+  recordAgentEnd(state, 4_000);
+  recordAgentSettled(state, 5_000);
 
-    ledger.start("subagent", 2_000);
-    ledger.end("subagent", 5_000);
-    ledger.attachSubagentReport("subagent", {
-      version: 2,
-      observedMillis: 3_000,
-      modelMillis: 3_000,
-      fileOpsMillis: 0,
-      toolWaitMillis: 0,
-      idleMillis: 0,
-      unaccountedMillis: 0,
-    });
-
-    recordAgentEnd(state, 5_000);
-
-    expect(distributionSnapshot(state, 5_000, ledger)).toMatchObject({
-      generatingMillis: 4_000,
-      toolWaitMillis: 0,
-      idleMillis: 1_000,
-    });
-  });
-
-  test("formatStatus reflects reconciled subagent time", () => {
-    const state = createRuntimeStatusState();
-    const ledger = new ToolIntervalLedger();
-
-    recordAgentStart(state, 0);
-    recordTurnStart(state, 1_000);
-    recordAfterProviderResponse(state, 1_200);
-    handleAssistantMessageEnd(state, 2_000, 100);
-
-    ledger.start("subagent", 2_000);
-    ledger.end("subagent", 5_000);
-    ledger.attachSubagentReport("subagent", {
-      version: 2,
-      observedMillis: 3_000,
-      modelMillis: 3_000,
-      fileOpsMillis: 0,
-      toolWaitMillis: 0,
-      idleMillis: 0,
-      unaccountedMillis: 0,
-    });
-
-    recordAgentEnd(state, 5_000);
-
-    expect(formatStatus(state, false, 5_000, ledger)).toBe(
-      "✓ 100.0 t/s | gen 4.0s 80% | tools 0.0s 0% | idle 1.0s 20%",
-    );
+  expect(distributionSnapshot(state, 10_000)).toEqual({
+    wallMillis: 10_000,
+    modelMillis: 1_000,
+    fileOpsMillis: 0,
+    toolWaitMillis: 0,
+    idleMillis: 6_000,
+    unaccountedMillis: 3_000,
   });
 });
 
-describe("runtime status contracts", () => {
-  test("TPS uses total output tokens over completed model-call time", () => {
-    const state = createRuntimeStatusState();
+test.failing("formats compact session stopwatch boundaries", () => {
+  expect(formatStopwatch(8_999)).toBe("8s");
+  expect(formatStopwatch(134_999)).toBe("2m 14s");
+  expect(formatStopwatch(3_792_999)).toBe("1h 03m 12s");
+});
 
-    recordAgentStart(state, 0);
-    recordTurnStart(state, 1_000);
-    recordAfterProviderResponse(state, 2_000);
-    handleAssistantMessageEnd(state, 12_000, 352);
-    recordAgentEnd(state, 12_500);
+test.failing("renders stopwatch, files, and explicit other percentages", () => {
+  const state = createRuntimeStatusState();
+  recordSessionStart(state, 0);
+  recordProcessingStart(state, 1_000);
+  recordTurnStart(state, 2_000);
+  handleAssistantMessageEnd(state, 3_000, 100);
+  recordToolExecutionStart(state, "read-1", "read", 3_000);
+  recordToolExecutionEnd(state, "read-1", 4_000);
+  recordAgentSettled(state, 5_000);
 
-    expect(state.sessionAccumulation).toEqual({ tokens: 352, activeMillis: 11_000 });
-    expect(distributionSnapshot(state, 12_500)).toMatchObject({
-      generatingMillis: 11_000,
-      toolWaitMillis: 0,
-      idleMillis: 1_500,
-    });
-    expect(formatStatus(state, false, 12_500)).toBe(
-      "✓ 32.0 t/s | gen 11.0s 88% | tools 0.0s 0% | idle 1.5s 12%",
-    );
+  expect(formatStatus(state, 10_000)).toBe(
+    "⏱ 10s | 100.0 t/s | gen 1.0s 10% | files 1.0s 10% | tools 0.0s 0% | idle 6.0s 60% | other 2.0s 20%",
+  );
+});
+
+test.failing("keeps TPS on provider duration while excluding file operations", () => {
+  const state = createRuntimeStatusState();
+  recordSessionStart(state, 0);
+  recordProcessingStart(state, 0);
+  recordTurnStart(state, 1_000);
+  handleAssistantMessageEnd(state, 12_000, 352);
+  recordToolExecutionStart(state, "read-1", "read", 12_000);
+  recordToolExecutionEnd(state, "read-1", 12_500);
+  recordAgentSettled(state, 12_500);
+
+  expect(state.sessionAccumulation).toEqual({ tokens: 352, activeMillis: 11_000 });
+  expect(distributionSnapshot(state, 12_500)).toEqual({
+    wallMillis: 12_500,
+    modelMillis: 11_000,
+    fileOpsMillis: 500,
+    toolWaitMillis: 0,
+    idleMillis: 0,
+    unaccountedMillis: 1_000,
   });
-
-  test("tool execution counts as tool time outside provider response time", () => {
-    const state = createRuntimeStatusState();
-
-    recordAgentStart(state, 0);
-    recordTurnStart(state, 1_000);
-    recordAfterProviderResponse(state, 1_200);
-    handleAssistantMessageEnd(state, 2_000, 100);
-    recordToolExecutionStart(state, 2_000);
-    recordToolExecutionEnd(state, 5_000);
-    recordAgentEnd(state, 5_000);
-
-    expect(distributionSnapshot(state, 5_000)).toMatchObject({
-      generatingMillis: 1_000,
-      toolWaitMillis: 3_000,
-      idleMillis: 1_000,
-    });
-    expect(formatStatus(state, false, 5_000)).toBe(
-      "✓ 100.0 t/s | gen 1.0s 20% | tools 3.0s 60% | idle 1.0s 20%",
-    );
-  });
-
-  test("multiple turns aggregate tokens over total provider response time", () => {
-    const state = createRuntimeStatusState();
-
-    recordAgentStart(state, 0);
-    recordTurnStart(state, 1_000);
-    recordAfterProviderResponse(state, 1_200);
-    handleAssistantMessageEnd(state, 2_000, 100);
-    recordToolExecutionStart(state, 2_000);
-    recordToolExecutionEnd(state, 5_000);
-    recordTurnStart(state, 6_000);
-    recordAfterProviderResponse(state, 6_100);
-    handleAssistantMessageEnd(state, 6_500, 150);
-    recordAgentEnd(state, 6_500);
-
-    expect(distributionSnapshot(state, 6_500)).toMatchObject({
-      generatingMillis: 1_500,
-      toolWaitMillis: 3_000,
-      idleMillis: 2_000,
-    });
-    expect(formatStatus(state, false, 6_500)).toBe(
-      "✓ 166.7 t/s | gen 1.5s 23% | tools 3.0s 46% | idle 2.0s 31%",
-    );
-  });
-
-  test("runtime totals accumulate across multiple agent runs in one session", () => {
-    const state = createRuntimeStatusState();
-
-    recordAgentStart(state, 0);
-    recordTurnStart(state, 100);
-    recordAfterProviderResponse(state, 200);
-    handleAssistantMessageEnd(state, 1_100, 100);
-    recordAgentEnd(state, 2_000);
-
-    recordAgentStart(state, 10_000);
-    recordTurnStart(state, 10_200);
-    recordAfterProviderResponse(state, 10_300);
-    handleAssistantMessageEnd(state, 10_700, 150);
-    recordAgentEnd(state, 11_000);
-
-    expect(distributionSnapshot(state, 11_000)).toMatchObject({
-      generatingMillis: 1_500,
-      toolWaitMillis: 0,
-      idleMillis: 1_500,
-    });
-    expect(formatStatus(state, false, 11_000)).toBe(
-      "✓ 166.7 t/s | gen 1.5s 50% | tools 0.0s 0% | idle 1.5s 50%",
-    );
-  });
+  expect(formatStatus(state, 12_500)).toContain("32.0 t/s");
 });

@@ -4,7 +4,9 @@ import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join } from "node:path";
 import {
   type ReportStore,
+  type RootToolClassification,
   type RuntimeStatusReport,
+  type SubagentReportSink,
   publishChildReport,
   ToolIntervalLedger,
   validateRuntimeStatusReport,
@@ -55,6 +57,16 @@ type AssistantDelta = {
 type Theme = {
   fg(name: string, text: string): string;
 };
+
+export function recordSessionStart(_state: RuntimeStatusState, _now: number): void {}
+export function recordProcessingStart(_state: RuntimeStatusState, _now: number): void {}
+export function recordAgentSettled(_state: RuntimeStatusState, _now: number): void {}
+export function recordSessionShutdown(_state: RuntimeStatusState, _now: number): void {}
+export function formatStopwatch(_millis: number): string { return ""; }
+
+export function classifyRootTool(_toolName: string): RootToolClassification {
+  return "toolWait";
+}
 
 export function createRuntimeStatusState(): RuntimeStatusState {
   return {
@@ -366,7 +378,7 @@ export function createSubagentTelemetryAdapter(
   store: ReportStore,
 ): {
   prepare(toolCallId: string, command: string): Promise<{ command: string }>;
-  attachReportIfPresent(toolCallId: string, ledger: ToolIntervalLedger): Promise<void>;
+  attachReportIfPresent(toolCallId: string, sink: SubagentReportSink): Promise<void>;
   cleanup(): Promise<void>;
 } {
   const pendingReportPaths = new Map<string, string>();
@@ -378,7 +390,7 @@ export function createSubagentTelemetryAdapter(
       }
       return { command: prepared.command };
     },
-    async attachReportIfPresent(toolCallId: string, ledger: ToolIntervalLedger) {
+    async attachReportIfPresent(toolCallId: string, sink: SubagentReportSink) {
       const reportPath = pendingReportPaths.get(toolCallId);
       if (!reportPath) {
         return;
@@ -387,7 +399,7 @@ export function createSubagentTelemetryAdapter(
       const report = await store.readAndRemove(reportPath);
       const validated = report ? validateRuntimeStatusReport(report) : null;
       if (validated) {
-        ledger.attachSubagentReport(toolCallId, validated);
+        sink.attachSubagentReport(toolCallId, validated);
       }
     },
     async cleanup() {
