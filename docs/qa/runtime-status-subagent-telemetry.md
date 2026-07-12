@@ -10,25 +10,31 @@ pre-commit hooks, CI, or the `pi-subagent` wrapper.
 
 ## Prerequisites
 
-- The `runtime-status` extension is deployed (e.g. via `chezmoi apply`).
+- The `runtime-status` extension can be deployed with the target-scoped commands below.
 - The `pi-subagent` wrapper is available on `PATH`.
 - Pi is installed and configured with a provider that supports tool use.
 
 ## Procedure
 
-1. Deploy the latest dotfiles and move to a scratch directory:
+1. Inspect and deploy only the extension target, then move to a scratch directory:
 
    ```bash
-   chezmoi apply
+   chezmoi diff ~/.pi/agent/extensions/runtime-status.ts
+   chezmoi apply ~/.pi/agent/extensions/runtime-status.ts
    cd /tmp
    pi
    ```
 
+   Do not use global `chezmoi apply`: the scoped diff must show only
+   `runtime-status` changes so unrelated target drift is preserved.
+
 2. Leave Pi waiting at the editor for at least five seconds. Confirm that the
    stopwatch and `idle` duration increase while `other` does not.
 
-3. Invoke `read`, `write`, and `edit`. Confirm their exclusive wall time appears
-   under `files`, while Bash and other ordinary tools appear under `tools`.
+3. Invoke `read`, `write`, `edit`, Bash, and another ordinary root tool.
+   Confirm each tool's exclusive wall time increases `tools`; there is no
+   separate `files` category. Generating tool arguments and processing tool
+   results remain under `gen` rather than `tools`.
 
 4. Submit a normal prompt. Confirm processing gaps not covered by provider or
    tool intervals appear under `other`, not `idle`.
@@ -47,7 +53,7 @@ pre-commit hooks, CI, or the `pi-subagent` wrapper.
   display-rounding differences:
 
   ```text
-  model generation + file operations + tool wait + idle + other = stopwatch walltime
+  model generation + tool wait + idle + other = stopwatch walltime
   ```
 
 - Every category remains bounded by the displayed stopwatch.
@@ -57,9 +63,8 @@ pre-commit hooks, CI, or the `pi-subagent` wrapper.
   child complete
   ```
 
-- The child `model`, `files`, `tools`, `idle`, and `other` categories replace
-  only the attributable Bash tool time; unrelated Bash tool time remains under
-  `tools`.
+- The child `gen`, `tools`, `idle`, and `other` categories replace only the
+  attributable Bash tool time; unrelated Bash tool time remains under `tools`.
 - The shell output and the conversation transcript do **not** contain
   `PI_RUNTIME_STATUS_REPORT_PATH` or any JSON runtime status report.
 
@@ -84,8 +89,8 @@ To verify totals remain bounded by wall time with deeper nesting:
   nested child complete
   ```
 
-- The nested child `model`, `files`, `tools`, `idle`, and `other` categories
-  replace only their attributable Bash tool time at each nesting level.
+- The nested child `gen`, `tools`, `idle`, and `other` categories replace only
+  their attributable Bash tool time at each nesting level.
 - The root categories remain bounded by and sum to the displayed stopwatch,
   allowing only display-rounding differences.
 - No `PI_RUNTIME_STATUS_REPORT_PATH` value or JSON report appears in the
