@@ -23,14 +23,6 @@ export type SubagentReportSink = {
 
 export type RootToolClassification = "fileOps" | "toolWait";
 
-type LedgerToolInterval = {
-  toolCallId: string;
-  sequence: number;
-  startedAt: number;
-  endedAt: number | null;
-  subagentReport: RuntimeStatusReport | null;
-};
-
 export type ReportStore = {
   create(): Promise<string>;
   readAndRemove(path: string): Promise<unknown | null>;
@@ -368,113 +360,5 @@ export class RuntimeTimeline implements SubagentReportSink {
     return intervals.some((interval) =>
       interval.startedAt <= at && this.effectiveIntervalEnd(interval, effectiveEnd) > at
     );
-  }
-}
-
-export class ToolIntervalLedger {
-  private intervals: Map<string, LedgerToolInterval> = new Map();
-  private sequence = 0;
-
-  start(toolCallId: string, startedAt: number): void {
-    this.intervals.set(toolCallId, {
-      toolCallId,
-      sequence: this.sequence++,
-      startedAt,
-      endedAt: null,
-      subagentReport: null,
-    });
-  }
-
-  end(toolCallId: string, endedAt: number): void {
-    const interval = this.intervals.get(toolCallId);
-    if (interval) {
-      interval.endedAt = endedAt;
-    }
-  }
-
-  attachSubagentReport(toolCallId: string, report: RuntimeStatusReport): void {
-    const interval = this.intervals.get(toolCallId);
-    if (!interval) {
-      return;
-    }
-    interval.subagentReport = validateRuntimeStatusReport(report);
-  }
-
-  project(now: number): RuntimeCategoryMillis {
-    const totals: RuntimeCategoryMillis = {
-      modelMillis: 0,
-      fileOpsMillis: 0,
-      toolWaitMillis: 0,
-      idleMillis: 0,
-      unaccountedMillis: 0,
-    };
-
-    const intervals = Array.from(this.intervals.values());
-    if (intervals.length === 0) {
-      return totals;
-    }
-
-    const boundaries = new Set<number>();
-    for (const interval of intervals) {
-      boundaries.add(interval.startedAt);
-      boundaries.add(interval.endedAt ?? now);
-    }
-    const sortedBoundaries = Array.from(boundaries).sort((a, b) => a - b);
-
-    const ownedDuration = new Map<string, number>();
-    for (let i = 0; i < sortedBoundaries.length - 1; i++) {
-      const segmentStart = sortedBoundaries[i];
-      const segmentEnd = sortedBoundaries[i + 1];
-      if (segmentEnd <= segmentStart) {
-        continue;
-      }
-      const segmentDuration = segmentEnd - segmentStart;
-
-      let ownerId: string | null = null;
-      let ownerSequence = Infinity;
-      for (const interval of intervals) {
-        const effectiveEnd = interval.endedAt ?? now;
-        if (interval.startedAt <= segmentStart && effectiveEnd > segmentStart) {
-          if (interval.subagentReport && interval.sequence < ownerSequence) {
-            ownerSequence = interval.sequence;
-            ownerId = interval.toolCallId;
-          }
-        }
-      }
-
-      if (ownerId !== null) {
-        ownedDuration.set(ownerId, (ownedDuration.get(ownerId) ?? 0) + segmentDuration);
-      } else {
-        totals.toolWaitMillis += segmentDuration;
-      }
-    }
-
-    for (const interval of intervals) {
-      const owned = ownedDuration.get(interval.toolCallId) ?? 0;
-      if (owned <= 0 || !interval.subagentReport) {
-        continue;
-      }
-
-      const report = interval.subagentReport;
-      const effectiveEnd = interval.endedAt ?? now;
-      const parentSubagentToolMillis = effectiveEnd - interval.startedAt;
-      if (parentSubagentToolMillis <= 0) {
-        totals.toolWaitMillis += owned;
-        continue;
-      }
-
-      const attributable = Math.round(
-        owned * Math.min(1, report.observedMillis / parentSubagentToolMillis),
-      );
-      const scaled = scaleReport(report, attributable);
-      totals.modelMillis += scaled.modelMillis;
-      totals.fileOpsMillis += scaled.fileOpsMillis;
-      totals.toolWaitMillis += scaled.toolWaitMillis;
-      totals.idleMillis += scaled.idleMillis;
-      totals.unaccountedMillis += scaled.unaccountedMillis;
-      totals.toolWaitMillis += owned - attributable;
-    }
-
-    return totals;
   }
 }

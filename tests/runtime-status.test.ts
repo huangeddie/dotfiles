@@ -12,10 +12,8 @@ import {
   isPiSubagentCommand,
   NodeReportStore,
   prepareSubagentCommand,
-  recordAfterProviderResponse,
   recordAgentEnd,
   recordAgentSettled,
-  recordAgentStart,
   recordProcessingStart,
   recordSessionStart,
   recordTurnStart,
@@ -664,7 +662,7 @@ describe("subagent telemetry adapter", () => {
   });
 });
 
-test.failing("classifies Pi read, write, and edit tools as file operations", () => {
+test("classifies Pi read, write, and edit tools as file operations", () => {
   expect(classifyRootTool("read")).toBe("fileOps");
   expect(classifyRootTool("write")).toBe("fileOps");
   expect(classifyRootTool("edit")).toBe("fileOps");
@@ -674,7 +672,7 @@ test.failing("classifies Pi read, write, and edit tools as file operations", () 
   expect(classifyRootTool("unknown")).toBe("toolWait");
 });
 
-test.failing("keeps whole-session settled time idle and active gaps other", () => {
+test("keeps whole-session settled time idle and active gaps other", () => {
   const state = createRuntimeStatusState();
   recordSessionStart(state, 0);
   recordProcessingStart(state, 1_000);
@@ -693,13 +691,13 @@ test.failing("keeps whole-session settled time idle and active gaps other", () =
   });
 });
 
-test.failing("formats compact session stopwatch boundaries", () => {
+test("formats compact session stopwatch boundaries", () => {
   expect(formatStopwatch(8_999)).toBe("8s");
   expect(formatStopwatch(134_999)).toBe("2m 14s");
   expect(formatStopwatch(3_792_999)).toBe("1h 03m 12s");
 });
 
-test.failing("renders stopwatch, files, and explicit other percentages", () => {
+test("renders stopwatch, files, and explicit other percentages", () => {
   const state = createRuntimeStatusState();
   recordSessionStart(state, 0);
   recordProcessingStart(state, 1_000);
@@ -714,7 +712,7 @@ test.failing("renders stopwatch, files, and explicit other percentages", () => {
   );
 });
 
-test.failing("keeps TPS on provider duration while excluding file operations", () => {
+test("keeps TPS on provider duration while excluding file operations", () => {
   const state = createRuntimeStatusState();
   recordSessionStart(state, 0);
   recordProcessingStart(state, 0);

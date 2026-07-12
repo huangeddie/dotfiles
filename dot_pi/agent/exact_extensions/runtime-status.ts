@@ -5,10 +5,11 @@ import { dirname, isAbsolute, join } from "node:path";
 import {
   type ReportStore,
   type RootToolClassification,
+  type RuntimeDistribution,
   type RuntimeStatusReport,
   type SubagentReportSink,
   publishChildReport,
-  ToolIntervalLedger,
+  RuntimeTimeline,
   validateRuntimeStatusReport,
 } from "../runtime-status-core";
 
@@ -26,27 +27,13 @@ export type OutputBurst = TokenAccumulation & {
   lastOutputAt: number;
 };
 
-export type TimeDistribution = {
-  generatingMillis: number;
-  toolWaitMillis: number;
-  idleMillis: number;
-  observedMillis: number;
-  agentStartedAt: number | null;
-  agentEndedAt: number | null;
-  currentTurnStartedAt: number | null;
-  messageStartedAt: number | null;
-  currentToolWaitStartedAt: number | null;
-  messageStartedGeneratingMillis: number;
-  messageStartedToolWaitMillis: number;
-};
-
 export type RuntimeStatusState = {
   sessionAccumulation: TokenAccumulation;
   currentBurst: OutputBurst | null;
   lastBurstAccumulation: TokenAccumulation | null;
   currentMessageEstimate: TokenAccumulation;
-  timeDistribution: TimeDistribution;
-  active: boolean;
+  currentProviderStartedAt: number | null;
+  timeline: RuntimeTimeline;
 };
 
 type AssistantDelta = {
@@ -58,36 +45,14 @@ type Theme = {
   fg(name: string, text: string): string;
 };
 
-export function recordSessionStart(_state: RuntimeStatusState, _now: number): void {}
-export function recordProcessingStart(_state: RuntimeStatusState, _now: number): void {}
-export function recordAgentSettled(_state: RuntimeStatusState, _now: number): void {}
-export function recordSessionShutdown(_state: RuntimeStatusState, _now: number): void {}
-export function formatStopwatch(_millis: number): string { return ""; }
-
-export function classifyRootTool(_toolName: string): RootToolClassification {
-  return "toolWait";
-}
-
 export function createRuntimeStatusState(): RuntimeStatusState {
   return {
     sessionAccumulation: { tokens: 0, activeMillis: 0 },
     currentBurst: null,
     lastBurstAccumulation: null,
     currentMessageEstimate: { tokens: 0, activeMillis: 0 },
-    timeDistribution: {
-      generatingMillis: 0,
-      toolWaitMillis: 0,
-      idleMillis: 0,
-      observedMillis: 0,
-      agentStartedAt: null,
-      agentEndedAt: null,
-      currentTurnStartedAt: null,
-      messageStartedAt: null,
-      currentToolWaitStartedAt: null,
-      messageStartedGeneratingMillis: 0,
-      messageStartedToolWaitMillis: 0,
-    },
-    active: false,
+    currentProviderStartedAt: null,
+    timeline: new RuntimeTimeline(),
   };
 }
 
@@ -96,20 +61,29 @@ export function resetSession(state: RuntimeStatusState): void {
   state.currentBurst = null;
   state.lastBurstAccumulation = null;
   state.currentMessageEstimate = { tokens: 0, activeMillis: 0 };
-  state.timeDistribution = {
-    generatingMillis: 0,
-    toolWaitMillis: 0,
-    idleMillis: 0,
-    observedMillis: 0,
-    agentStartedAt: null,
-    agentEndedAt: null,
-    currentTurnStartedAt: null,
-    messageStartedAt: null,
-    currentToolWaitStartedAt: null,
-    messageStartedGeneratingMillis: 0,
-    messageStartedToolWaitMillis: 0,
-  };
-  state.active = false;
+  state.currentProviderStartedAt = null;
+  state.timeline.reset();
+}
+
+export function recordSessionStart(state: RuntimeStatusState, now: number): void {
+  resetSession(state);
+  state.timeline.startSession(now);
+}
+
+export function recordProcessingStart(state: RuntimeStatusState, now: number): void {
+  state.timeline.startProcessing(now);
+}
+
+export function recordAgentSettled(state: RuntimeStatusState, now: number): void {
+  closeCurrentTurnGeneration(state, now);
+  state.timeline.endProvider(now);
+  state.timeline.settle(now);
+}
+
+export function recordSessionShutdown(state: RuntimeStatusState, now: number): void {
+  closeCurrentTurnGeneration(state, now);
+  state.timeline.endProvider(now);
+  state.timeline.shutdown(now);
 }
 
 export function estimateTokens(text: string): number {
@@ -144,22 +118,14 @@ export function closeStaleBurst(
   now: number,
   idleCutoffMs = OUTPUT_IDLE_CUTOFF_MS,
 ): void {
-  if (!state.currentBurst) {
-    return;
-  }
-  if (now - state.currentBurst.lastOutputAt >= idleCutoffMs) {
+  if (state.currentBurst && now - state.currentBurst.lastOutputAt >= idleCutoffMs) {
     closeCurrentBurst(state);
   }
 }
 
-export function recordAssistantMessageStart(state: RuntimeStatusState, now: number): void {
-  state.active = true;
+export function recordAssistantMessageStart(state: RuntimeStatusState, _now: number): void {
   state.currentMessageEstimate = { tokens: 0, activeMillis: 0 };
   state.currentBurst = null;
-  state.timeDistribution.messageStartedAt = now;
-  state.timeDistribution.currentToolWaitStartedAt = null;
-  state.timeDistribution.messageStartedGeneratingMillis = state.timeDistribution.generatingMillis;
-  state.timeDistribution.messageStartedToolWaitMillis = state.timeDistribution.toolWaitMillis;
 }
 
 export function recordAssistantDelta(state: RuntimeStatusState, event: AssistantDelta, now: number): void {
@@ -167,7 +133,6 @@ export function recordAssistantDelta(state: RuntimeStatusState, event: Assistant
     closeCurrentBurst(state);
     return;
   }
-
   if (!isOutputDelta(event)) {
     return;
   }
@@ -177,25 +142,13 @@ export function recordAssistantDelta(state: RuntimeStatusState, event: Assistant
     return;
   }
 
-  state.active = true;
-
   if (!state.currentBurst) {
-    state.currentBurst = {
-      tokens: 0,
-      activeMillis: 0,
-      startedAt: now,
-      lastOutputAt: now,
-    };
+    state.currentBurst = { tokens: 0, activeMillis: 0, startedAt: now, lastOutputAt: now };
   } else {
     const gap = now - state.currentBurst.lastOutputAt;
     if (gap >= OUTPUT_IDLE_CUTOFF_MS) {
       closeCurrentBurst(state);
-      state.currentBurst = {
-        tokens: 0,
-        activeMillis: 0,
-        startedAt: now,
-        lastOutputAt: now,
-      };
+      state.currentBurst = { tokens: 0, activeMillis: 0, startedAt: now, lastOutputAt: now };
     } else {
       addStreamedActiveMillis(state, gap);
       state.currentBurst.lastOutputAt = now;
@@ -207,93 +160,43 @@ export function recordAssistantDelta(state: RuntimeStatusState, event: Assistant
   state.currentMessageEstimate.tokens += tokens;
 }
 
-export function recordAgentStart(state: RuntimeStatusState, now: number): void {
-  state.active = true;
-  state.timeDistribution.agentStartedAt = now;
-  state.timeDistribution.agentEndedAt = null;
-}
-
 export function recordTurnStart(state: RuntimeStatusState, now: number): void {
-  state.active = true;
-  state.timeDistribution.currentTurnStartedAt = now;
+  if (state.currentProviderStartedAt === null) {
+    state.currentProviderStartedAt = now;
+  }
+  state.timeline.startProvider(now);
 }
 
-export function recordAfterProviderResponse(state: RuntimeStatusState, now: number): void {
-  void state;
-  void now;
-}
+export function recordAfterProviderResponse(_state: RuntimeStatusState, _now: number): void {}
 
 function closeCurrentTurnGeneration(state: RuntimeStatusState, now: number): void {
-  const startedAt = state.timeDistribution.currentTurnStartedAt;
+  const startedAt = state.currentProviderStartedAt;
   if (startedAt === null) {
     return;
   }
-  const activeMillis = Math.max(0, now - startedAt);
-  state.sessionAccumulation.activeMillis += activeMillis;
-  state.timeDistribution.generatingMillis += activeMillis;
-  state.timeDistribution.currentTurnStartedAt = null;
+  state.sessionAccumulation.activeMillis += Math.max(0, now - startedAt);
+  state.currentProviderStartedAt = null;
 }
 
-export function recordToolExecutionStart(state: RuntimeStatusState, now: number): void {
-  if (state.timeDistribution.currentToolWaitStartedAt !== null) {
-    return;
-  }
-  if (state.timeDistribution.agentStartedAt !== null && state.timeDistribution.agentEndedAt === null) {
-    state.active = true;
-  }
+export function classifyRootTool(toolName: string): RootToolClassification {
+  return toolName === "read" || toolName === "write" || toolName === "edit" ? "fileOps" : "toolWait";
+}
+
+export function recordToolExecutionStart(
+  state: RuntimeStatusState,
+  toolCallId: string,
+  toolName: string,
+  now: number,
+): void {
   closeCurrentBurst(state);
-  state.timeDistribution.currentToolWaitStartedAt = now;
+  state.timeline.startTool(toolCallId, classifyRootTool(toolName), now);
 }
 
-export function recordToolExecutionEnd(state: RuntimeStatusState, now: number): void {
-  const startedAt = state.timeDistribution.currentToolWaitStartedAt;
-  if (startedAt === null) {
-    return;
-  }
-  state.timeDistribution.toolWaitMillis += Math.max(0, now - startedAt);
-  state.timeDistribution.currentToolWaitStartedAt = null;
+export function recordToolExecutionEnd(state: RuntimeStatusState, toolCallId: string, now: number): void {
+  state.timeline.endTool(toolCallId, now);
 }
 
-function currentToolWaitMillis(state: RuntimeStatusState, now: number): number {
-  const startedAt = state.timeDistribution.currentToolWaitStartedAt;
-  if (startedAt === null) {
-    return 0;
-  }
-  return Math.max(0, now - startedAt);
-}
-
-function currentProviderResponseMillis(state: RuntimeStatusState, now: number): number {
-  const startedAt = state.timeDistribution.currentTurnStartedAt;
-  if (startedAt === null) {
-    return 0;
-  }
-  return Math.max(0, now - startedAt);
-}
-
-function observedRuntimeMillis(state: RuntimeStatusState, now: number): number {
-  const startedAt = state.timeDistribution.agentStartedAt;
-  if (startedAt === null) {
-    return state.timeDistribution.observedMillis;
-  }
-  return state.timeDistribution.observedMillis + Math.max(0, (state.timeDistribution.agentEndedAt ?? now) - startedAt);
-}
-
-function idleMillisSnapshot(state: RuntimeStatusState, now: number): number {
-  const generatingMillis = state.timeDistribution.generatingMillis + currentProviderResponseMillis(state, now);
-  const toolWaitMillis = state.timeDistribution.toolWaitMillis + currentToolWaitMillis(state, now);
-  return Math.max(0, observedRuntimeMillis(state, now) - generatingMillis - toolWaitMillis);
-}
-
-export function finalizeAssistantMessageTime(state: RuntimeStatusState, now: number): void {
-  const messageStartedAt = state.timeDistribution.messageStartedAt;
-  if (messageStartedAt === null) {
-    return;
-  }
-
-  state.timeDistribution.messageStartedAt = null;
-  state.timeDistribution.messageStartedGeneratingMillis = state.timeDistribution.generatingMillis;
-  state.timeDistribution.messageStartedToolWaitMillis = state.timeDistribution.toolWaitMillis;
-}
+export function finalizeAssistantMessageTime(_state: RuntimeStatusState, _now: number): void {}
 
 export function handleAssistantMessageEnd(
   state: RuntimeStatusState,
@@ -308,26 +211,19 @@ export function handleAssistantMessageEnd(
     }
     closeCurrentBurst(state);
   }
-
   if (outputUsage !== undefined) {
     state.sessionAccumulation.tokens += outputUsage - state.currentMessageEstimate.tokens;
   }
 
   closeCurrentTurnGeneration(state, now);
+  state.timeline.endProvider(now);
   finalizeAssistantMessageTime(state, now);
   state.currentMessageEstimate = { tokens: 0, activeMillis: 0 };
 }
 
 export function recordAgentEnd(state: RuntimeStatusState, now: number): void {
   closeCurrentTurnGeneration(state, now);
-  recordToolExecutionEnd(state, now);
-  if (state.timeDistribution.agentStartedAt !== null) {
-    state.timeDistribution.observedMillis += Math.max(0, now - state.timeDistribution.agentStartedAt);
-  }
-  state.timeDistribution.agentEndedAt = now;
-  state.timeDistribution.agentStartedAt = null;
-  state.timeDistribution.idleMillis = idleMillisSnapshot(state, now);
-  state.active = false;
+  state.timeline.endProvider(now);
 }
 
 export function rate(accumulation: TokenAccumulation | null): number {
@@ -337,30 +233,8 @@ export function rate(accumulation: TokenAccumulation | null): number {
   return accumulation.tokens / (accumulation.activeMillis / 1000);
 }
 
-export function distributionSnapshot(
-  state: RuntimeStatusState,
-  now: number,
-  ledger?: ToolIntervalLedger,
-): TimeDistribution {
-  const completedRootModelMillis = state.timeDistribution.generatingMillis + currentProviderResponseMillis(state, now);
-  const ledgerProjection = ledger?.project(now) ?? {
-    modelMillis: 0,
-    fileOpsMillis: 0,
-    toolWaitMillis: 0,
-    idleMillis: 0,
-    unaccountedMillis: 0,
-  };
-  const generatingMillis = completedRootModelMillis + ledgerProjection.modelMillis;
-  const toolWaitMillis = ledger
-    ? ledgerProjection.toolWaitMillis
-    : state.timeDistribution.toolWaitMillis + currentToolWaitMillis(state, now);
-  const snapshot: TimeDistribution = {
-    ...state.timeDistribution,
-    generatingMillis,
-    toolWaitMillis,
-    idleMillis: Math.max(0, observedRuntimeMillis(state, now) - generatingMillis - toolWaitMillis),
-  };
-  return snapshot;
+export function distributionSnapshot(state: RuntimeStatusState, now: number): RuntimeDistribution {
+  return state.timeline.snapshot(now);
 }
 
 function formatSeconds(millis: number): string {
@@ -372,6 +246,35 @@ function formatPercent(millis: number, totalMillis: number): string {
     return "0%";
   }
   return `${Math.round((millis / totalMillis) * 100)}%`;
+}
+
+export function formatStopwatch(millis: number): string {
+  const totalSeconds = Math.floor(Math.max(0, millis) / 1_000);
+  const hours = Math.floor(totalSeconds / 3_600);
+  const minutes = Math.floor((totalSeconds % 3_600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours > 0) {
+    return `${hours}h ${String(minutes).padStart(2, "0")}m ${String(seconds).padStart(2, "0")}s`;
+  }
+  if (minutes > 0) {
+    return `${minutes}m ${String(seconds).padStart(2, "0")}s`;
+  }
+  return `${seconds}s`;
+}
+
+export function formatStatus(state: RuntimeStatusState, now = Date.now()): string {
+  const tps = rate(state.sessionAccumulation).toFixed(1);
+  const distribution = distributionSnapshot(state, now);
+  const totalMillis = distribution.wallMillis;
+  return [
+    `⏱ ${formatStopwatch(distribution.wallMillis)}`,
+    `${tps} t/s`,
+    `gen ${formatSeconds(distribution.modelMillis)} ${formatPercent(distribution.modelMillis, totalMillis)}`,
+    `files ${formatSeconds(distribution.fileOpsMillis)} ${formatPercent(distribution.fileOpsMillis, totalMillis)}`,
+    `tools ${formatSeconds(distribution.toolWaitMillis)} ${formatPercent(distribution.toolWaitMillis, totalMillis)}`,
+    `idle ${formatSeconds(distribution.idleMillis)} ${formatPercent(distribution.idleMillis, totalMillis)}`,
+    `other ${formatSeconds(distribution.unaccountedMillis)} ${formatPercent(distribution.unaccountedMillis, totalMillis)}`,
+  ].join(" | ");
 }
 
 export function createSubagentTelemetryAdapter(
@@ -407,7 +310,7 @@ export function createSubagentTelemetryAdapter(
         try {
           await store.remove(reportPath);
         } catch {
-          // best-effort cleanup; continue with the remaining paths
+          // Best-effort cleanup must not prevent remaining reports from being removed.
         }
       }
       pendingReportPaths.clear();
@@ -420,8 +323,7 @@ export function isPiSubagentCommand(command: string): boolean {
   if (trimmed.length === 0) {
     return false;
   }
-  const token = trimmed.split(/\s+/)[0];
-  return token === "pi-subagent";
+  return trimmed.split(/\s+/)[0] === "pi-subagent";
 }
 
 function shellQuoteSingle(value: string): string {
@@ -441,8 +343,10 @@ export async function prepareSubagentCommand(
   } catch {
     return { command, reportPath: null };
   }
-  const preparedCommand = `export PI_RUNTIME_STATUS_REPORT_PATH=${shellQuoteSingle(reportPath)}; ${command}`;
-  return { command: preparedCommand, reportPath };
+  return {
+    command: `export PI_RUNTIME_STATUS_REPORT_PATH=${shellQuoteSingle(reportPath)}; ${command}`,
+    reportPath,
+  };
 }
 
 export type FileOperations = {
@@ -470,8 +374,7 @@ export function isManagedReportPath(path: string): boolean {
   if (!normalized.startsWith(tmp)) {
     return false;
   }
-  const suffix = normalized.slice(tmp.length);
-  return /^\/pi-runtime-status-[^/]+\/report\.json$/.test(suffix);
+  return /^\/pi-runtime-status-[^/]+\/report\.json$/.test(normalized.slice(tmp.length));
 }
 
 export class NodeReportStore implements ReportStore {
@@ -488,16 +391,14 @@ export class NodeReportStore implements ReportStore {
     }
     const dir = dirname(path);
     try {
-      const data = await this.fs.readFile(path, "utf-8");
-      const parsed = JSON.parse(data);
-      return parsed;
+      return JSON.parse(await this.fs.readFile(path, "utf-8"));
     } catch {
       return null;
     } finally {
       try {
         await this.fs.rm(dir, { force: true, recursive: true });
       } catch {
-        // best-effort recursive removal of the managed report directory
+        // Best-effort recursive removal of the managed report directory.
       }
     }
   }
@@ -515,12 +416,12 @@ export class NodeReportStore implements ReportStore {
       try {
         await this.fs.rm(tempPath, { force: true });
       } catch {
-        // best-effort cleanup of the sibling temporary file
+        // Best-effort removal of the temporary report file.
       }
       try {
         await this.fs.rm(dir, { force: true, recursive: true });
       } catch {
-        // best-effort cleanup of the managed report directory
+        // Best-effort removal of the managed report directory.
       }
       throw error;
     }
@@ -530,44 +431,20 @@ export class NodeReportStore implements ReportStore {
     if (!isManagedReportPath(path)) {
       return;
     }
-    const dir = dirname(path);
     try {
-      await this.fs.rm(dir, { force: true, recursive: true });
+      await this.fs.rm(dirname(path), { force: true, recursive: true });
     } catch {
-      // best-effort recursive removal of the managed report directory
+      // Best-effort recursive removal of the managed report directory.
     }
   }
 }
 
-export function formatStatus(
-  state: RuntimeStatusState,
-  streaming: boolean,
-  now = Date.now(),
-  ledger?: ToolIntervalLedger,
-): string {
-  const tps = rate(state.sessionAccumulation).toFixed(1);
-  const distribution = distributionSnapshot(state, now, ledger);
-  const totalMillis =
-    distribution.generatingMillis + distribution.toolWaitMillis + distribution.idleMillis;
-  const icon = streaming ? "●" : "✓";
-  return [
-    `${icon} ${tps} t/s`,
-    `gen ${formatSeconds(distribution.generatingMillis)} ${formatPercent(distribution.generatingMillis, totalMillis)}`,
-    `tools ${formatSeconds(distribution.toolWaitMillis)} ${formatPercent(distribution.toolWaitMillis, totalMillis)}`,
-    `idle ${formatSeconds(distribution.idleMillis)} ${formatPercent(distribution.idleMillis, totalMillis)}`,
-  ].join(" | ");
-}
-
-function renderStatus(state: RuntimeStatusState, theme: Theme, streaming: boolean, ledger?: ToolIntervalLedger): string {
-  const status = formatStatus(state, streaming, Date.now(), ledger);
-  const [icon, ...rest] = status.split(" ");
-  const iconColor = streaming ? "accent" : "success";
-  return theme.fg(iconColor, icon) + theme.fg("dim", ` ${rest.join(" ")}`);
+function renderStatus(state: RuntimeStatusState, theme: Theme): string {
+  return theme.fg("dim", formatStatus(state));
 }
 
 export default function (pi: ExtensionAPI) {
   const state = createRuntimeStatusState();
-  const ledger = new ToolIntervalLedger();
   const store = new NodeReportStore(nodeFileOperations);
   const adapter = createSubagentTelemetryAdapter(store);
   let interval: ReturnType<typeof setInterval> | null = null;
@@ -579,106 +456,106 @@ export default function (pi: ExtensionAPI) {
     }
   }
 
-  function setStatus(ctx: ExtensionContext, streaming: boolean) {
-    if (!ctx.hasUI) {
-      return;
+  function setStatus(ctx: ExtensionContext) {
+    if (ctx.hasUI) {
+      ctx.ui.setStatus(STATUS_KEY, renderStatus(state, ctx.ui.theme));
     }
-    ctx.ui.setStatus(STATUS_KEY, renderStatus(state, ctx.ui.theme, streaming, ledger));
   }
 
   function startInterval(ctx: ExtensionContext) {
     stopInterval();
     interval = setInterval(() => {
       closeStaleBurst(state, Date.now());
-      setStatus(ctx, state.active);
+      setStatus(ctx);
     }, RENDER_INTERVAL_MS);
   }
 
   pi.on("session_start", async (_event, ctx) => {
-    resetSession(state);
-    stopInterval();
-    if (ctx.hasUI) {
-      ctx.ui.setStatus(STATUS_KEY, undefined);
-    }
+    const now = Date.now();
+    recordSessionStart(state, now);
+    startInterval(ctx);
+    setStatus(ctx);
   });
 
-  pi.on("agent_start", async (_event, ctx) => {
-    recordAgentStart(state, Date.now());
-    startInterval(ctx);
-    setStatus(ctx, true);
+  pi.on("before_agent_start", async (_event, ctx) => {
+    recordProcessingStart(state, Date.now());
+    setStatus(ctx);
   });
 
   pi.on("turn_start", async (_event, ctx) => {
     recordTurnStart(state, Date.now());
-    setStatus(ctx, true);
+    setStatus(ctx);
   });
 
   pi.on("after_provider_response", async (_event, ctx) => {
     recordAfterProviderResponse(state, Date.now());
-    setStatus(ctx, state.active);
+    setStatus(ctx);
   });
 
-  pi.on("message_start", async (event, ctx) => {
-    if (event.message.role !== "assistant") {
-      return;
+  pi.on("message_start", async (event, _ctx) => {
+    if (event.message.role === "assistant") {
+      recordAssistantMessageStart(state, Date.now());
     }
-    recordAssistantMessageStart(state, Date.now());
-    startInterval(ctx);
   });
 
   pi.on("message_update", async (event, ctx) => {
     recordAssistantDelta(state, event.assistantMessageEvent, Date.now());
     if (isOutputDelta(event.assistantMessageEvent)) {
-      setStatus(ctx, true);
+      setStatus(ctx);
     }
   });
 
   pi.on("tool_call", async (event) => {
-    if (event.toolName !== "bash" || !isPiSubagentCommand(event.input.command)) return;
+    if (event.toolName !== "bash" || !isPiSubagentCommand(event.input.command)) {
+      return;
+    }
     const prepared = await adapter.prepare(event.toolCallId, event.input.command);
     event.input.command = prepared.command;
   });
 
   pi.on("tool_execution_start", (event) => {
-    ledger.start(event.toolCallId, Date.now());
+    recordToolExecutionStart(state, event.toolCallId, event.toolName, Date.now());
   });
 
   pi.on("tool_execution_end", async (event) => {
-    ledger.end(event.toolCallId, Date.now());
-    await adapter.attachReportIfPresent(event.toolCallId, ledger);
+    recordToolExecutionEnd(state, event.toolCallId, Date.now());
+    await adapter.attachReportIfPresent(event.toolCallId, state.timeline);
   });
 
   pi.on("message_end", async (event, ctx) => {
-    if (event.message.role !== "assistant") {
-      return;
+    if (event.message.role === "assistant") {
+      handleAssistantMessageEnd(state, Date.now(), event.message.usage?.output);
+      setStatus(ctx);
     }
-    handleAssistantMessageEnd(state, Date.now(), event.message.usage?.output);
-    setStatus(ctx, state.active);
   });
 
   pi.on("agent_end", async (_event, ctx) => {
-    stopInterval();
     recordAgentEnd(state, Date.now());
-    setStatus(ctx, false);
+    setStatus(ctx);
+  });
+
+  pi.on("agent_settled", async (_event, ctx) => {
+    recordAgentSettled(state, Date.now());
+    setStatus(ctx);
   });
 
   pi.on("session_shutdown", async (_event, ctx) => {
+    const now = Date.now();
+    recordSessionShutdown(state, now);
     stopInterval();
-    handleAssistantMessageEnd(state, Date.now(), undefined);
-    recordAgentEnd(state, Date.now());
     await adapter.cleanup();
+
     const envReportPath = process.env.PI_RUNTIME_STATUS_REPORT_PATH;
     if (envReportPath && isManagedReportPath(envReportPath)) {
-      const now = Date.now();
-      const distribution = distributionSnapshot(state, now, ledger);
+      const distribution = distributionSnapshot(state, now);
       const report: RuntimeStatusReport = {
         version: 2,
-        observedMillis: distribution.generatingMillis + distribution.toolWaitMillis + distribution.idleMillis,
-        modelMillis: distribution.generatingMillis,
-        fileOpsMillis: 0,
+        observedMillis: distribution.wallMillis,
+        modelMillis: distribution.modelMillis,
+        fileOpsMillis: distribution.fileOpsMillis,
         toolWaitMillis: distribution.toolWaitMillis,
         idleMillis: distribution.idleMillis,
-        unaccountedMillis: 0,
+        unaccountedMillis: distribution.unaccountedMillis,
       };
       await publishChildReport(store, envReportPath, report);
     }
