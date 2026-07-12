@@ -2,7 +2,6 @@ export type RuntimeStatusReport = {
   version: 2;
   observedMillis: number;
   modelMillis: number;
-  fileOpsMillis: number;
   toolWaitMillis: number;
   idleMillis: number;
   unaccountedMillis: number;
@@ -10,7 +9,7 @@ export type RuntimeStatusReport = {
 
 export type RuntimeCategoryMillis = Pick<
   RuntimeStatusReport,
-  "modelMillis" | "fileOpsMillis" | "toolWaitMillis" | "idleMillis" | "unaccountedMillis"
+  "modelMillis" | "toolWaitMillis" | "idleMillis" | "unaccountedMillis"
 >;
 
 export type RuntimeDistribution = RuntimeCategoryMillis & {
@@ -20,8 +19,6 @@ export type RuntimeDistribution = RuntimeCategoryMillis & {
 export type SubagentReportSink = {
   attachSubagentReport(toolCallId: string, report: RuntimeStatusReport): void;
 };
-
-export type RootToolClassification = "fileOps" | "toolWait";
 
 export type ReportStore = {
   create(): Promise<string>;
@@ -86,10 +83,12 @@ export function scaleReport(
       toolWaitMillis: 0,
       idleMillis: 0,
       unaccountedMillis: 0,
-    };
+    } as LegacyRuntimeCategoryMillis;
   }
 
-  const raw = categories.map((category) => (targetMillis * report[category]) / total);
+  const raw = categories.map((category) =>
+    (targetMillis * (report as LegacyRuntimeStatusReport)[category]) / total
+  );
   const floors = raw.map(Math.floor);
   const deficit = targetMillis - floors.reduce((sum, floor) => sum + floor, 0);
 
@@ -113,7 +112,7 @@ export function scaleReport(
     toolWaitMillis: floors[2],
     idleMillis: floors[3],
     unaccountedMillis: floors[4],
-  };
+  } as LegacyRuntimeCategoryMillis;
 }
 
 export async function publishChildReport(
@@ -131,10 +130,14 @@ export async function publishChildReport(
 
 type Interval = { startedAt: number; endedAt: number | null };
 
+type LegacyRuntimeStatusReport = RuntimeStatusReport & { fileOpsMillis: number };
+
+type LegacyRuntimeCategoryMillis = RuntimeCategoryMillis & { fileOpsMillis: number };
+
 type ToolInterval = Interval & {
   toolCallId: string;
   sequence: number;
-  classification: RootToolClassification;
+  classification: "fileOps" | "toolWait";
   subagentReport: RuntimeStatusReport | null;
 };
 
@@ -200,13 +203,13 @@ export class RuntimeTimeline implements SubagentReportSink {
     this.openProviderInterval = null;
   }
 
-  startTool(toolCallId: string, classification: RootToolClassification, now: number): void {
+  startTool(toolCallId: string, now: number): void {
     if (!this.canStartAt(now) || this.toolIntervals.get(toolCallId)?.endedAt === null) {
       return;
     }
     this.toolIntervals.set(toolCallId, {
       toolCallId,
-      classification,
+      classification: "toolWait",
       sequence: this.sequence++,
       startedAt: now,
       endedAt: null,
@@ -238,7 +241,7 @@ export class RuntimeTimeline implements SubagentReportSink {
   }
 
   snapshot(now: number): RuntimeDistribution {
-    const totals: RuntimeCategoryMillis = {
+    const totals: LegacyRuntimeCategoryMillis = {
       modelMillis: 0,
       fileOpsMillis: 0,
       toolWaitMillis: 0,
@@ -328,7 +331,7 @@ export class RuntimeTimeline implements SubagentReportSink {
         : Math.round(owned * Math.min(1, interval.subagentReport.observedMillis / parentToolDuration));
       const scaled = scaleReport(interval.subagentReport, attributable);
       totals.modelMillis += scaled.modelMillis;
-      totals.fileOpsMillis += scaled.fileOpsMillis;
+      totals.fileOpsMillis += (scaled as LegacyRuntimeCategoryMillis).fileOpsMillis;
       totals.toolWaitMillis += scaled.toolWaitMillis + owned - attributable;
       totals.idleMillis += scaled.idleMillis;
       totals.unaccountedMillis += scaled.unaccountedMillis;
@@ -341,7 +344,7 @@ export class RuntimeTimeline implements SubagentReportSink {
     ) {
       throw new Error("RuntimeTimeline must partition session wall time");
     }
-    return { wallMillis, ...totals };
+    return { wallMillis, ...totals } as RuntimeDistribution;
   }
 
   private canStartAt(now: number): boolean {

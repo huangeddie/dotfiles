@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join } from "node:path";
 import {
   type ReportStore,
-  type RootToolClassification,
   type RuntimeDistribution,
   type RuntimeStatusReport,
   type SubagentReportSink,
@@ -178,18 +177,13 @@ function closeCurrentTurnGeneration(state: RuntimeStatusState, now: number): voi
   state.currentProviderStartedAt = null;
 }
 
-export function classifyRootTool(toolName: string): RootToolClassification {
-  return toolName === "read" || toolName === "write" || toolName === "edit" ? "fileOps" : "toolWait";
-}
-
 export function recordToolExecutionStart(
   state: RuntimeStatusState,
   toolCallId: string,
-  toolName: string,
   now: number,
 ): void {
   closeCurrentBurst(state);
-  state.timeline.startTool(toolCallId, classifyRootTool(toolName), now);
+  state.timeline.startTool(toolCallId, now);
 }
 
 export function recordToolExecutionEnd(state: RuntimeStatusState, toolCallId: string, now: number): void {
@@ -514,7 +508,7 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("tool_execution_start", (event) => {
-    recordToolExecutionStart(state, event.toolCallId, event.toolName, Date.now());
+    recordToolExecutionStart(state, event.toolCallId, Date.now());
   });
 
   pi.on("tool_execution_end", async (event) => {
