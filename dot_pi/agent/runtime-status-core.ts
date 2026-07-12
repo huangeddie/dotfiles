@@ -29,11 +29,16 @@ export type ReportStore = {
 
 const categories = [
   "modelMillis",
-  "fileOpsMillis",
   "toolWaitMillis",
   "idleMillis",
   "unaccountedMillis",
 ] as const;
+
+const reportKeys = new Set([
+  "version",
+  "observedMillis",
+  ...categories,
+]);
 
 function isMillis(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
@@ -45,6 +50,9 @@ export function validateRuntimeStatusReport(value: unknown): RuntimeStatusReport
   }
 
   const candidate = value as Record<string, unknown>;
+  if (Object.keys(candidate).some((key) => !reportKeys.has(key))) {
+    return null;
+  }
   if (candidate.version !== 2) {
     return null;
   }
@@ -52,7 +60,6 @@ export function validateRuntimeStatusReport(value: unknown): RuntimeStatusReport
   if (
     !isMillis(candidate.observedMillis) ||
     !isMillis(candidate.modelMillis) ||
-    !isMillis(candidate.fileOpsMillis) ||
     !isMillis(candidate.toolWaitMillis) ||
     !isMillis(candidate.idleMillis) ||
     !isMillis(candidate.unaccountedMillis)
@@ -62,8 +69,8 @@ export function validateRuntimeStatusReport(value: unknown): RuntimeStatusReport
 
   if (
     candidate.observedMillis !==
-    candidate.modelMillis + candidate.fileOpsMillis + candidate.toolWaitMillis +
-      candidate.idleMillis + candidate.unaccountedMillis
+    candidate.modelMillis + candidate.toolWaitMillis + candidate.idleMillis +
+      candidate.unaccountedMillis
   ) {
     return null;
   }
@@ -79,16 +86,13 @@ export function scaleReport(
   if (total === 0 || targetMillis <= 0) {
     return {
       modelMillis: 0,
-      fileOpsMillis: 0,
       toolWaitMillis: 0,
       idleMillis: 0,
       unaccountedMillis: 0,
-    } as LegacyRuntimeCategoryMillis;
+    };
   }
 
-  const raw = categories.map((category) =>
-    (targetMillis * (report as LegacyRuntimeStatusReport)[category]) / total
-  );
+  const raw = categories.map((category) => (targetMillis * report[category]) / total);
   const floors = raw.map(Math.floor);
   const deficit = targetMillis - floors.reduce((sum, floor) => sum + floor, 0);
 
@@ -108,11 +112,10 @@ export function scaleReport(
 
   return {
     modelMillis: floors[0],
-    fileOpsMillis: floors[1],
-    toolWaitMillis: floors[2],
-    idleMillis: floors[3],
-    unaccountedMillis: floors[4],
-  } as LegacyRuntimeCategoryMillis;
+    toolWaitMillis: floors[1],
+    idleMillis: floors[2],
+    unaccountedMillis: floors[3],
+  };
 }
 
 export async function publishChildReport(
@@ -130,14 +133,9 @@ export async function publishChildReport(
 
 type Interval = { startedAt: number; endedAt: number | null };
 
-type LegacyRuntimeStatusReport = RuntimeStatusReport & { fileOpsMillis: number };
-
-type LegacyRuntimeCategoryMillis = RuntimeCategoryMillis & { fileOpsMillis: number };
-
 type ToolInterval = Interval & {
   toolCallId: string;
   sequence: number;
-  classification: "fileOps" | "toolWait";
   subagentReport: RuntimeStatusReport | null;
 };
 
@@ -148,7 +146,7 @@ export class RuntimeTimeline implements SubagentReportSink {
   private openProcessingInterval: Interval | null = null;
   private providerIntervals: Interval[] = [];
   private openProviderInterval: Interval | null = null;
-  private toolIntervals: Map<string, ToolInterval> = new Map();
+  private tools: Map<string, ToolInterval> = new Map();
   private sequence = 0;
 
   reset(): void {
@@ -158,7 +156,7 @@ export class RuntimeTimeline implements SubagentReportSink {
     this.openProcessingInterval = null;
     this.providerIntervals = [];
     this.openProviderInterval = null;
-    this.toolIntervals.clear();
+    this.tools.clear();
     this.sequence = 0;
   }
 
@@ -204,12 +202,11 @@ export class RuntimeTimeline implements SubagentReportSink {
   }
 
   startTool(toolCallId: string, now: number): void {
-    if (!this.canStartAt(now) || this.toolIntervals.get(toolCallId)?.endedAt === null) {
+    if (this.sessionStartedAt === null || this.tools.has(toolCallId)) {
       return;
     }
-    this.toolIntervals.set(toolCallId, {
+    this.tools.set(toolCallId, {
       toolCallId,
-      classification: "toolWait",
       sequence: this.sequence++,
       startedAt: now,
       endedAt: null,
@@ -218,7 +215,7 @@ export class RuntimeTimeline implements SubagentReportSink {
   }
 
   endTool(toolCallId: string, now: number): void {
-    const interval = this.toolIntervals.get(toolCallId);
+    const interval = this.tools.get(toolCallId);
     if (!interval || interval.endedAt !== null) {
       return;
     }
@@ -226,7 +223,7 @@ export class RuntimeTimeline implements SubagentReportSink {
   }
 
   attachSubagentReport(toolCallId: string, report: RuntimeStatusReport): void {
-    const interval = this.toolIntervals.get(toolCallId);
+    const interval = this.tools.get(toolCallId);
     if (!interval) {
       return;
     }
@@ -241,9 +238,8 @@ export class RuntimeTimeline implements SubagentReportSink {
   }
 
   snapshot(now: number): RuntimeDistribution {
-    const totals: LegacyRuntimeCategoryMillis = {
+    const totals: RuntimeCategoryMillis = {
       modelMillis: 0,
-      fileOpsMillis: 0,
       toolWaitMillis: 0,
       idleMillis: 0,
       unaccountedMillis: 0,
@@ -254,7 +250,7 @@ export class RuntimeTimeline implements SubagentReportSink {
     }
 
     const effectiveEnd = Math.max(sessionStartedAt, this.sessionEndedAt ?? now);
-    const toolIntervals = Array.from(this.toolIntervals.values());
+    const toolIntervals = Array.from(this.tools.values());
     const allIntervals = [
       ...this.processingIntervals,
       ...this.providerIntervals,
@@ -303,15 +299,9 @@ export class RuntimeTimeline implements SubagentReportSink {
       }
 
       if (toolIntervals.some((interval) =>
-        interval.classification === "toolWait" &&
         this.isCoveredBy([interval], segmentStartedAt, effectiveEnd)
       )) {
         totals.toolWaitMillis += duration;
-      } else if (toolIntervals.some((interval) =>
-        interval.classification === "fileOps" &&
-        this.isCoveredBy([interval], segmentStartedAt, effectiveEnd)
-      )) {
-        totals.fileOpsMillis += duration;
       } else if (this.isCoveredBy(this.providerIntervals, segmentStartedAt, effectiveEnd)) {
         totals.modelMillis += duration;
       } else {
@@ -331,7 +321,6 @@ export class RuntimeTimeline implements SubagentReportSink {
         : Math.round(owned * Math.min(1, interval.subagentReport.observedMillis / parentToolDuration));
       const scaled = scaleReport(interval.subagentReport, attributable);
       totals.modelMillis += scaled.modelMillis;
-      totals.fileOpsMillis += (scaled as LegacyRuntimeCategoryMillis).fileOpsMillis;
       totals.toolWaitMillis += scaled.toolWaitMillis + owned - attributable;
       totals.idleMillis += scaled.idleMillis;
       totals.unaccountedMillis += scaled.unaccountedMillis;
@@ -339,12 +328,12 @@ export class RuntimeTimeline implements SubagentReportSink {
 
     const wallMillis = effectiveEnd - sessionStartedAt;
     if (
-      totals.modelMillis + totals.fileOpsMillis + totals.toolWaitMillis +
-        totals.idleMillis + totals.unaccountedMillis !== wallMillis
+      totals.modelMillis + totals.toolWaitMillis + totals.idleMillis +
+        totals.unaccountedMillis !== wallMillis
     ) {
       throw new Error("RuntimeTimeline must partition session wall time");
     }
-    return { wallMillis, ...totals } as RuntimeDistribution;
+    return { wallMillis, ...totals };
   }
 
   private canStartAt(now: number): boolean {
