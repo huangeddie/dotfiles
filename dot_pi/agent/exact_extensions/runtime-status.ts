@@ -332,11 +332,13 @@ export function distributionSnapshot(
 ): TimeDistribution {
   const completedRootModelMillis = state.timeDistribution.generatingMillis + currentProviderResponseMillis(state, now);
   const ledgerProjection = ledger?.project(now) ?? {
-    generatingMillis: 0,
+    modelMillis: 0,
+    fileOpsMillis: 0,
     toolWaitMillis: 0,
     idleMillis: 0,
+    unaccountedMillis: 0,
   };
-  const generatingMillis = completedRootModelMillis + ledgerProjection.generatingMillis;
+  const generatingMillis = completedRootModelMillis + ledgerProjection.modelMillis;
   const toolWaitMillis = ledger
     ? ledgerProjection.toolWaitMillis
     : state.timeDistribution.toolWaitMillis + currentToolWaitMillis(state, now);
@@ -658,11 +660,13 @@ export default function (pi: ExtensionAPI) {
       const now = Date.now();
       const distribution = distributionSnapshot(state, now, ledger);
       const report: RuntimeStatusReport = {
-        version: 1,
+        version: 2,
         observedMillis: distribution.generatingMillis + distribution.toolWaitMillis + distribution.idleMillis,
-        generatingMillis: distribution.generatingMillis,
+        modelMillis: distribution.generatingMillis,
+        fileOpsMillis: 0,
         toolWaitMillis: distribution.toolWaitMillis,
         idleMillis: distribution.idleMillis,
+        unaccountedMillis: 0,
       };
       await publishChildReport(store, envReportPath, report);
     }

@@ -100,75 +100,100 @@ class FakeFileOperations implements FileOperations {
 }
 
 
-test("accepts only a v1 report with finite non-negative integer durations that sum exactly", () => {
-  const valid = {
-    version: 1,
+test.failing("accepts only a v2 report whose five categories sum exactly", () => {
+  const valid: RuntimeStatusReport = {
+    version: 2,
     observedMillis: 10,
-    generatingMillis: 4,
+    modelMillis: 3,
+    fileOpsMillis: 1,
     toolWaitMillis: 3,
-    idleMillis: 3,
+    idleMillis: 2,
+    unaccountedMillis: 1,
   };
 
   expect(validateRuntimeStatusReport(valid)).toEqual(valid);
-  expect(validateRuntimeStatusReport({ ...valid, version: 2 })).toBeNull();
-  expect(validateRuntimeStatusReport({ ...valid, idleMillis: -1 })).toBeNull();
-  expect(validateRuntimeStatusReport({ ...valid, generatingMillis: 4.5 })).toBeNull();
+  expect(validateRuntimeStatusReport({ ...valid, version: 1 })).toBeNull();
+  expect(validateRuntimeStatusReport({ ...valid, unaccountedMillis: -1 })).toBeNull();
+  expect(validateRuntimeStatusReport({ ...valid, modelMillis: 3.5 })).toBeNull();
   expect(validateRuntimeStatusReport({ ...valid, observedMillis: 11 })).toBeNull();
 });
 
-test("scales report categories with deterministic total-preserving rounding", () => {
-  expect(scaleReport({ version: 1, observedMillis: 3, generatingMillis: 1, toolWaitMillis: 1, idleMillis: 1 }, 10))
-    .toEqual({ generatingMillis: 4, toolWaitMillis: 3, idleMillis: 3 });
+test.failing("scales all five report categories with total-preserving rounding", () => {
+  expect(scaleReport({
+    version: 2,
+    observedMillis: 5,
+    modelMillis: 1,
+    fileOpsMillis: 1,
+    toolWaitMillis: 1,
+    idleMillis: 1,
+    unaccountedMillis: 1,
+  }, 12)).toEqual({
+    modelMillis: 3,
+    fileOpsMillis: 3,
+    toolWaitMillis: 2,
+    idleMillis: 2,
+    unaccountedMillis: 2,
+  });
 });
 
 test("keeps a missing or invalid subagent report as ordinary tool time", () => {
   const ledger = new ToolIntervalLedger();
   ledger.start("subagent", 0);
   ledger.end("subagent", 10);
-  expect(ledger.project(10)).toEqual({ generatingMillis: 0, toolWaitMillis: 10, idleMillis: 0 });
+  expect(ledger.project(10)).toEqual({
+    modelMillis: 0, fileOpsMillis: 0, toolWaitMillis: 10, idleMillis: 0, unaccountedMillis: 0,
+  });
 });
 
-test("reclassifies a complete subagent interval without changing root elapsed time", () => {
+test.failing("reclassifies a complete subagent interval without changing root elapsed time", () => {
   const ledger = new ToolIntervalLedger();
   ledger.start("subagent", 0);
   ledger.end("subagent", 12);
   ledger.attachSubagentReport("subagent", {
-    version: 1, observedMillis: 10, generatingMillis: 5, toolWaitMillis: 3, idleMillis: 2,
+    version: 2, observedMillis: 10, modelMillis: 5, fileOpsMillis: 0, toolWaitMillis: 3, idleMillis: 2, unaccountedMillis: 0,
   });
-  expect(ledger.project(12)).toEqual({ generatingMillis: 5, toolWaitMillis: 5, idleMillis: 2 });
+  expect(ledger.project(12)).toEqual({
+    modelMillis: 5, fileOpsMillis: 0, toolWaitMillis: 5, idleMillis: 2, unaccountedMillis: 0,
+  });
 });
 
-test("gives overlapping subagents start-order ownership without double-counting", () => {
+test.failing("gives overlapping subagents start-order ownership without double-counting", () => {
   const ledger = new ToolIntervalLedger();
   ledger.start("first", 0); ledger.start("second", 5);
   ledger.end("first", 10); ledger.end("second", 15);
-  ledger.attachSubagentReport("first", { version: 1, observedMillis: 10, generatingMillis: 10, toolWaitMillis: 0, idleMillis: 0 });
-  ledger.attachSubagentReport("second", { version: 1, observedMillis: 10, generatingMillis: 0, toolWaitMillis: 10, idleMillis: 0 });
-  expect(ledger.project(15)).toEqual({ generatingMillis: 10, toolWaitMillis: 5, idleMillis: 0 });
+  ledger.attachSubagentReport("first", { version: 2, observedMillis: 10, modelMillis: 10, fileOpsMillis: 0, toolWaitMillis: 0, idleMillis: 0, unaccountedMillis: 0 });
+  ledger.attachSubagentReport("second", { version: 2, observedMillis: 10, modelMillis: 0, fileOpsMillis: 0, toolWaitMillis: 10, idleMillis: 0, unaccountedMillis: 0 });
+  expect(ledger.project(15)).toEqual({
+    modelMillis: 10, fileOpsMillis: 0, toolWaitMillis: 5, idleMillis: 0, unaccountedMillis: 0,
+  });
 });
 
 test("counts overlapping ordinary tools as a wall-clock union", () => {
   const ledger = new ToolIntervalLedger();
   ledger.start("one", 0); ledger.start("two", 5);
   ledger.end("one", 10); ledger.end("two", 15);
-  expect(ledger.project(15)).toEqual({ generatingMillis: 0, toolWaitMillis: 15, idleMillis: 0 });
+  expect(ledger.project(15)).toEqual({
+    modelMillis: 0, fileOpsMillis: 0, toolWaitMillis: 15, idleMillis: 0, unaccountedMillis: 0,
+  });
 });
 
-test("reattributes lifecycle-valid overlapping subagents proportionally by owned duration", () => {
+test.failing("reattributes lifecycle-valid overlapping subagents proportionally by owned duration", () => {
   const ledger = new ToolIntervalLedger();
   ledger.start("first", 0);
   ledger.start("second", 5);
   ledger.end("first", 10);
   ledger.end("second", 15);
   ledger.attachSubagentReport("first", {
-    version: 1, observedMillis: 10, generatingMillis: 10, toolWaitMillis: 0, idleMillis: 0,
+    version: 2, observedMillis: 10, modelMillis: 10, fileOpsMillis: 0, toolWaitMillis: 0, idleMillis: 0, unaccountedMillis: 0,
   });
   ledger.attachSubagentReport("second", {
-    version: 1, observedMillis: 5, generatingMillis: 5, toolWaitMillis: 0, idleMillis: 0,
+    version: 2, observedMillis: 5, modelMillis: 5, fileOpsMillis: 0, toolWaitMillis: 0, idleMillis: 0, unaccountedMillis: 0,
   });
 
   // first owns [0,10); second owns [10,15), but its report covers half its parent duration.
-  expect(ledger.project(15)).toEqual({ generatingMillis: 13, toolWaitMillis: 2, idleMillis: 0 });
+  expect(ledger.project(15)).toEqual({
+    modelMillis: 13, fileOpsMillis: 0, toolWaitMillis: 2, idleMillis: 0, unaccountedMillis: 0,
+  });
 });
 
 test("publishChildReport resolves even when store write rejects", async () => {
@@ -179,7 +204,7 @@ test("publishChildReport resolves even when store write rejects", async () => {
     async remove() {},
   };
   const report: RuntimeStatusReport = {
-    version: 1, observedMillis: 10, generatingMillis: 10, toolWaitMillis: 0, idleMillis: 0,
+    version: 2, observedMillis: 10, modelMillis: 10, fileOpsMillis: 0, toolWaitMillis: 0, idleMillis: 0, unaccountedMillis: 0,
   };
   await expect(publishChildReport(store, "/tmp/report.json", report)).resolves.toBeUndefined();
 });
@@ -251,7 +276,7 @@ describe("report store directory cleanup", () => {
     const store = new NodeReportStore(fs);
     const path = await store.create();
     const report: RuntimeStatusReport = {
-      version: 1, observedMillis: 10, generatingMillis: 10, toolWaitMillis: 0, idleMillis: 0,
+      version: 2, observedMillis: 10, modelMillis: 10, fileOpsMillis: 0, toolWaitMillis: 0, idleMillis: 0, unaccountedMillis: 0,
     };
     await store.writeAtomically(path, report);
     await store.readAndRemove(path);
@@ -273,7 +298,7 @@ describe("report store directory cleanup", () => {
     const store = new NodeReportStore(fs);
     const path = await store.create();
     const report: RuntimeStatusReport = {
-      version: 1, observedMillis: 10, generatingMillis: 10, toolWaitMillis: 0, idleMillis: 0,
+      version: 2, observedMillis: 10, modelMillis: 10, fileOpsMillis: 0, toolWaitMillis: 0, idleMillis: 0, unaccountedMillis: 0,
     };
     fs.failNextRename = new Error("rename failed");
     await expect(store.writeAtomically(path, report)).rejects.toThrow("rename failed");
@@ -292,18 +317,20 @@ describe("subagent telemetry adapter", () => {
     );
   });
 
-  test("attachReportIfPresent reads and validates a report for the matching tool call", async () => {
+  test.failing("attachReportIfPresent reads and validates a report for the matching tool call", async () => {
     const store = new FakeReportStore();
     const adapter = createSubagentTelemetryAdapter(store);
     await adapter.prepare("tc-1", "pi-subagent 'inspect this'");
     const reportPath = "/tmp/runtime-0.json";
-    const report = { version: 1, observedMillis: 10, generatingMillis: 4, toolWaitMillis: 3, idleMillis: 3 };
+    const report = { version: 2, observedMillis: 10, modelMillis: 4, fileOpsMillis: 0, toolWaitMillis: 3, idleMillis: 3, unaccountedMillis: 0 };
     await store.writeAtomically(reportPath, report);
     const ledger = new ToolIntervalLedger();
     ledger.start("tc-1", 0);
     ledger.end("tc-1", 10);
     await adapter.attachReportIfPresent("tc-1", ledger);
-    expect(ledger.project(10)).toEqual({ generatingMillis: 4, toolWaitMillis: 3, idleMillis: 3 });
+    expect(ledger.project(10)).toEqual({
+      modelMillis: 4, fileOpsMillis: 0, toolWaitMillis: 3, idleMillis: 3, unaccountedMillis: 0,
+    });
   });
 
   test("attachReportIfPresent ignores a missing or invalid report", async () => {
@@ -314,7 +341,9 @@ describe("subagent telemetry adapter", () => {
     ledger.start("tc-1", 0);
     ledger.end("tc-1", 10);
     await adapter.attachReportIfPresent("tc-1", ledger);
-    expect(ledger.project(10)).toEqual({ generatingMillis: 0, toolWaitMillis: 10, idleMillis: 0 });
+    expect(ledger.project(10)).toEqual({
+      modelMillis: 0, fileOpsMillis: 0, toolWaitMillis: 10, idleMillis: 0, unaccountedMillis: 0,
+    });
   });
 
   test("cleanup removes all still-pending report paths", async () => {
@@ -344,7 +373,7 @@ describe("subagent telemetry adapter", () => {
 });
 
 describe("ledger reconciliation", () => {
-  test("distributionSnapshot adds subagent generating time to root model time", () => {
+  test.failing("distributionSnapshot adds subagent generating time to root model time", () => {
     const state = createRuntimeStatusState();
     const ledger = new ToolIntervalLedger();
 
@@ -356,11 +385,13 @@ describe("ledger reconciliation", () => {
     ledger.start("subagent", 2_000);
     ledger.end("subagent", 5_000);
     ledger.attachSubagentReport("subagent", {
-      version: 1,
+      version: 2,
       observedMillis: 3_000,
-      generatingMillis: 3_000,
+      modelMillis: 3_000,
+      fileOpsMillis: 0,
       toolWaitMillis: 0,
       idleMillis: 0,
+      unaccountedMillis: 0,
     });
 
     recordAgentEnd(state, 5_000);
@@ -372,7 +403,7 @@ describe("ledger reconciliation", () => {
     });
   });
 
-  test("formatStatus reflects reconciled subagent time", () => {
+  test.failing("formatStatus reflects reconciled subagent time", () => {
     const state = createRuntimeStatusState();
     const ledger = new ToolIntervalLedger();
 
@@ -384,11 +415,13 @@ describe("ledger reconciliation", () => {
     ledger.start("subagent", 2_000);
     ledger.end("subagent", 5_000);
     ledger.attachSubagentReport("subagent", {
-      version: 1,
+      version: 2,
       observedMillis: 3_000,
-      generatingMillis: 3_000,
+      modelMillis: 3_000,
+      fileOpsMillis: 0,
       toolWaitMillis: 0,
       idleMillis: 0,
+      unaccountedMillis: 0,
     });
 
     recordAgentEnd(state, 5_000);

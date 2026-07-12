@@ -1,14 +1,16 @@
 export type RuntimeStatusReport = {
-  version: 1;
+  version: 2;
   observedMillis: number;
-  generatingMillis: number;
+  modelMillis: number;
+  fileOpsMillis: number;
   toolWaitMillis: number;
   idleMillis: number;
+  unaccountedMillis: number;
 };
 
 export type RuntimeCategoryMillis = Pick<
   RuntimeStatusReport,
-  "generatingMillis" | "toolWaitMillis" | "idleMillis"
+  "modelMillis" | "fileOpsMillis" | "toolWaitMillis" | "idleMillis" | "unaccountedMillis"
 >;
 
 export type ToolInterval = {
@@ -67,7 +69,13 @@ export function scaleReport(
 ): RuntimeCategoryMillis {
   const total = report.observedMillis;
   if (total === 0 || targetMillis <= 0) {
-    return { generatingMillis: 0, toolWaitMillis: 0, idleMillis: 0 };
+    return {
+      modelMillis: 0,
+      fileOpsMillis: 0,
+      toolWaitMillis: 0,
+      idleMillis: 0,
+      unaccountedMillis: 0,
+    };
   }
 
   const raw = categories.map((category) => (targetMillis * report[category]) / total);
@@ -89,9 +97,11 @@ export function scaleReport(
   }
 
   return {
-    generatingMillis: floors[0],
+    modelMillis: floors[0],
+    fileOpsMillis: 0,
     toolWaitMillis: floors[1],
     idleMillis: floors[2],
+    unaccountedMillis: 0,
   };
 }
 
@@ -139,9 +149,11 @@ export class ToolIntervalLedger {
 
   project(now: number): RuntimeCategoryMillis {
     const totals: RuntimeCategoryMillis = {
-      generatingMillis: 0,
+      modelMillis: 0,
+      fileOpsMillis: 0,
       toolWaitMillis: 0,
       idleMillis: 0,
+      unaccountedMillis: 0,
     };
 
     const intervals = Array.from(this.intervals.values());
@@ -202,9 +214,11 @@ export class ToolIntervalLedger {
         owned * Math.min(1, report.observedMillis / parentSubagentToolMillis),
       );
       const scaled = scaleReport(report, attributable);
-      totals.generatingMillis += scaled.generatingMillis;
+      totals.modelMillis += scaled.modelMillis;
+      totals.fileOpsMillis += scaled.fileOpsMillis;
       totals.toolWaitMillis += scaled.toolWaitMillis;
       totals.idleMillis += scaled.idleMillis;
+      totals.unaccountedMillis += scaled.unaccountedMillis;
       totals.toolWaitMillis += owned - attributable;
     }
 
