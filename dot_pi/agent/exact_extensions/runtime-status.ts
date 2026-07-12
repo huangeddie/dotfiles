@@ -542,12 +542,12 @@ export default function (pi: ExtensionAPI) {
   pi.on("session_shutdown", async (_event, ctx) => {
     const now = Date.now();
     recordSessionShutdown(state, now);
+    const distribution = distributionSnapshot(state, now);
     stopInterval();
     await adapter.cleanup();
 
     const envReportPath = process.env.PI_RUNTIME_STATUS_REPORT_PATH;
     if (envReportPath && isManagedReportPath(envReportPath)) {
-      const distribution = distributionSnapshot(state, now);
       const report: RuntimeStatusReport = {
         version: 2,
         observedMillis: distribution.wallMillis,
