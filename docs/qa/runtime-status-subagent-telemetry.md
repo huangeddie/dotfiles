@@ -35,9 +35,11 @@ pre-commit hooks, CI, or the `pi-subagent` wrapper.
    stopwatch and `idle` duration increase while `other` does not.
 
 3. Invoke `read`, `write`, `edit`, Bash, and another ordinary root tool.
-   Confirm each tool's exclusive wall time increases `tools`; there is no
-   separate `files` category. Generating tool arguments and processing tool
-   results remain under `gen` rather than `tools`.
+   Every ordinary root-tool execution accrues its exclusive wall time to
+   `tools`: this is the universal contract for those examples and all other
+   ordinary root tools. There is no separate `files` category. Generating tool
+   arguments and processing tool results remain under `gen` rather than
+   `tools`.
 
 4. Submit a normal prompt. Confirm processing gaps not covered by provider or
    tool intervals appear under `other`, not `idle`.
