@@ -13,6 +13,16 @@ export type RuntimeCategoryMillis = Pick<
   "modelMillis" | "fileOpsMillis" | "toolWaitMillis" | "idleMillis" | "unaccountedMillis"
 >;
 
+export type RuntimeDistribution = RuntimeCategoryMillis & {
+  wallMillis: number;
+};
+
+export type SubagentReportSink = {
+  attachSubagentReport(toolCallId: string, report: RuntimeStatusReport): void;
+};
+
+export type RootToolClassification = "fileOps" | "toolWait";
+
 export type ToolInterval = {
   toolCallId: string;
   sequence: number;
@@ -124,6 +134,33 @@ export async function publishChildReport(
   } catch {
     // A child report write failure is intentionally non-fatal and must not alter
     // Pi's exit code or response.
+  }
+}
+
+export class RuntimeTimeline implements SubagentReportSink {
+  reset(): void {}
+  startSession(_now: number): void {}
+  startProcessing(_now: number): void {}
+  settle(_now: number): void {}
+  startProvider(_now: number): void {}
+  endProvider(_now: number): void {}
+  startTool(
+    _toolCallId: string,
+    _classification: RootToolClassification,
+    _now: number,
+  ): void {}
+  endTool(_toolCallId: string, _now: number): void {}
+  attachSubagentReport(_toolCallId: string, _report: RuntimeStatusReport): void {}
+  shutdown(_now: number): void {}
+  snapshot(_now: number): RuntimeDistribution {
+    return {
+      wallMillis: 0,
+      modelMillis: 0,
+      fileOpsMillis: 0,
+      toolWaitMillis: 0,
+      idleMillis: 0,
+      unaccountedMillis: 0,
+    };
   }
 }
 

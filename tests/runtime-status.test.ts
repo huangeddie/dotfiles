@@ -26,6 +26,7 @@ import {
   type ReportStore,
   type RuntimeStatusReport,
   publishChildReport,
+  RuntimeTimeline,
   ToolIntervalLedger,
   scaleReport,
   validateRuntimeStatusReport,
@@ -133,6 +134,337 @@ test("scales all five report categories with total-preserving rounding", () => {
     toolWaitMillis: 2,
     idleMillis: 2,
     unaccountedMillis: 2,
+  });
+});
+
+test.failing("partitions settled and uncovered active session walltime", () => {
+  const timeline = new RuntimeTimeline();
+  timeline.startSession(0);
+  timeline.startProcessing(1_000);
+  timeline.startProvider(1_500);
+  timeline.endProvider(2_500);
+  timeline.startTool("tool", "toolWait", 3_000);
+  timeline.endTool("tool", 4_000);
+  timeline.settle(5_000);
+
+  expect(timeline.snapshot(8_000)).toEqual({
+    wallMillis: 8_000,
+    modelMillis: 1_000,
+    fileOpsMillis: 0,
+    toolWaitMillis: 1_000,
+    idleMillis: 4_000,
+    unaccountedMillis: 2_000,
+  });
+});
+
+test.failing("keeps agent-end retry gaps active until agent_settled", () => {
+  const timeline = new RuntimeTimeline();
+  timeline.startSession(0);
+  timeline.startProcessing(1_000);
+  // A low-level agent_end produces no timeline transition.
+  timeline.startProvider(2_000);
+  timeline.endProvider(3_000);
+  timeline.settle(5_000);
+  expect(timeline.snapshot(6_000)).toEqual({
+    wallMillis: 6_000,
+    modelMillis: 1_000,
+    fileOpsMillis: 0,
+    toolWaitMillis: 0,
+    idleMillis: 2_000,
+    unaccountedMillis: 3_000,
+  });
+});
+
+test.failing("applies tool-wait then file-ops then provider precedence", () => {
+  const timeline = new RuntimeTimeline();
+  timeline.startSession(0);
+  timeline.startProcessing(0);
+  timeline.startProvider(0);
+  timeline.startTool("read", "fileOps", 1_000);
+  timeline.startTool("bash", "toolWait", 2_000);
+  timeline.endTool("bash", 3_000);
+  timeline.endTool("read", 4_000);
+  timeline.endProvider(6_000);
+  timeline.settle(6_000);
+  expect(timeline.snapshot(6_000)).toEqual({
+    wallMillis: 6_000,
+    modelMillis: 3_000,
+    fileOpsMillis: 2_000,
+    toolWaitMillis: 1_000,
+    idleMillis: 0,
+    unaccountedMillis: 0,
+  });
+});
+
+test.failing("reattributes reported subagents across all five categories", () => {
+  const timeline = new RuntimeTimeline();
+  timeline.startSession(0);
+  timeline.startProcessing(0);
+  timeline.startTool("child", "toolWait", 0);
+  timeline.endTool("child", 12);
+  timeline.attachSubagentReport("child", {
+    version: 2,
+    observedMillis: 10,
+    modelMillis: 3,
+    fileOpsMillis: 1,
+    toolWaitMillis: 3,
+    idleMillis: 2,
+    unaccountedMillis: 1,
+  });
+  timeline.settle(12);
+  expect(timeline.snapshot(12)).toEqual({
+    wallMillis: 12,
+    modelMillis: 3,
+    fileOpsMillis: 1,
+    toolWaitMillis: 5,
+    idleMillis: 2,
+    unaccountedMillis: 1,
+  });
+});
+
+test.failing("keeps a missing subagent report as ordinary tool time", () => {
+  const timeline = new RuntimeTimeline();
+  timeline.startSession(0);
+  timeline.startProcessing(0);
+  timeline.startTool("subagent", "toolWait", 0);
+  timeline.endTool("subagent", 10);
+  timeline.settle(10);
+  expect(timeline.snapshot(10)).toEqual({
+    wallMillis: 10,
+    modelMillis: 0,
+    fileOpsMillis: 0,
+    toolWaitMillis: 10,
+    idleMillis: 0,
+    unaccountedMillis: 0,
+  });
+});
+
+test.failing("gives overlapping subagents start-order ownership without double-counting", () => {
+  const timeline = new RuntimeTimeline();
+  timeline.startSession(0);
+  timeline.startProcessing(0);
+  timeline.startTool("first", "toolWait", 0);
+  timeline.startTool("second", "toolWait", 5);
+  timeline.endTool("first", 10);
+  timeline.endTool("second", 15);
+  timeline.attachSubagentReport("first", {
+    version: 2, observedMillis: 10, modelMillis: 10, fileOpsMillis: 0, toolWaitMillis: 0, idleMillis: 0, unaccountedMillis: 0,
+  });
+  timeline.attachSubagentReport("second", {
+    version: 2, observedMillis: 10, modelMillis: 0, fileOpsMillis: 0, toolWaitMillis: 10, idleMillis: 0, unaccountedMillis: 0,
+  });
+  timeline.settle(15);
+  expect(timeline.snapshot(15)).toEqual({
+    wallMillis: 15,
+    modelMillis: 10,
+    fileOpsMillis: 0,
+    toolWaitMillis: 5,
+    idleMillis: 0,
+    unaccountedMillis: 0,
+  });
+});
+
+test.failing("counts overlapping ordinary tools as a wall-clock union", () => {
+  const timeline = new RuntimeTimeline();
+  timeline.startSession(0);
+  timeline.startProcessing(0);
+  timeline.startTool("one", "toolWait", 0);
+  timeline.startTool("two", "toolWait", 5);
+  timeline.endTool("one", 10);
+  timeline.endTool("two", 15);
+  timeline.settle(15);
+  expect(timeline.snapshot(15)).toEqual({
+    wallMillis: 15,
+    modelMillis: 0,
+    fileOpsMillis: 0,
+    toolWaitMillis: 15,
+    idleMillis: 0,
+    unaccountedMillis: 0,
+  });
+});
+
+test.failing("reattributes overlapping subagents proportionally by owned duration", () => {
+  const timeline = new RuntimeTimeline();
+  timeline.startSession(0);
+  timeline.startProcessing(0);
+  timeline.startTool("first", "toolWait", 0);
+  timeline.startTool("second", "toolWait", 5);
+  timeline.endTool("first", 10);
+  timeline.endTool("second", 15);
+  timeline.attachSubagentReport("first", {
+    version: 2, observedMillis: 10, modelMillis: 10, fileOpsMillis: 0, toolWaitMillis: 0, idleMillis: 0, unaccountedMillis: 0,
+  });
+  timeline.attachSubagentReport("second", {
+    version: 2, observedMillis: 5, modelMillis: 5, fileOpsMillis: 0, toolWaitMillis: 0, idleMillis: 0, unaccountedMillis: 0,
+  });
+  timeline.settle(15);
+  expect(timeline.snapshot(15)).toEqual({
+    wallMillis: 15,
+    modelMillis: 13,
+    fileOpsMillis: 0,
+    toolWaitMillis: 2,
+    idleMillis: 0,
+    unaccountedMillis: 0,
+  });
+});
+
+test.failing("ignores pre-session starts and unmatched ends", () => {
+  const timeline = new RuntimeTimeline();
+  timeline.endProvider(0);
+  timeline.endTool("unknown", 0);
+  timeline.startProcessing(0);
+  timeline.startProvider(0);
+  timeline.startTool("before", "toolWait", 0);
+  timeline.startSession(10);
+  timeline.startProcessing(10);
+  timeline.settle(20);
+
+  expect(timeline.snapshot(20)).toEqual({
+    wallMillis: 10,
+    modelMillis: 0,
+    fileOpsMillis: 0,
+    toolWaitMillis: 0,
+    idleMillis: 0,
+    unaccountedMillis: 10,
+  });
+});
+
+test.failing("ignores duplicate open interval starts", () => {
+  const timeline = new RuntimeTimeline();
+  timeline.startSession(0);
+  timeline.startProcessing(0);
+  timeline.startProvider(0);
+  timeline.startTool("tool", "toolWait", 0);
+  timeline.startProcessing(1);
+  timeline.startProvider(1);
+  timeline.startTool("tool", "fileOps", 1);
+  timeline.endProvider(5);
+  timeline.endTool("tool", 5);
+  timeline.settle(5);
+
+  expect(timeline.snapshot(10)).toEqual({
+    wallMillis: 10,
+    modelMillis: 0,
+    fileOpsMillis: 0,
+    toolWaitMillis: 5,
+    idleMillis: 5,
+    unaccountedMillis: 0,
+  });
+});
+
+test.failing("clamps ends before their starts without negative accounting", () => {
+  const timeline = new RuntimeTimeline();
+  timeline.startSession(0);
+  timeline.startProcessing(10);
+  timeline.startProvider(10);
+  timeline.startTool("tool", "toolWait", 10);
+  timeline.endProvider(5);
+  timeline.endTool("tool", 5);
+  timeline.settle(5);
+
+  expect(timeline.snapshot(20)).toEqual({
+    wallMillis: 20,
+    modelMillis: 0,
+    fileOpsMillis: 0,
+    toolWaitMillis: 0,
+    idleMillis: 20,
+    unaccountedMillis: 0,
+  });
+});
+
+test.failing("caps open child intervals at shutdown", () => {
+  const timeline = new RuntimeTimeline();
+  timeline.startSession(0);
+  timeline.startProcessing(0);
+  timeline.startProvider(0);
+  timeline.startTool("tool", "toolWait", 0);
+  timeline.shutdown(10);
+
+  expect(timeline.snapshot(20)).toEqual({
+    wallMillis: 10,
+    modelMillis: 0,
+    fileOpsMillis: 0,
+    toolWaitMillis: 10,
+    idleMillis: 0,
+    unaccountedMillis: 0,
+  });
+});
+
+test.failing("reset discards a prior session and its open intervals", () => {
+  const timeline = new RuntimeTimeline();
+  timeline.startSession(0);
+  timeline.startProcessing(0);
+  timeline.startTool("tool", "toolWait", 0);
+  timeline.reset();
+  timeline.startSession(10);
+
+  expect(timeline.snapshot(20)).toEqual({
+    wallMillis: 10,
+    modelMillis: 0,
+    fileOpsMillis: 0,
+    toolWaitMillis: 0,
+    idleMillis: 10,
+    unaccountedMillis: 0,
+  });
+});
+
+test.failing("gives a reported child precedence over every root category", () => {
+  const timeline = new RuntimeTimeline();
+  timeline.startSession(0);
+  timeline.startProcessing(0);
+  timeline.startProvider(0);
+  timeline.startTool("file", "fileOps", 0);
+  timeline.startTool("wait", "toolWait", 0);
+  timeline.startTool("child", "toolWait", 0);
+  timeline.endProvider(10);
+  timeline.endTool("file", 10);
+  timeline.endTool("wait", 10);
+  timeline.endTool("child", 10);
+  timeline.attachSubagentReport("child", {
+    version: 2,
+    observedMillis: 10,
+    modelMillis: 0,
+    fileOpsMillis: 10,
+    toolWaitMillis: 0,
+    idleMillis: 0,
+    unaccountedMillis: 0,
+  });
+  timeline.settle(10);
+
+  expect(timeline.snapshot(10)).toEqual({
+    wallMillis: 10,
+    modelMillis: 0,
+    fileOpsMillis: 10,
+    toolWaitMillis: 0,
+    idleMillis: 0,
+    unaccountedMillis: 0,
+  });
+});
+
+test.failing("falls back to a root tool classification for an invalid child report", () => {
+  const timeline = new RuntimeTimeline();
+  timeline.startSession(0);
+  timeline.startProcessing(0);
+  timeline.startTool("child", "fileOps", 0);
+  timeline.endTool("child", 10);
+  timeline.attachSubagentReport("child", {
+    version: 2,
+    observedMillis: 9,
+    modelMillis: 10,
+    fileOpsMillis: 0,
+    toolWaitMillis: 0,
+    idleMillis: 0,
+    unaccountedMillis: 0,
+  });
+  timeline.settle(10);
+
+  expect(timeline.snapshot(10)).toEqual({
+    wallMillis: 10,
+    modelMillis: 0,
+    fileOpsMillis: 10,
+    toolWaitMillis: 0,
+    idleMillis: 0,
+    unaccountedMillis: 0,
   });
 });
 
