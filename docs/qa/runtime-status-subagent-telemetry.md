@@ -24,24 +24,42 @@ pre-commit hooks, CI, or the `pi-subagent` wrapper.
    pi
    ```
 
-2. In the Pi prompt, ask the assistant to invoke the subagent wrapper:
+2. Leave Pi waiting at the editor for at least five seconds. Confirm that the
+   stopwatch and `idle` duration increase while `other` does not.
+
+3. Invoke `read`, `write`, and `edit`. Confirm their exclusive wall time appears
+   under `files`, while Bash and other ordinary tools appear under `tools`.
+
+4. Submit a normal prompt. Confirm processing gaps not covered by provider or
+   tool intervals appear under `other`, not `idle`.
+
+5. In the Pi prompt, ask the assistant to invoke the subagent wrapper:
 
    ```text
    Run: pi-subagent "Reply with exactly: child complete"
    ```
 
-3. Wait for the subprocess to finish and the assistant to respond.
+6. Wait for the subprocess to finish and the assistant to respond.
 
 ## Expected observations
 
-- The root runtime status line transitions from tool wait time to child
-  generation/idle time (or child tool time) after the subprocess completes.
+- The root runtime status categories satisfy this invariant, allowing only
+  display-rounding differences:
+
+  ```text
+  model generation + file operations + tool wait + idle + other = stopwatch walltime
+  ```
+
+- Every category remains bounded by the displayed stopwatch.
 - The assistant receives only the literal output:
 
   ```text
   child complete
   ```
 
+- The child `model`, `files`, `tools`, `idle`, and `other` categories replace
+  only the attributable Bash tool time; unrelated Bash tool time remains under
+  `tools`.
 - The shell output and the conversation transcript do **not** contain
   `PI_RUNTIME_STATUS_REPORT_PATH` or any JSON runtime status report.
 
@@ -66,8 +84,10 @@ To verify totals remain bounded by wall time with deeper nesting:
   nested child complete
   ```
 
-- The root runtime status totals (generation + tool wait + idle) are each less
-  than or equal to the elapsed wall time since the session started.
+- The nested child `model`, `files`, `tools`, `idle`, and `other` categories
+  replace only their attributable Bash tool time at each nesting level.
+- The root categories remain bounded by and sum to the displayed stopwatch,
+  allowing only display-rounding differences.
 - No `PI_RUNTIME_STATUS_REPORT_PATH` value or JSON report appears in the
   shell output or conversation transcript.
 
