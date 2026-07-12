@@ -3,6 +3,8 @@ alias n='nvim'
 
 # Version control
 alias g='git'
+alias gp='git push'
+alias gl='git pull'
 alias lg='lazygit'
 alias j='jj'
 alias ji='jjui'
