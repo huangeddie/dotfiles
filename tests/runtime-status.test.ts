@@ -100,7 +100,7 @@ class FakeFileOperations implements FileOperations {
 }
 
 
-test.failing("accepts only a v2 report whose five categories sum exactly", () => {
+test("accepts only a v2 report whose five categories sum exactly", () => {
   const valid: RuntimeStatusReport = {
     version: 2,
     observedMillis: 10,
@@ -118,7 +118,7 @@ test.failing("accepts only a v2 report whose five categories sum exactly", () =>
   expect(validateRuntimeStatusReport({ ...valid, observedMillis: 11 })).toBeNull();
 });
 
-test.failing("scales all five report categories with total-preserving rounding", () => {
+test("scales all five report categories with total-preserving rounding", () => {
   expect(scaleReport({
     version: 2,
     observedMillis: 5,
@@ -145,7 +145,7 @@ test("keeps a missing or invalid subagent report as ordinary tool time", () => {
   });
 });
 
-test.failing("reclassifies a complete subagent interval without changing root elapsed time", () => {
+test("reclassifies a complete subagent interval without changing root elapsed time", () => {
   const ledger = new ToolIntervalLedger();
   ledger.start("subagent", 0);
   ledger.end("subagent", 12);
@@ -157,7 +157,7 @@ test.failing("reclassifies a complete subagent interval without changing root el
   });
 });
 
-test.failing("gives overlapping subagents start-order ownership without double-counting", () => {
+test("gives overlapping subagents start-order ownership without double-counting", () => {
   const ledger = new ToolIntervalLedger();
   ledger.start("first", 0); ledger.start("second", 5);
   ledger.end("first", 10); ledger.end("second", 15);
@@ -177,7 +177,7 @@ test("counts overlapping ordinary tools as a wall-clock union", () => {
   });
 });
 
-test.failing("reattributes lifecycle-valid overlapping subagents proportionally by owned duration", () => {
+test("reattributes lifecycle-valid overlapping subagents proportionally by owned duration", () => {
   const ledger = new ToolIntervalLedger();
   ledger.start("first", 0);
   ledger.start("second", 5);
@@ -317,7 +317,7 @@ describe("subagent telemetry adapter", () => {
     );
   });
 
-  test.failing("attachReportIfPresent reads and validates a report for the matching tool call", async () => {
+  test("attachReportIfPresent reads and validates a report for the matching tool call", async () => {
     const store = new FakeReportStore();
     const adapter = createSubagentTelemetryAdapter(store);
     await adapter.prepare("tc-1", "pi-subagent 'inspect this'");
@@ -373,7 +373,7 @@ describe("subagent telemetry adapter", () => {
 });
 
 describe("ledger reconciliation", () => {
-  test.failing("distributionSnapshot adds subagent generating time to root model time", () => {
+  test("distributionSnapshot adds subagent generating time to root model time", () => {
     const state = createRuntimeStatusState();
     const ledger = new ToolIntervalLedger();
 
@@ -403,7 +403,7 @@ describe("ledger reconciliation", () => {
     });
   });
 
-  test.failing("formatStatus reflects reconciled subagent time", () => {
+  test("formatStatus reflects reconciled subagent time", () => {
     const state = createRuntimeStatusState();
     const ledger = new ToolIntervalLedger();
 

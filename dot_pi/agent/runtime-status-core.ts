@@ -28,7 +28,13 @@ export type ReportStore = {
   remove(path: string): Promise<void>;
 };
 
-const categories = ["generatingMillis", "toolWaitMillis", "idleMillis"] as const;
+const categories = [
+  "modelMillis",
+  "fileOpsMillis",
+  "toolWaitMillis",
+  "idleMillis",
+  "unaccountedMillis",
+] as const;
 
 function isMillis(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
@@ -40,22 +46,25 @@ export function validateRuntimeStatusReport(value: unknown): RuntimeStatusReport
   }
 
   const candidate = value as Record<string, unknown>;
-  if (candidate.version !== 1) {
+  if (candidate.version !== 2) {
     return null;
   }
 
   if (
     !isMillis(candidate.observedMillis) ||
-    !isMillis(candidate.generatingMillis) ||
+    !isMillis(candidate.modelMillis) ||
+    !isMillis(candidate.fileOpsMillis) ||
     !isMillis(candidate.toolWaitMillis) ||
-    !isMillis(candidate.idleMillis)
+    !isMillis(candidate.idleMillis) ||
+    !isMillis(candidate.unaccountedMillis)
   ) {
     return null;
   }
 
   if (
     candidate.observedMillis !==
-    candidate.generatingMillis + candidate.toolWaitMillis + candidate.idleMillis
+    candidate.modelMillis + candidate.fileOpsMillis + candidate.toolWaitMillis +
+      candidate.idleMillis + candidate.unaccountedMillis
   ) {
     return null;
   }
@@ -98,10 +107,10 @@ export function scaleReport(
 
   return {
     modelMillis: floors[0],
-    fileOpsMillis: 0,
-    toolWaitMillis: floors[1],
-    idleMillis: floors[2],
-    unaccountedMillis: 0,
+    fileOpsMillis: floors[1],
+    toolWaitMillis: floors[2],
+    idleMillis: floors[3],
+    unaccountedMillis: floors[4],
   };
 }
 
