@@ -19,7 +19,8 @@ A runtime snapshot has this shape:
 ```ts
 type RuntimeDistribution = {
   wallMillis: number;
-  generatingMillis: number;
+  modelMillis: number;
+  fileOpsMillis: number;
   toolWaitMillis: number;
   idleMillis: number;
   unaccountedMillis: number;
@@ -30,7 +31,8 @@ All fields are finite, non-negative integer milliseconds. Every snapshot must
 satisfy:
 
 ```text
-wallMillis = generatingMillis
+wallMillis = modelMillis
+           + fileOpsMillis
            + toolWaitMillis
            + idleMillis
            + unaccountedMillis
@@ -38,10 +40,12 @@ wallMillis = generatingMillis
 
 The categories mean:
 
-- `generatingMillis`: time covered by a recorded root provider/turn interval or
-  attributed child generation.
-- `toolWaitMillis`: time covered by an ordinary root tool interval, child tool
-  time, or subagent wrapper overhead.
+- `modelMillis`: time covered by a recorded root provider/turn interval or
+  attributed child model generation.
+- `fileOpsMillis`: time covered by root `read`, `write`, or `edit` execution or
+  attributed child file-operation time.
+- `toolWaitMillis`: time covered by any other ordinary root tool interval,
+  child tool-wait time, or subagent wrapper overhead.
 - `idleMillis`: time when Pi is explicitly settled and waiting for input,
   including initial and final settled session time.
 - `unaccountedMillis`: time inside an active processing envelope that is not
@@ -86,9 +90,18 @@ Classification rules are:
 1. A segment outside an active-processing envelope is idle.
 2. Within an active envelope, an owning reported subagent tool uses the child's
    proportional distribution.
-3. Otherwise, a segment covered by any ordinary root tool is tool wait.
-4. Otherwise, a segment covered by a root provider interval is generating.
-5. Remaining active-envelope time is unaccounted.
+3. Otherwise, a segment covered by an ordinary tool classified as tool wait is
+   tool wait.
+4. Otherwise, a segment covered by `read`, `write`, or `edit` is a file
+   operation.
+5. Otherwise, a segment covered by a root provider interval is model time.
+6. Remaining active-envelope time is unaccounted.
+
+Tool classification is owned by the Pi adapter, which maps tool names to the
+narrow core contract `"fileOps" | "toolWait"`. The pure timeline receives the
+classification and does not depend on Pi tool names. Tool-wait intervals take
+precedence over overlapping file-operation intervals; file-operation intervals
+take precedence over overlapping provider intervals.
 
 The existing deterministic start-order ownership rule applies when reported
 subagents overlap. Ordinary overlapping tools continue to count as a wall-clock
@@ -108,7 +121,8 @@ A child publishes only this strict report version:
 type RuntimeStatusReport = {
   version: 2;
   observedMillis: number;
-  generatingMillis: number;
+  modelMillis: number;
+  fileOpsMillis: number;
   toolWaitMillis: number;
   idleMillis: number;
   unaccountedMillis: number;
@@ -118,7 +132,8 @@ type RuntimeStatusReport = {
 The required invariant is:
 
 ```text
-observedMillis = generatingMillis
+observedMillis = modelMillis
+               + fileOpsMillis
                + toolWaitMillis
                + idleMillis
                + unaccountedMillis
@@ -144,20 +159,21 @@ The extension is the composition root for effects:
 - `setInterval` requests periodic UI refreshes;
 - the existing `ReportStore` handles child report I/O.
 
-Token and TPS accounting remain independent. Session token throughput still
-uses model generation time rather than session walltime as its denominator.
+Token and TPS accounting remain independent. Session token throughput uses
+only `modelMillis` rather than file-operation time or session walltime as its
+denominator.
 
 ## UI
 
 The live status is:
 
 ```text
-⏱ 2m 14s | 38.7 t/s | gen 12s 9% | tools 5s 4% | idle 1m 55s 86% | other 2s 1%
+⏱ 2m 14s | 38.7 t/s | gen 12s 9% | files 8s 6% | tools 5s 4% | idle 1m 47s 80% | other 2s 1%
 ```
 
-`other` is the display label for `unaccountedMillis`. All percentages use
-`wallMillis` as their denominator. A zero-duration session displays zero for all
-percentages.
+`gen` displays `modelMillis`, `files` displays `fileOpsMillis`, and `other`
+displays `unaccountedMillis`. All percentages use `wallMillis` as their
+denominator. A zero-duration session displays zero for all percentages.
 
 The stopwatch uses a compact duration:
 
@@ -191,18 +207,22 @@ Pi runtime, filesystem, or network. They cover:
 2. initial, between-run, and final settled intervals are idle;
 3. uncovered active-envelope intervals are unaccounted;
 4. `agent_end` before retry or `agent_settled` does not begin idle;
-5. provider and tool intervals classify active time with deterministic
-   precedence;
-6. overlapping ordinary tools count as a wall-clock union;
-7. overlapping subagents preserve exclusive start-order ownership;
-8. every snapshot category sums exactly to session walltime;
-9. strict version-2 report validation and rejection of version 1;
-10. recursive version-2 child attribution, scaling, and wrapper overhead;
-11. stopwatch formatting below one minute, below one hour, and at least one
+5. provider, file-operation, and tool-wait intervals classify active time with
+   deterministic precedence;
+6. `read`, `write`, and `edit` map to file operations while other ordinary tools
+   map to tool wait;
+7. overlapping intervals in each tool class count as a wall-clock union;
+8. overlapping subagents preserve exclusive start-order ownership;
+9. every snapshot category sums exactly to session walltime;
+10. strict version-2 report validation and rejection of version 1;
+11. recursive version-2 child attribution across all five categories, scaling,
+    and wrapper overhead;
+12. stopwatch formatting below one minute, below one hour, and at least one
     hour;
-12. percentages use session walltime and `other` renders explicitly;
-13. `agent_end` and `agent_settled` leave the session render timer running;
-14. session reset, replacement, reload, and shutdown finalize or discard the
+13. percentages use session walltime and `files` and `other` render explicitly;
+14. TPS uses only model time, excluding file operations;
+15. `agent_end` and `agent_settled` leave the session render timer running;
+16. session reset, replacement, reload, and shutdown finalize or discard the
     correct intervals.
 
 No UI or system test is required. The existing manually invoked subagent

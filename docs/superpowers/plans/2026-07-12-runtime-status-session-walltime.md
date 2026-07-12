@@ -2,17 +2,18 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add a session-lifetime stopwatch and partition its walltime into explicitly observed generation, tools, settled idle, and unaccounted active-processing time.
+**Goal:** Add a session-lifetime stopwatch and partition its walltime into model generation, file operations, other tools, settled idle, and unaccounted active-processing time.
 
-**Architecture:** A pure `RuntimeTimeline` in `runtime-status-core.ts` owns timestamped session, processing-envelope, provider, and tool intervals and projects an exclusive four-category snapshot. The Pi extension is the composition root: lifecycle events feed timestamps into the timeline, the render timer only refreshes UI, and the existing report-store boundary transports strict version-2 recursive telemetry.
+**Architecture:** A pure `RuntimeTimeline` in `runtime-status-core.ts` owns timestamped session, processing-envelope, provider, and classified tool intervals and projects an exclusive five-category snapshot. The Pi extension owns the policy mapping `read`/`write`/`edit` to file operations and all other root tools to tool wait. Lifecycle events feed timestamps into the timeline, the render timer only refreshes UI, and the existing report-store boundary transports strict version-2 recursive telemetry.
 
 **Tech Stack:** TypeScript, Pi extension lifecycle API, Bun 1.3 test runner, Node filesystem APIs, chezmoi source-state workflow.
 
 ## Global Constraints
 
-- `wallMillis = generatingMillis + toolWaitMillis + idleMillis + unaccountedMillis` for every snapshot.
+- `wallMillis = modelMillis + fileOpsMillis + toolWaitMillis + idleMillis + unaccountedMillis` for every snapshot.
 - Idle means only time when Pi is explicitly outside `before_agent_start`–`agent_settled`; uncovered time inside that envelope is `unaccountedMillis`.
-- Tool classification takes precedence over root provider classification, and overlapping tools count exclusive walltime rather than summed durations.
+- The Pi adapter maps `read`, `write`, and `edit` to `fileOps`; every other ordinary root tool maps to `toolWait`.
+- Exclusive precedence is reported subagent, tool wait, file operations, provider model time, then unaccounted; overlapping intervals count walltime rather than summed durations.
 - Recursive telemetry supports only report `version: 2`; version 1 is rejected without migration.
 - Child report and filesystem failures remain private, best-effort, and non-fatal.
 - TPS continues to use provider-generation duration, not session walltime.
@@ -25,7 +26,7 @@
 
 ## File map
 
-- Modify `dot_pi/agent/runtime-status-core.ts`: strict v2 report contract, four-category scaling, exclusive `RuntimeTimeline`, and narrow report sink contract.
+- Modify `dot_pi/agent/runtime-status-core.ts`: strict v2 report contract, five-category scaling, classified-tool `RuntimeTimeline`, and narrow report sink contract.
 - Modify `dot_pi/agent/exact_extensions/runtime-status.ts`: session lifecycle wiring, TPS state, status formatting, report publication, timer lifetime, and report-store effects.
 - Modify `tests/runtime-status.test.ts`: deterministic contract and unit tests using fake report/filesystem boundaries.
 - Modify `docs/qa/runtime-status-subagent-telemetry.md`: manual checks for stopwatch, explicit idle, `other`, and bounded recursive totals.
@@ -40,8 +41,8 @@
 - Test: `tests/runtime-status.test.ts:1-299`
 
 **Interfaces:**
-- Produces: `RuntimeStatusReport` with literal `version: 2` and `unaccountedMillis`.
-- Produces: `RuntimeCategoryMillis` with all four category fields.
+- Produces: `RuntimeStatusReport` with literal `version: 2` and atomic model, file-operation, tool-wait, idle, and unaccounted fields.
+- Produces: `RuntimeCategoryMillis` with all five category fields.
 - Produces: `scaleReport(report: RuntimeStatusReport, targetMillis: number): RuntimeCategoryMillis`.
 - Preserves: `ReportStore`, `validateRuntimeStatusReport`, and `publishChildReport` names.
 
@@ -53,7 +54,8 @@ Change the core contracts first:
 export type RuntimeStatusReport = {
   version: 2;
   observedMillis: number;
-  generatingMillis: number;
+  modelMillis: number;
+  fileOpsMillis: number;
   toolWaitMillis: number;
   idleMillis: number;
   unaccountedMillis: number;
@@ -61,18 +63,20 @@ export type RuntimeStatusReport = {
 
 export type RuntimeCategoryMillis = Pick<
   RuntimeStatusReport,
-  "generatingMillis" | "toolWaitMillis" | "idleMillis" | "unaccountedMillis"
+  "modelMillis" | "fileOpsMillis" | "toolWaitMillis" |
+    "idleMillis" | "unaccountedMillis"
 >;
 ```
 
-Add `unaccountedMillis: 0` to temporary category-return stubs and all existing typed report fixtures so TypeScript compiles. Change report literals to `version: 2`. Temporarily leave validation/scaling behavior unchanged so these real assertions are expected failures:
+Replace report-fixture `generatingMillis` with `modelMillis`, add `fileOpsMillis: 0` and `unaccountedMillis: 0`, and change report literals to `version: 2`. Add all five zero fields to temporary category-return stubs so TypeScript compiles. Mark every existing validation, scaling, ledger, adapter, or reconciliation test whose report contract changed with `test.failing`; leave unrelated command/path/store tests ordinary. Temporarily leave validation/scaling behavior unchanged so these real assertions are expected failures:
 
 ```ts
-test.failing("accepts only a v2 report whose four categories sum exactly", () => {
+test.failing("accepts only a v2 report whose five categories sum exactly", () => {
   const valid: RuntimeStatusReport = {
     version: 2,
     observedMillis: 10,
-    generatingMillis: 4,
+    modelMillis: 3,
+    fileOpsMillis: 1,
     toolWaitMillis: 3,
     idleMillis: 2,
     unaccountedMillis: 1,
@@ -81,28 +85,30 @@ test.failing("accepts only a v2 report whose four categories sum exactly", () =>
   expect(validateRuntimeStatusReport(valid)).toEqual(valid);
   expect(validateRuntimeStatusReport({ ...valid, version: 1 })).toBeNull();
   expect(validateRuntimeStatusReport({ ...valid, unaccountedMillis: -1 })).toBeNull();
-  expect(validateRuntimeStatusReport({ ...valid, generatingMillis: 4.5 })).toBeNull();
+  expect(validateRuntimeStatusReport({ ...valid, modelMillis: 3.5 })).toBeNull();
   expect(validateRuntimeStatusReport({ ...valid, observedMillis: 11 })).toBeNull();
 });
 
-test.failing("scales all four report categories with total-preserving rounding", () => {
+test.failing("scales all five report categories with total-preserving rounding", () => {
   expect(scaleReport({
     version: 2,
-    observedMillis: 4,
-    generatingMillis: 1,
+    observedMillis: 5,
+    modelMillis: 1,
+    fileOpsMillis: 1,
     toolWaitMillis: 1,
     idleMillis: 1,
     unaccountedMillis: 1,
-  }, 10)).toEqual({
-    generatingMillis: 3,
-    toolWaitMillis: 3,
+  }, 12)).toEqual({
+    modelMillis: 3,
+    fileOpsMillis: 3,
+    toolWaitMillis: 2,
     idleMillis: 2,
     unaccountedMillis: 2,
   });
 });
 ```
 
-Update every non-failing existing equality expectation for category objects to include `unaccountedMillis: 0`. In the extension's temporary shutdown report literal, use `version: 2` and `unaccountedMillis: 0` solely as a compilation stub; Task 3 replaces it with the real snapshot value.
+Update affected category expectations to use `modelMillis` and include `fileOpsMillis: 0` and `unaccountedMillis: 0`. In the extension's temporary shutdown report literal, map its current generation snapshot to `modelMillis`, and set `fileOpsMillis: 0` and `unaccountedMillis: 0` solely as compilation stubs; Task 3 replaces these with real timeline values.
 
 - [ ] **Step 2: Run the contract tests and verify anticipated failures**
 
@@ -112,7 +118,7 @@ Run:
 bun test tests/runtime-status.test.ts
 ```
 
-Expected: exit 0; the two `test.failing` cases report as passing expected failures, with no ordinary failures.
+Expected: exit 0; all report-dependent cases changed in Step 1 report as passing expected failures, with no ordinary failures.
 
 - [ ] **Step 3: Commit the Track A contract**
 
@@ -121,13 +127,14 @@ git add dot_pi/agent/runtime-status-core.ts dot_pi/agent/exact_extensions/runtim
 git commit -m "test: specify runtime telemetry v2 contract"
 ```
 
-- [ ] **Step 4: Implement strict validation and four-category scaling**
+- [ ] **Step 4: Implement strict validation and five-category scaling**
 
 Use the complete category list and invariant:
 
 ```ts
 const categories = [
-  "generatingMillis",
+  "modelMillis",
+  "fileOpsMillis",
   "toolWaitMillis",
   "idleMillis",
   "unaccountedMillis",
@@ -139,32 +146,34 @@ export function validateRuntimeStatusReport(value: unknown): RuntimeStatusReport
   if (candidate.version !== 2) return null;
   if (
     !isMillis(candidate.observedMillis) ||
-    !isMillis(candidate.generatingMillis) ||
+    !isMillis(candidate.modelMillis) ||
+    !isMillis(candidate.fileOpsMillis) ||
     !isMillis(candidate.toolWaitMillis) ||
     !isMillis(candidate.idleMillis) ||
     !isMillis(candidate.unaccountedMillis)
   ) return null;
   if (
     candidate.observedMillis !==
-    candidate.generatingMillis + candidate.toolWaitMillis +
+    candidate.modelMillis + candidate.fileOpsMillis + candidate.toolWaitMillis +
       candidate.idleMillis + candidate.unaccountedMillis
   ) return null;
   return value as RuntimeStatusReport;
 }
 ```
 
-Retain the existing largest-remainder scaling algorithm, now over four entries, and return:
+Retain the existing largest-remainder scaling algorithm, now over five entries, and return:
 
 ```ts
 return {
-  generatingMillis: floors[0],
-  toolWaitMillis: floors[1],
-  idleMillis: floors[2],
-  unaccountedMillis: floors[3],
+  modelMillis: floors[0],
+  fileOpsMillis: floors[1],
+  toolWaitMillis: floors[2],
+  idleMillis: floors[3],
+  unaccountedMillis: floors[4],
 };
 ```
 
-The zero-target branch must return all four zero fields. Remove `.failing` from the two report tests.
+The zero-target branch must return all five zero fields. Update the temporary `ToolIntervalLedger` projection to carry all five categories until Task 3 replaces it, then remove `.failing` from every report-dependent test marked in Step 1.
 
 - [ ] **Step 5: Run the focused suite and verify GREEN**
 
@@ -194,7 +203,8 @@ git commit -m "feat: enforce runtime telemetry v2 reports"
 **Interfaces:**
 - Consumes: strict `RuntimeStatusReport`, `RuntimeCategoryMillis`, `scaleReport`, and `validateRuntimeStatusReport` from Task 1.
 - Produces: `RuntimeDistribution`, `SubagentReportSink`, and `RuntimeTimeline`.
-- Produces methods: `reset()`, `startSession(now)`, `startProcessing(now)`, `settle(now)`, `startProvider(now)`, `endProvider(now)`, `startTool(id, now)`, `endTool(id, now)`, `attachSubagentReport(id, report)`, `shutdown(now)`, and `snapshot(now)`.
+- Produces: `RootToolClassification = "fileOps" | "toolWait"`.
+- Produces methods: `reset()`, `startSession(now)`, `startProcessing(now)`, `settle(now)`, `startProvider(now)`, `endProvider(now)`, `startTool(id, classification, now)`, `endTool(id, now)`, `attachSubagentReport(id, report)`, `shutdown(now)`, and `snapshot(now)`.
 
 - [ ] **Step 1: Add timeline interfaces, method stubs, and expected-failure tests**
 
@@ -209,6 +219,8 @@ export type SubagentReportSink = {
   attachSubagentReport(toolCallId: string, report: RuntimeStatusReport): void;
 };
 
+export type RootToolClassification = "fileOps" | "toolWait";
+
 export class RuntimeTimeline implements SubagentReportSink {
   reset(): void {}
   startSession(_now: number): void {}
@@ -216,14 +228,19 @@ export class RuntimeTimeline implements SubagentReportSink {
   settle(_now: number): void {}
   startProvider(_now: number): void {}
   endProvider(_now: number): void {}
-  startTool(_toolCallId: string, _now: number): void {}
+  startTool(
+    _toolCallId: string,
+    _classification: RootToolClassification,
+    _now: number,
+  ): void {}
   endTool(_toolCallId: string, _now: number): void {}
   attachSubagentReport(_toolCallId: string, _report: RuntimeStatusReport): void {}
   shutdown(_now: number): void {}
   snapshot(_now: number): RuntimeDistribution {
     return {
       wallMillis: 0,
-      generatingMillis: 0,
+      modelMillis: 0,
+      fileOpsMillis: 0,
       toolWaitMillis: 0,
       idleMillis: 0,
       unaccountedMillis: 0,
@@ -241,13 +258,14 @@ test.failing("partitions settled and uncovered active session walltime", () => {
   timeline.startProcessing(1_000);
   timeline.startProvider(1_500);
   timeline.endProvider(2_500);
-  timeline.startTool("tool", 3_000);
+  timeline.startTool("tool", "toolWait", 3_000);
   timeline.endTool("tool", 4_000);
   timeline.settle(5_000);
 
   expect(timeline.snapshot(8_000)).toEqual({
     wallMillis: 8_000,
-    generatingMillis: 1_000,
+    modelMillis: 1_000,
+    fileOpsMillis: 0,
     toolWaitMillis: 1_000,
     idleMillis: 4_000,
     unaccountedMillis: 2_000,
@@ -264,43 +282,46 @@ test.failing("keeps agent-end retry gaps active until agent_settled", () => {
   timeline.settle(5_000);
   expect(timeline.snapshot(6_000)).toEqual({
     wallMillis: 6_000,
-    generatingMillis: 1_000,
+    modelMillis: 1_000,
+    fileOpsMillis: 0,
     toolWaitMillis: 0,
     idleMillis: 2_000,
     unaccountedMillis: 3_000,
   });
 });
 
-test.failing("gives tools precedence over providers and unions overlapping tools", () => {
+test.failing("applies tool-wait then file-ops then provider precedence", () => {
   const timeline = new RuntimeTimeline();
   timeline.startSession(0);
   timeline.startProcessing(0);
   timeline.startProvider(0);
-  timeline.startTool("one", 2_000);
-  timeline.startTool("two", 3_000);
-  timeline.endTool("one", 4_000);
-  timeline.endTool("two", 5_000);
+  timeline.startTool("read", "fileOps", 1_000);
+  timeline.startTool("bash", "toolWait", 2_000);
+  timeline.endTool("bash", 3_000);
+  timeline.endTool("read", 4_000);
   timeline.endProvider(6_000);
   timeline.settle(6_000);
   expect(timeline.snapshot(6_000)).toEqual({
     wallMillis: 6_000,
-    generatingMillis: 3_000,
-    toolWaitMillis: 3_000,
+    modelMillis: 3_000,
+    fileOpsMillis: 2_000,
+    toolWaitMillis: 1_000,
     idleMillis: 0,
     unaccountedMillis: 0,
   });
 });
 
-test.failing("reattributes reported subagents across all four categories", () => {
+test.failing("reattributes reported subagents across all five categories", () => {
   const timeline = new RuntimeTimeline();
   timeline.startSession(0);
   timeline.startProcessing(0);
-  timeline.startTool("child", 0);
+  timeline.startTool("child", "toolWait", 0);
   timeline.endTool("child", 12);
   timeline.attachSubagentReport("child", {
     version: 2,
     observedMillis: 10,
-    generatingMillis: 4,
+    modelMillis: 3,
+    fileOpsMillis: 1,
     toolWaitMillis: 3,
     idleMillis: 2,
     unaccountedMillis: 1,
@@ -308,7 +329,8 @@ test.failing("reattributes reported subagents across all four categories", () =>
   timeline.settle(12);
   expect(timeline.snapshot(12)).toEqual({
     wallMillis: 12,
-    generatingMillis: 4,
+    modelMillis: 3,
+    fileOpsMillis: 1,
     toolWaitMillis: 5,
     idleMillis: 2,
     unaccountedMillis: 1,
@@ -344,11 +366,12 @@ type Interval = { startedAt: number; endedAt: number | null };
 type ToolInterval = Interval & {
   toolCallId: string;
   sequence: number;
+  classification: RootToolClassification;
   subagentReport: RuntimeStatusReport | null;
 };
 ```
 
-`RuntimeTimeline` owns one session interval, an array plus optional open processing interval, an array plus optional open provider interval, a tool map, and a sequence counter. Starts before session start are ignored; duplicate starts for an open processing/provider/tool interval are ignored; unmatched ends are ignored; ends are clamped to at least their start. `shutdown(now)` closes the session boundary but leaves every still-open child interval effectively ending at the same shutdown time. `reset()` clears every field and resets sequence.
+`RuntimeTimeline` owns one session interval, an array plus optional open processing interval, an array plus optional open provider interval, a classified tool map, and a sequence counter. Starts before session start are ignored; duplicate starts for an open processing/provider/tool interval are ignored; unmatched ends are ignored; ends are clamped to at least their start. `shutdown(now)` closes the session boundary but leaves every still-open child interval effectively ending at the same shutdown time. `reset()` clears every field and resets sequence.
 
 Implement `snapshot(now)` as this exact sweep:
 
@@ -357,11 +380,12 @@ Implement `snapshot(now)` as this exact sweep:
 3. For each positive segment, test coverage at `segmentStart`.
 4. If no processing interval covers it, add duration to idle.
 5. Otherwise choose the earliest-sequence covering tool that has a valid child report. If found, add duration to that child's `ownedDuration`.
-6. Otherwise, if any tool covers it, add duration to tool wait.
-7. Otherwise, if any provider interval covers it, add duration to generation.
-8. Otherwise add duration to unaccounted.
-9. For each reported child owner, calculate `attributable = round(owned * min(1, report.observedMillis / parentToolDuration))`, add `scaleReport(report, attributable)` category-by-category, and add `owned - attributable` to tool wait.
-10. Return `wallMillis = effectiveEnd - sessionStartedAt` and assert by construction that the four categories sum to it.
+6. Otherwise, if any covering tool has classification `toolWait`, add duration to tool wait.
+7. Otherwise, if any covering tool has classification `fileOps`, add duration to file operations.
+8. Otherwise, if any provider interval covers it, add duration to model time.
+9. Otherwise add duration to unaccounted.
+10. For each reported child owner, calculate `attributable = round(owned * min(1, report.observedMillis / parentToolDuration))`, add `scaleReport(report, attributable)` category-by-category, and add `owned - attributable` to tool wait.
+11. Return `wallMillis = effectiveEnd - sessionStartedAt` and assert by construction that the five categories sum to it.
 
 Retain `ToolIntervalLedger` temporarily because the deployed extension and adapter still consume it at this checkpoint. Task 3 ports those consumers and deletes the old class so the final design has only one accounting implementation. Remove `.failing` from all new `RuntimeTimeline` tests.
 
@@ -373,7 +397,7 @@ Run:
 bun test tests/runtime-status.test.ts
 ```
 
-Expected: all strict report, overlap, scaling, and timeline tests pass.
+Expected: all strict report, classified-tool precedence, overlap, scaling, and timeline tests pass.
 
 - [ ] **Step 6: Commit the Track B timeline implementation**
 
@@ -392,7 +416,9 @@ git commit -m "feat: add exclusive session runtime timeline"
 
 **Interfaces:**
 - Consumes: `RuntimeTimeline`, `RuntimeDistribution`, `SubagentReportSink`, and strict report v2 from Tasks 1–2.
+- Produces: `classifyRootTool(toolName: string): RootToolClassification`.
 - Produces: `recordSessionStart`, `recordProcessingStart`, `recordAgentSettled`, `recordSessionShutdown`, `distributionSnapshot`, `formatStopwatch`, and `formatStatus` pure helpers.
+- Changes: `recordToolExecutionStart(state, toolCallId, toolName, now)` classifies before opening the timeline interval.
 - Changes: `createSubagentTelemetryAdapter(...).attachReportIfPresent` accepts `SubagentReportSink` rather than the removed `ToolIntervalLedger`.
 
 - [ ] **Step 1: Add extension contract stubs and expected-failure lifecycle/rendering tests**
@@ -421,7 +447,8 @@ test.failing("keeps whole-session settled time idle and active gaps other", () =
 
   expect(distributionSnapshot(state, 10_000)).toEqual({
     wallMillis: 10_000,
-    generatingMillis: 1_000,
+    modelMillis: 1_000,
+    fileOpsMillis: 0,
     toolWaitMillis: 0,
     idleMillis: 6_000,
     unaccountedMillis: 3_000,
@@ -434,21 +461,23 @@ test.failing("formats compact session stopwatch boundaries", () => {
   expect(formatStopwatch(3_792_999)).toBe("1h 03m 12s");
 });
 
-test.failing("renders stopwatch and explicit other percentage", () => {
+test.failing("renders stopwatch, files, and explicit other percentages", () => {
   const state = createRuntimeStatusState();
   recordSessionStart(state, 0);
   recordProcessingStart(state, 1_000);
   recordTurnStart(state, 2_000);
   handleAssistantMessageEnd(state, 3_000, 100);
+  recordToolExecutionStart(state, "read-1", "read", 3_000);
+  recordToolExecutionEnd(state, "read-1", 4_000);
   recordAgentSettled(state, 5_000);
 
   expect(formatStatus(state, 10_000)).toBe(
-    "⏱ 10s | 100.0 t/s | gen 1.0s 10% | tools 0.0s 0% | idle 6.0s 60% | other 3.0s 30%",
+    "⏱ 10s | 100.0 t/s | gen 1.0s 10% | files 1.0s 10% | tools 0.0s 0% | idle 6.0s 60% | other 2.0s 20%",
   );
 });
 ```
 
-Update the adapter test to construct `RuntimeTimeline`, start a session and processing envelope, start/end the matching tool, attach the v2 report, and assert the four-category snapshot. Keep TPS tests asserting provider duration remains the denominator.
+Update the adapter test to construct `RuntimeTimeline`, start a session and processing envelope, start/end the matching `toolWait` tool, attach the v2 report, and assert the five-category snapshot. Add a pure `classifyRootTool` contract test proving `read`, `write`, and `edit` return `"fileOps"` while `bash`, `grep`, `find`, and unknown tools return `"toolWait"`. Keep TPS tests asserting model/provider duration remains the denominator and excludes `fileOpsMillis`.
 
 - [ ] **Step 2: Run extension tests and verify anticipated failures**
 
@@ -514,7 +543,7 @@ export function distributionSnapshot(
 `handleAssistantMessageEnd` closes both the TPS provider timer and timeline
 provider interval. `recordAgentEnd` closes an unexpectedly open provider but
 does not settle processing or stop session timing. Tool lifecycle helpers call
-`state.timeline.startTool/endTool`.
+tool lifecycle helpers map the Pi tool name with `classifyRootTool(toolName)` and call `state.timeline.startTool(toolCallId, classification, now)` / `endTool(toolCallId, now)`.
 
 Remove `.failing` from lifecycle tests once these helpers pass.
 
@@ -536,7 +565,7 @@ export function formatStopwatch(millis: number): string {
 }
 ```
 
-`formatStatus(state, now)` must use `snapshot.wallMillis` for the stopwatch and every percentage denominator, retain one-decimal seconds for categories, label `unaccountedMillis` as `other`, and produce the exact tested field order. Remove the old streaming/checkmark icon because the approved stopwatch occupies the leading status position.
+`formatStatus(state, now)` must use `snapshot.wallMillis` for the stopwatch and every percentage denominator, retain one-decimal seconds for categories, display `modelMillis` as `gen`, `fileOpsMillis` as `files`, and `unaccountedMillis` as `other`, and produce the exact tested field order. Remove the old streaming/checkmark icon because the approved stopwatch occupies the leading status position.
 
 - [ ] **Step 6: Wire the complete Pi session lifecycle**
 
@@ -545,7 +574,7 @@ Change event handlers as follows:
 - `session_start`: call `recordSessionStart(state, now)`, start the render interval, and immediately set status instead of clearing it.
 - `before_agent_start`: call `recordProcessingStart(state, now)` and refresh status.
 - `turn_start`: open provider/TPS timing.
-- tool start/end: update `state.timeline`; attach a child report to that same timeline after tool end.
+- tool start/end: classify `read`/`write`/`edit` as `fileOps`, classify every other root tool as `toolWait`, update `state.timeline`, and attach a child report to that same timeline after tool end.
 - `agent_end`: defensively close provider timing and refresh only; do not stop the interval.
 - `agent_settled`: call `recordAgentSettled` and refresh; do not stop the interval.
 - `session_shutdown`: capture one `now`, call `recordSessionShutdown`, stop the interval, clean pending reports, publish strict v2 from the final snapshot, then clear status.
@@ -556,7 +585,8 @@ The published report is:
 const report: RuntimeStatusReport = {
   version: 2,
   observedMillis: distribution.wallMillis,
-  generatingMillis: distribution.generatingMillis,
+  modelMillis: distribution.modelMillis,
+  fileOpsMillis: distribution.fileOpsMillis,
   toolWaitMillis: distribution.toolWaitMillis,
   idleMillis: distribution.idleMillis,
   unaccountedMillis: distribution.unaccountedMillis,
@@ -596,19 +626,20 @@ git commit -m "feat: report explicit session walltime"
 
 - [ ] **Step 1: Update the manual QA observations**
 
-Change the expected root status total from three categories to:
+Change the existing root status total to the new five-category invariant:
 
 ```text
-generation + tool wait + idle + other = stopwatch walltime
+model generation + file operations + tool wait + idle + other = stopwatch walltime
 ```
 
 Add these manual checks:
 
 1. Leave Pi waiting at the editor for at least five seconds; the stopwatch and idle duration increase while `other` does not.
-2. Submit a normal prompt; processing gaps not covered by provider/tool intervals appear under `other`, not idle.
-3. Run the existing direct and nested `pi-subagent` prompts; child generation/tool/idle/other replace only attributable Bash tool time.
-4. Confirm no report JSON or `PI_RUNTIME_STATUS_REPORT_PATH` enters shell output or conversation context.
-5. Confirm all categories remain bounded by and sum to the displayed stopwatch, allowing only display-rounding differences.
+2. Invoke `read`, `write`, and `edit`; their exclusive walltime appears under `files`, while Bash and other ordinary tools appear under `tools`.
+3. Submit a normal prompt; processing gaps not covered by provider/tool intervals appear under `other`, not idle.
+4. Run the existing direct and nested `pi-subagent` prompts; child model/file/tool/idle/other categories replace only attributable Bash tool time.
+5. Confirm no report JSON or `PI_RUNTIME_STATUS_REPORT_PATH` enters shell output or conversation context.
+6. Confirm all categories remain bounded by and sum to the displayed stopwatch, allowing only display-rounding differences.
 
 Keep the document's explicit prohibition against CI, hooks, and Bun test inclusion.
 
