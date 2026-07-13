@@ -10,6 +10,8 @@ next_tab = ["prefix+n", "ctrl+alt+]"]
 split_vertical = ["prefix+v", "ctrl+alt+d"]
 split_horizontal = ["prefix+minus", "ctrl+alt+shift+d"]
 zoom = ["prefix+z", "ctrl+alt+z"]
+previous_workspace = "ctrl+alt+p"
+next_workspace = "ctrl+alt+n"
 
 [theme]
 name = "catppuccin"
@@ -23,4 +25,3 @@ key = "ctrl+alt+v"
 type = "pane"
 command = "vcsui"
 description = "run lazygit or jj UI"
-
