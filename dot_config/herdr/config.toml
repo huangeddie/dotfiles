@@ -1,17 +1,17 @@
 onboarding = false
 [keys]
 prefix = "ctrl+space"
-focus_pane_left = ["prefix+h", "ctrl+alt+h"]
-focus_pane_down = ["prefix+j", "ctrl+alt+j"]
-focus_pane_up = ["prefix+k", "ctrl+alt+k"]
-focus_pane_right = ["prefix+l", "ctrl+alt+l"]
-previous_tab = ["prefix+p", "ctrl+alt+["]
-next_tab = ["prefix+n", "ctrl+alt+]"]
+focus_pane_left = ["prefix+h"]
+focus_pane_down = ["prefix+j"]
+focus_pane_up = ["prefix+k"]
+focus_pane_right = ["prefix+l"]
+previous_tab = ["prefix+p", "ctrl+alt+h"]
+next_tab = ["prefix+n", "ctrl+alt+l"]
 split_vertical = ["prefix+v", "ctrl+alt+d"]
 split_horizontal = ["prefix+minus", "ctrl+alt+shift+d"]
 zoom = ["prefix+z", "ctrl+alt+z"]
-previous_workspace = "ctrl+alt+p"
-next_workspace = "ctrl+alt+n"
+previous_workspace = "ctrl+alt+k"
+next_workspace = "ctrl+alt+j"
 
 [theme]
 name = "catppuccin"
