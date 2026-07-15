@@ -15,6 +15,7 @@
 - The extension is the sole active subagent interface.
 - Historical specs and plans remain tracked.
 - Remove wrapper-only executable, system instruction, tests, QA, runtime command interception, report-file effects, and child-runtime reattribution.
+- Use root `.chezmoiremove` entries for `.local/bin/pi-subagent` and `.pi/agent/APPEND_SYSTEM.md`; deleting their non-exact source files alone does not remove deployed targets.
 - Do not perform a network-backed model invocation during verification.
 - This vendor/config installation and pure deletion refactor are exceptions to red-green TDD; preserve and run deterministic runtime-status tests.
 
@@ -28,6 +29,7 @@
 | `dot_pi/agent/exact_extensions/subagent/agents.ts` | Discover and parse user/project agent definitions. |
 | `dot_pi/agent/agents/*.md` | Define sample agent names, tool capabilities, models, and system prompts. |
 | `dot_pi/agent/prompts/*.md` | Define slash-command workflow templates. |
+| `.chezmoiremove` | Remove the two legacy non-exact deployed targets on every managed machine. |
 | `dot_pi/agent/runtime-status-core.ts` | Account only root session/provider/tool wall-clock intervals. |
 | `dot_pi/agent/exact_extensions/runtime-status.ts` | Adapt Pi lifecycle events to root runtime status UI. |
 | `tests/runtime-status.test.ts` | Verify deterministic root runtime accounting and formatting. |
@@ -100,6 +102,7 @@ Expected: rows for `openai-codex gpt-5.6-luna` and `openai-codex gpt-5.6-terra`.
 ### Task 2: Remove wrapper-owned contracts and effects
 
 **Files:**
+- Create: `.chezmoiremove`
 - Delete: `dot_local/bin/executable_pi-subagent`
 - Delete: `dot_pi/agent/APPEND_SYSTEM.md`
 - Delete: `tests/pi-subagent.test.ts`
@@ -113,7 +116,16 @@ Expected: rows for `openai-codex gpt-5.6-luna` and `openai-codex gpt-5.6-terra`.
 - Removes: `RuntimeStatusReport`, `SubagentReportSink`, `ReportStore`, `validateRuntimeStatusReport`, `scaleReport`, `publishChildReport`, `createSubagentTelemetryAdapter`, `isPiSubagentCommand`, `prepareSubagentCommand`, `FileOperations`, `NodeReportStore`, and `isManagedReportPath`.
 - Preserves: `RuntimeDistribution`, `RuntimeTimeline`, runtime lifecycle recorders, status formatting, and ordinary tool-wall-time accounting.
 
-- [ ] **Step 1: Delete wrapper-owned files**
+- [ ] **Step 1: Delete wrapper-owned files and declare deployed removals**
+
+Create `.chezmoiremove` with:
+
+```text
+.local/bin/pi-subagent
+.pi/agent/APPEND_SYSTEM.md
+```
+
+Then delete source-owned files:
 
 ```bash
 rm \
@@ -124,7 +136,7 @@ rm \
   docs/qa/runtime-status-subagent-telemetry.md
 ```
 
-Expected: `git status --short` marks exactly these tracked files deleted, alongside Task 1 additions and planned runtime modifications.
+Expected: `git status --short` marks exactly these tracked files deleted, adds `.chezmoiremove`, and shows Task 1 additions and planned runtime modifications.
 
 - [ ] **Step 2: Simplify the runtime core schema and timeline**
 
@@ -236,10 +248,17 @@ Expected: all repository tests pass with zero failures.
 - [ ] **Step 3: Apply chezmoi source state**
 
 ```bash
-chezmoi apply
+chezmoi apply --dry-run --verbose ~/.local/bin/pi-subagent ~/.pi/agent/APPEND_SYSTEM.md
+chezmoi apply \
+  ~/.local/bin/pi-subagent \
+  ~/.pi/agent/APPEND_SYSTEM.md \
+  ~/.pi/agent/extensions \
+  ~/.pi/agent/agents \
+  ~/.pi/agent/prompts \
+  ~/.pi/agent/runtime-status-core.ts
 ```
 
-Expected: successful exit with no error output.
+Expected: dry-run explicitly reports removal of both legacy files; target-scoped apply succeeds without applying unrelated target drift.
 
 - [ ] **Step 4: Verify deployed contracts and removals**
 
@@ -269,6 +288,7 @@ Expected: Pi loads configuration and lists models with empty stderr.
 
 ```bash
 git add \
+  .chezmoiremove \
   dot_pi/agent/exact_extensions/subagent \
   dot_pi/agent/agents \
   dot_pi/agent/prompts \

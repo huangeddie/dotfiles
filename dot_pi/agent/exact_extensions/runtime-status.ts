@@ -1,15 +1,7 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { dirname, isAbsolute, join } from "node:path";
 import {
-  type ReportStore,
   type RuntimeDistribution,
-  type RuntimeStatusReport,
-  type SubagentReportSink,
-  publishChildReport,
   RuntimeTimeline,
-  validateRuntimeStatusReport,
 } from "../runtime-status-core";
 
 export const OUTPUT_IDLE_CUTOFF_MS = 750;
@@ -270,176 +262,12 @@ export function formatStatus(state: RuntimeStatusState, now = Date.now()): strin
   ].join(" | ");
 }
 
-export function createSubagentTelemetryAdapter(
-  store: ReportStore,
-): {
-  prepare(toolCallId: string, command: string): Promise<{ command: string }>;
-  attachReportIfPresent(toolCallId: string, sink: SubagentReportSink): Promise<void>;
-  cleanup(): Promise<void>;
-} {
-  const pendingReportPaths = new Map<string, string>();
-  return {
-    async prepare(toolCallId: string, command: string) {
-      const prepared = await prepareSubagentCommand(command, store);
-      if (prepared.reportPath) {
-        pendingReportPaths.set(toolCallId, prepared.reportPath);
-      }
-      return { command: prepared.command };
-    },
-    async attachReportIfPresent(toolCallId: string, sink: SubagentReportSink) {
-      const reportPath = pendingReportPaths.get(toolCallId);
-      if (!reportPath) {
-        return;
-      }
-      pendingReportPaths.delete(toolCallId);
-      const report = await store.readAndRemove(reportPath);
-      const validated = report ? validateRuntimeStatusReport(report) : null;
-      if (validated) {
-        sink.attachSubagentReport(toolCallId, validated);
-      }
-    },
-    async cleanup() {
-      for (const reportPath of pendingReportPaths.values()) {
-        try {
-          await store.remove(reportPath);
-        } catch {
-          // Best-effort cleanup must not prevent remaining reports from being removed.
-        }
-      }
-      pendingReportPaths.clear();
-    },
-  };
-}
-
-export function isPiSubagentCommand(command: string): boolean {
-  const trimmed = command.trim();
-  if (trimmed.length === 0) {
-    return false;
-  }
-  return trimmed.split(/\s+/)[0] === "pi-subagent";
-}
-
-function shellQuoteSingle(value: string): string {
-  return `'${value.replace(/'/g, "'\\''")}'`;
-}
-
-export async function prepareSubagentCommand(
-  command: string,
-  store: ReportStore,
-): Promise<{ command: string; reportPath: string | null }> {
-  if (!isPiSubagentCommand(command)) {
-    return { command, reportPath: null };
-  }
-  let reportPath: string;
-  try {
-    reportPath = await store.create();
-  } catch {
-    return { command, reportPath: null };
-  }
-  return {
-    command: `export PI_RUNTIME_STATUS_REPORT_PATH=${shellQuoteSingle(reportPath)}; ${command}`,
-    reportPath,
-  };
-}
-
-export type FileOperations = {
-  mkdtemp(prefix: string): Promise<string>;
-  readFile(path: string, encoding: "utf-8"): Promise<string>;
-  writeFile(path: string, data: string, options?: { mode?: number }): Promise<void>;
-  rename(oldPath: string, newPath: string): Promise<void>;
-  rm(path: string, options?: { force?: boolean; recursive?: boolean }): Promise<void>;
-};
-
-const nodeFileOperations: FileOperations = {
-  mkdtemp: (prefix) => mkdtemp(prefix),
-  readFile: (path, encoding) => readFile(path, encoding),
-  writeFile: (path, data, options) => writeFile(path, data, options),
-  rename: (oldPath, newPath) => rename(oldPath, newPath),
-  rm: (path, options) => rm(path, options),
-};
-
-export function isManagedReportPath(path: string): boolean {
-  if (!isAbsolute(path)) {
-    return false;
-  }
-  const normalized = path.replace(/\\/g, "/");
-  const tmp = tmpdir().replace(/\\/g, "/");
-  if (!normalized.startsWith(tmp)) {
-    return false;
-  }
-  return /^\/pi-runtime-status-[^/]+\/report\.json$/.test(normalized.slice(tmp.length));
-}
-
-export class NodeReportStore implements ReportStore {
-  constructor(private readonly fs: FileOperations) {}
-
-  async create(): Promise<string> {
-    const dir = await this.fs.mkdtemp(join(tmpdir(), "pi-runtime-status-"));
-    return join(dir, "report.json");
-  }
-
-  async readAndRemove(path: string): Promise<unknown | null> {
-    if (!isManagedReportPath(path)) {
-      return null;
-    }
-    const dir = dirname(path);
-    try {
-      return JSON.parse(await this.fs.readFile(path, "utf-8"));
-    } catch {
-      return null;
-    } finally {
-      try {
-        await this.fs.rm(dir, { force: true, recursive: true });
-      } catch {
-        // Best-effort recursive removal of the managed report directory.
-      }
-    }
-  }
-
-  async writeAtomically(path: string, report: RuntimeStatusReport): Promise<void> {
-    if (!isManagedReportPath(path)) {
-      throw new Error("Invalid report path");
-    }
-    const dir = dirname(path);
-    const tempPath = `${path}.tmp`;
-    try {
-      await this.fs.writeFile(tempPath, JSON.stringify(report), { mode: 0o600 });
-      await this.fs.rename(tempPath, path);
-    } catch (error) {
-      try {
-        await this.fs.rm(tempPath, { force: true });
-      } catch {
-        // Best-effort removal of the temporary report file.
-      }
-      try {
-        await this.fs.rm(dir, { force: true, recursive: true });
-      } catch {
-        // Best-effort removal of the managed report directory.
-      }
-      throw error;
-    }
-  }
-
-  async remove(path: string): Promise<void> {
-    if (!isManagedReportPath(path)) {
-      return;
-    }
-    try {
-      await this.fs.rm(dirname(path), { force: true, recursive: true });
-    } catch {
-      // Best-effort recursive removal of the managed report directory.
-    }
-  }
-}
-
 function renderStatus(state: RuntimeStatusState, theme: Theme): string {
   return theme.fg("dim", formatStatus(state));
 }
 
 export default function (pi: ExtensionAPI) {
   const state = createRuntimeStatusState();
-  const store = new NodeReportStore(nodeFileOperations);
-  const adapter = createSubagentTelemetryAdapter(store);
   let interval: ReturnType<typeof setInterval> | null = null;
 
   function stopInterval() {
@@ -498,21 +326,12 @@ export default function (pi: ExtensionAPI) {
     }
   });
 
-  pi.on("tool_call", async (event) => {
-    if (event.toolName !== "bash" || !isPiSubagentCommand(event.input.command)) {
-      return;
-    }
-    const prepared = await adapter.prepare(event.toolCallId, event.input.command);
-    event.input.command = prepared.command;
-  });
-
   pi.on("tool_execution_start", (event) => {
     recordToolExecutionStart(state, event.toolCallId, Date.now());
   });
 
-  pi.on("tool_execution_end", async (event) => {
+  pi.on("tool_execution_end", (event) => {
     recordToolExecutionEnd(state, event.toolCallId, Date.now());
-    await adapter.attachReportIfPresent(event.toolCallId, state.timeline);
   });
 
   pi.on("message_end", async (event, ctx) => {
@@ -533,24 +352,8 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("session_shutdown", async (_event, ctx) => {
-    const now = Date.now();
-    recordSessionShutdown(state, now);
-    const distribution = distributionSnapshot(state, now);
+    recordSessionShutdown(state, Date.now());
     stopInterval();
-    await adapter.cleanup();
-
-    const envReportPath = process.env.PI_RUNTIME_STATUS_REPORT_PATH;
-    if (envReportPath && isManagedReportPath(envReportPath)) {
-      const report: RuntimeStatusReport = {
-        version: 2,
-        observedMillis: distribution.wallMillis,
-        modelMillis: distribution.modelMillis,
-        toolWaitMillis: distribution.toolWaitMillis,
-        idleMillis: distribution.idleMillis,
-        unaccountedMillis: distribution.unaccountedMillis,
-      };
-      await publishChildReport(store, envReportPath, report);
-    }
     if (ctx.hasUI) {
       ctx.ui.setStatus(STATUS_KEY, undefined);
     }

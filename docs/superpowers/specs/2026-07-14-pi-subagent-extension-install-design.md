@@ -47,7 +47,7 @@ Chezmoi deploys the extension to `~/.pi/agent/extensions/subagent`, agents to `~
 
 ## Retired Bash interface
 
-Remove all active support owned specifically by the old wrapper:
+Remove all active support owned specifically by the old wrapper. A root `.chezmoiremove` entry removes the two non-exact deployed targets on every managed machine instead of merely forgetting their source files.
 
 - `dot_local/bin/executable_pi-subagent`
 - its root-agent instruction in `dot_pi/agent/APPEND_SYSTEM.md`
@@ -67,7 +67,7 @@ This is a configuration/vendor installation, so red-green TDD does not apply. Ve
 2. Inspect the chezmoi diff before deployment.
 3. Apply the managed source.
 4. Confirm deployed files and model frontmatter match source state.
-5. Confirm chezmoi removes the deployed wrapper and that the deployed appended system prompt no longer mentions it.
+5. Confirm `.chezmoiremove` removes the deployed wrapper and appended system prompt.
 6. Run deterministic runtime-status and full repository tests after removing wrapper telemetry.
 7. Start Pi non-interactively with the extension and verify it loads without startup errors, without making a model request.
 

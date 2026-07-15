@@ -1,153 +1,23 @@
-export type RuntimeStatusReport = {
-  version: 2;
-  observedMillis: number;
+export type RuntimeDistribution = {
+  wallMillis: number;
   modelMillis: number;
   toolWaitMillis: number;
   idleMillis: number;
   unaccountedMillis: number;
 };
 
-export type RuntimeCategoryMillis = Pick<
-  RuntimeStatusReport,
-  "modelMillis" | "toolWaitMillis" | "idleMillis" | "unaccountedMillis"
->;
-
-export type RuntimeDistribution = RuntimeCategoryMillis & {
-  wallMillis: number;
-};
-
-export type SubagentReportSink = {
-  attachSubagentReport(toolCallId: string, report: RuntimeStatusReport): void;
-};
-
-export type ReportStore = {
-  create(): Promise<string>;
-  readAndRemove(path: string): Promise<unknown | null>;
-  writeAtomically(path: string, report: RuntimeStatusReport): Promise<void>;
-  remove(path: string): Promise<void>;
-};
-
-const categories = [
-  "modelMillis",
-  "toolWaitMillis",
-  "idleMillis",
-  "unaccountedMillis",
-] as const;
-
-const reportKeys = new Set([
-  "version",
-  "observedMillis",
-  ...categories,
-]);
-
-function isMillis(value: unknown): value is number {
-  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
-}
-
-export function validateRuntimeStatusReport(value: unknown): RuntimeStatusReport | null {
-  if (typeof value !== "object" || value === null) {
-    return null;
-  }
-
-  const candidate = value as Record<string, unknown>;
-  if (Object.keys(candidate).some((key) => !reportKeys.has(key))) {
-    return null;
-  }
-  if (candidate.version !== 2) {
-    return null;
-  }
-
-  if (
-    !isMillis(candidate.observedMillis) ||
-    !isMillis(candidate.modelMillis) ||
-    !isMillis(candidate.toolWaitMillis) ||
-    !isMillis(candidate.idleMillis) ||
-    !isMillis(candidate.unaccountedMillis)
-  ) {
-    return null;
-  }
-
-  if (
-    candidate.observedMillis !==
-    candidate.modelMillis + candidate.toolWaitMillis + candidate.idleMillis +
-      candidate.unaccountedMillis
-  ) {
-    return null;
-  }
-
-  return value as RuntimeStatusReport;
-}
-
-export function scaleReport(
-  report: RuntimeStatusReport,
-  targetMillis: number,
-): RuntimeCategoryMillis {
-  const total = report.observedMillis;
-  if (total === 0 || targetMillis <= 0) {
-    return {
-      modelMillis: 0,
-      toolWaitMillis: 0,
-      idleMillis: 0,
-      unaccountedMillis: 0,
-    };
-  }
-
-  const raw = categories.map((category) => (targetMillis * report[category]) / total);
-  const floors = raw.map(Math.floor);
-  const deficit = targetMillis - floors.reduce((sum, floor) => sum + floor, 0);
-
-  const indices = floors.map((_, index) => index);
-  indices.sort((a, b) => {
-    const remainderA = raw[a] - floors[a];
-    const remainderB = raw[b] - floors[b];
-    if (remainderB !== remainderA) {
-      return remainderB - remainderA;
-    }
-    return a - b;
-  });
-
-  for (let i = 0; i < deficit; i++) {
-    floors[indices[i]]++;
-  }
-
-  return {
-    modelMillis: floors[0],
-    toolWaitMillis: floors[1],
-    idleMillis: floors[2],
-    unaccountedMillis: floors[3],
-  };
-}
-
-export async function publishChildReport(
-  store: ReportStore,
-  path: string,
-  report: RuntimeStatusReport,
-): Promise<void> {
-  try {
-    await store.writeAtomically(path, report);
-  } catch {
-    // A child report write failure is intentionally non-fatal and must not alter
-    // Pi's exit code or response.
-  }
-}
+type RuntimeCategoryMillis = Omit<RuntimeDistribution, "wallMillis">;
 
 type Interval = { startedAt: number; endedAt: number | null };
 
-type ToolInterval = Interval & {
-  toolCallId: string;
-  sequence: number;
-  subagentReport: RuntimeStatusReport | null;
-};
-
-export class RuntimeTimeline implements SubagentReportSink {
+export class RuntimeTimeline {
   private sessionStartedAt: number | null = null;
   private sessionEndedAt: number | null = null;
   private processingIntervals: Interval[] = [];
   private openProcessingInterval: Interval | null = null;
   private providerIntervals: Interval[] = [];
   private openProviderInterval: Interval | null = null;
-  private tools: Map<string, ToolInterval> = new Map();
-  private sequence = 0;
+  private tools: Map<string, Interval> = new Map();
 
   reset(): void {
     this.sessionStartedAt = null;
@@ -157,7 +27,6 @@ export class RuntimeTimeline implements SubagentReportSink {
     this.providerIntervals = [];
     this.openProviderInterval = null;
     this.tools.clear();
-    this.sequence = 0;
   }
 
   startSession(now: number): void {
@@ -205,13 +74,7 @@ export class RuntimeTimeline implements SubagentReportSink {
     if (this.sessionStartedAt === null || this.tools.has(toolCallId)) {
       return;
     }
-    this.tools.set(toolCallId, {
-      toolCallId,
-      sequence: this.sequence++,
-      startedAt: now,
-      endedAt: null,
-      subagentReport: null,
-    });
+    this.tools.set(toolCallId, { startedAt: now, endedAt: null });
   }
 
   endTool(toolCallId: string, now: number): void {
@@ -220,14 +83,6 @@ export class RuntimeTimeline implements SubagentReportSink {
       return;
     }
     this.endInterval(interval, now);
-  }
-
-  attachSubagentReport(toolCallId: string, report: RuntimeStatusReport): void {
-    const interval = this.tools.get(toolCallId);
-    if (!interval) {
-      return;
-    }
-    interval.subagentReport = validateRuntimeStatusReport(report);
   }
 
   shutdown(now: number): void {
@@ -265,7 +120,6 @@ export class RuntimeTimeline implements SubagentReportSink {
       }
     }
 
-    const ownedDuration = new Map<string, number>();
     const sortedBoundaries = Array.from(boundaries).sort((a, b) => a - b);
     for (let i = 0; i < sortedBoundaries.length - 1; i++) {
       const segmentStartedAt = sortedBoundaries[i];
@@ -277,28 +131,7 @@ export class RuntimeTimeline implements SubagentReportSink {
       const duration = segmentEndedAt - segmentStartedAt;
       if (!this.isCoveredBy(this.processingIntervals, segmentStartedAt, effectiveEnd)) {
         totals.idleMillis += duration;
-        continue;
-      }
-
-      let childOwner: ToolInterval | null = null;
-      for (const interval of toolIntervals) {
-        if (
-          interval.subagentReport &&
-          this.isCoveredBy([interval], segmentStartedAt, effectiveEnd) &&
-          (!childOwner || interval.sequence < childOwner.sequence)
-        ) {
-          childOwner = interval;
-        }
-      }
-      if (childOwner) {
-        ownedDuration.set(
-          childOwner.toolCallId,
-          (ownedDuration.get(childOwner.toolCallId) ?? 0) + duration,
-        );
-        continue;
-      }
-
-      if (toolIntervals.some((interval) =>
+      } else if (toolIntervals.some((interval) =>
         this.isCoveredBy([interval], segmentStartedAt, effectiveEnd)
       )) {
         totals.toolWaitMillis += duration;
@@ -307,23 +140,6 @@ export class RuntimeTimeline implements SubagentReportSink {
       } else {
         totals.unaccountedMillis += duration;
       }
-    }
-
-    for (const interval of toolIntervals) {
-      const owned = ownedDuration.get(interval.toolCallId) ?? 0;
-      if (owned <= 0 || !interval.subagentReport) {
-        continue;
-      }
-
-      const parentToolDuration = this.effectiveIntervalEnd(interval, effectiveEnd) - interval.startedAt;
-      const attributable = parentToolDuration <= 0
-        ? 0
-        : Math.round(owned * Math.min(1, interval.subagentReport.observedMillis / parentToolDuration));
-      const scaled = scaleReport(interval.subagentReport, attributable);
-      totals.modelMillis += scaled.modelMillis;
-      totals.toolWaitMillis += scaled.toolWaitMillis + owned - attributable;
-      totals.idleMillis += scaled.idleMillis;
-      totals.unaccountedMillis += scaled.unaccountedMillis;
     }
 
     const wallMillis = effectiveEnd - sessionStartedAt;
