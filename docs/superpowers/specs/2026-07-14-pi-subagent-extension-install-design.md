@@ -4,7 +4,7 @@
 
 ## Goal
 
-Install Pi's example `subagent` extension as reproducible chezmoi-managed configuration and select the requested OpenAI Codex models for its sample agents.
+Install Pi's example `subagent` extension as reproducible chezmoi-managed configuration, select the requested OpenAI Codex models for its sample agents, and retire the custom `pi-subagent` Bash mechanism so the extension is the sole subagent interface.
 
 ## Managed files
 
@@ -45,7 +45,19 @@ Provider-qualified selectors avoid ambiguity and match Pi's live `--list-models`
 
 Chezmoi deploys the extension to `~/.pi/agent/extensions/subagent`, agents to `~/.pi/agent/agents`, and workflow templates to `~/.pi/agent/prompts`. Pi discovers the extension and templates at startup or `/reload`. The root model receives the registered `subagent` tool schema; the workflow templates provide explicit orchestration instructions.
 
-This extension is independent from the existing `pi-subagent` shell wrapper and may coexist with it.
+## Retired Bash interface
+
+Remove all active support owned specifically by the old wrapper:
+
+- `dot_local/bin/executable_pi-subagent`
+- its root-agent instruction in `dot_pi/agent/APPEND_SYSTEM.md`
+- `tests/pi-subagent.test.ts`
+- wrapper-only QA documents
+- `pi-subagent` command detection, environment/report-file transport, child-report publication, runtime reattribution, and their tests in the runtime-status extension/core
+
+Historical specs and plans remain as architectural history. The local untracked model-selection state file may remain because it is inert without the wrapper and is outside chezmoi ownership.
+
+After removal, the root model learns delegation through Pi's registered `subagent` tool schema and the installed workflow templates, rather than a system-prompt instruction to invoke Bash.
 
 ## Verification
 
@@ -55,6 +67,8 @@ This is a configuration/vendor installation, so red-green TDD does not apply. Ve
 2. Inspect the chezmoi diff before deployment.
 3. Apply the managed source.
 4. Confirm deployed files and model frontmatter match source state.
-5. Start Pi non-interactively with the extension and verify it loads without startup errors, without making a model request.
+5. Confirm chezmoi removes the deployed wrapper and that the deployed appended system prompt no longer mentions it.
+6. Run deterministic runtime-status and full repository tests after removing wrapper telemetry.
+7. Start Pi non-interactively with the extension and verify it loads without startup errors, without making a model request.
 
 No network-backed QA model invocation is required.
