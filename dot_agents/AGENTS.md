@@ -163,3 +163,5 @@ above.
 
 - SG(TM) = "sounds good (to me)"
 - LG(TM) = "looks good (to me)"
+- Y = "yes"
+- N = "no"
