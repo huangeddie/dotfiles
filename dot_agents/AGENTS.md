@@ -158,3 +158,8 @@ related to any code changes, also in red-green fashion.
 
 Flag any code smells you discover that misalign with our preferences stated
 above.
+
+## Terminology
+
+- SG(TM) = "sounds good (to me)"
+- LG(TM) = "looks good (to me)"
