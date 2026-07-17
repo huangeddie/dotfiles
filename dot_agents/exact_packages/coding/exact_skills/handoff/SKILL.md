@@ -6,8 +6,8 @@ description:
 
 # Handoff
 
-Write a clipboard-ready prompt for another agent to investigate, discuss, or
-work on a specific task.
+Write a clipboard-ready prompt directing another agent to carry out a specific
+task.
 
 Use when the user asks for `handoff <task>`, "write a handoff", "delegate this",
 or wants a prompt for another agent.
@@ -19,8 +19,7 @@ or wants a prompt for another agent.
    docs, and obvious nearby context.
 2. Gather enough context to write a useful handoff: repo/product identity,
    relevant issue/PR/branch names, likely modules, constraints, and known
-   symptoms. Do not perform the receiving agent's full independent review or
-   decide the final technical direction for them.
+   symptoms.
 3. Write a standalone prompt for a fresh agent.
 4. Copy the full prompt to the clipboard.
 5. Final reply: terse confirmation with the task title. Do not paste the full
@@ -30,13 +29,13 @@ or wants a prompt for another agent.
 
 The prompt must:
 
-- Start a discussion, not a command-only work order.
-- Ask the receiving agent to do an extensive independent review before changing
-  anything.
-- Make clear that the receiving agent owns that review; the handoff only gives
-  starting context and known constraints.
-- Ask the agent to decide whether the task is a good idea, stale, already
-  solved, over-scoped, or better handled differently.
+- Be a work order: state the task and tell the agent to do it.
+- Give the agent only the orientation it needs to start working: which repo,
+  which code, which constraints.
+- Not ask the agent to debate the premise, re-litigate scope, or seek approval
+  before starting. The decision to do this task is already made.
+- Still tell the agent to stop and surface it if the task turns out to be
+  already done, impossible, or built on a broken assumption.
 - Assume the agent starts in the repo, a parent directory, a workspace
   directory, or a home directory and can find the repo itself.
 - Use portable anchors instead: repo owner/name, product/module names, issue/PR
@@ -55,7 +54,7 @@ The prompt must:
 Use this shape by default:
 
 ```text
-I want to discuss and possibly work on: <short task title>
+Task: <short task title>
 
 Context:
 - <portable repo/product context>
@@ -63,17 +62,17 @@ Context:
 - <known current state, branch/issue/PR names or URLs if relevant>
 - <important constraints and ownership boundaries>
 
-Before doing any implementation:
+To orient yourself:
 - Find the right repository from the current directory, a parent directory, or the usual workspace.
 - Read the local agent/repo instructions.
-- Inspect the relevant code, docs, tests, recent commits, and linked issue/PR state.
-- Decide whether this task is still real, whether the proposed direction is a good idea, and whether a smaller/better fix exists.
-- Call out stale assumptions, hidden risks, and anything that should stop the work.
+- Read the relevant code, docs, tests, and linked issue/PR state; re-check live repo/GitHub/CI state where it matters.
 
-Task:
-- <what to investigate or implement if the review supports it>
-- <expected behavior or decision criteria>
+Do this:
+- <what to implement>
+- <expected behavior>
 - <non-goals>
+
+Stop and report back only if the task is already done, is blocked, or rests on an assumption you find to be false. Otherwise proceed.
 
 Validation:
 - <focused tests/checks/live proof expected>
@@ -81,9 +80,7 @@ Validation:
 - <what is explicitly not required>
 
 Output:
-- Start with your review findings and recommendation.
-- Then give the proposed plan or patch summary.
-- If you edit code, keep changes scoped and report exact proof run.
+- Summarize what you changed and the exact proof run.
 - Do not push, merge, close issues/PRs, label, or post public comments unless explicitly told.
 ```
 
@@ -105,4 +102,4 @@ If `pbcopy` is unavailable, use the obvious platform clipboard tool (`wl-copy`,
 
 - No invented facts. Mark reviewed facts as such only after checking them.
 - Enough context for a fresh agent to orient; no giant brain dump.
-- First real instruction to the receiving agent: review, discuss, assess.
+- First real instruction to the receiving agent: the task itself.
