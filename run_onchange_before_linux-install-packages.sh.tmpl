@@ -34,12 +34,6 @@ if ! command -v tv >/dev/null 2>&1; then
   curl -fsSL https://alexpasmantier.github.io/television/install.sh | bash
 fi
 
-# sesh
-if ! command -v sesh >/dev/null 2>&1; then
-  echo "🚀 Installing sesh..."
-  go install github.com/joshmedeski/sesh/v2@latest
-fi
-
 # zoxide
 if ! command -v zoxide >/dev/null 2>&1; then
   echo "🚀 Installing zoxide..."

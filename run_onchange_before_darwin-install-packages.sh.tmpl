@@ -7,8 +7,13 @@ if ! command -v brew >/dev/null 2>&1; then
   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 fi
 
-echo "==> Installing Homebrew packages via brew bundle"
-brew bundle --file=/dev/stdin <<EOF
+# packages.yaml is authoritative: --cleanup --force uninstalls anything
+# installed that is not declared there.
+echo "==> Syncing Homebrew packages via brew bundle (strict)"
+brew bundle --file=/dev/stdin --cleanup --force <<EOF
+{{ range .packages.darwin.taps -}}
+tap {{ . | quote }}
+{{ end -}}
 {{ range .packages.darwin.brews -}}
 brew {{ . | quote }}
 {{ end -}}

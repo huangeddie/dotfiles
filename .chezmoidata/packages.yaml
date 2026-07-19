@@ -1,22 +1,53 @@
+# Declarative package manifest.
+#
+# On darwin this list is AUTHORITATIVE: `chezmoi apply` runs `brew bundle`
+# with --cleanup --force, so any Homebrew package NOT listed here is
+# uninstalled. Adding a package here installs it; removing it uninstalls it.
+# Dependencies of listed packages are retained automatically.
+#
+# Unversioned formulae (python, zig) intentionally track the latest stable
+# release rather than pinning a version.
+#
+# The linux/apt list is install-only; apt has no safe declarative prune.
 packages:
   darwin:
+    taps:
+      [
+        "modem-dev/tap",
+      ]
     brews:
       [
+        "bat",
+        "chezmoi",
+        "cloudflared",
+        "fd",
+        "ffmpeg",
+        "fzf",
+        "gh",
+        "herdr",
         "jj",
         "jjui",
+        "lazygit",
         "modem-dev/tap/hunk",
-        "sesh",
+        "neovim",
+        "python",
+        "rust-analyzer",
+        "stylua",
+        "swiftformat",
         "television",
-        "zoxide",
         "universal-ctags",
-        "bat",
-        "herdr",
-        "fd",
-        "fzf",
+        "zig",
+        "zoxide",
       ]
-    casks: []
+    casks:
+      [
+        "codex",
+        "font-jetbrains-mono-nerd-font",
+        "gcloud-cli",
+        "ghostty",
+      ]
   linux:
-    apt: 
+    apt:
       [
         "golang-go",
         "fd-find",

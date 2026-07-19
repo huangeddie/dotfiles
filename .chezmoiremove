@@ -1,2 +1,5 @@
 .local/bin/pi-subagent
 .pi/agent/APPEND_SYSTEM.md
+.tmux.conf
+.tmux
+.config/television/cable/sesh.toml
