@@ -1,4 +1,6 @@
+const SUBAGENT_TOOL_NAME = "subagent";
+
 export function buildChildToolArgs(tools?: readonly string[]): string[] {
-	if (!tools || tools.length === 0) return [];
-	return ["--tools", tools.join(",")];
+	const args = tools && tools.length > 0 ? ["--tools", tools.join(",")] : [];
+	return [...args, "--exclude-tools", SUBAGENT_TOOL_NAME];
 }
