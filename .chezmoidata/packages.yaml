@@ -17,6 +17,13 @@ packages:
       ]
     brews:
       [
+        # Linked against by the mise-managed Ruby toolchain. Homebrew cannot
+        # see that dependency, so without an explicit entry cleanup treats
+        # these as orphans and removes them, breaking `ruby` at runtime.
+        "gmp",
+        "libyaml",
+        "openssl@3",
+
         "bat",
         "chezmoi",
         "cloudflared",
