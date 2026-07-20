@@ -24,6 +24,7 @@ packages:
         "ffmpeg",
         "fzf",
         "gh",
+        "git-delta",
         "herdr",
         "jj",
         "jjui",
