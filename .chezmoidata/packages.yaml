@@ -43,6 +43,7 @@ packages:
         "jj",
         "jjui",
         "lazygit",
+        "mise",
         "modem-dev/tap/hunk",
         "neovim",
         "python",
