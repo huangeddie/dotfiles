@@ -15,6 +15,13 @@ packages:
       [
         "modem-dev/tap",
       ]
+    # Homebrew refuses to load formulae from third-party taps unless they are
+    # trusted. Scoped per-formula rather than per-tap, so formulae added to a
+    # tap later are not implicitly authorized.
+    trusted_formulae:
+      [
+        "modem-dev/tap/hunk",
+      ]
     brews:
       [
         # Linked against by the mise-managed Ruby toolchain. Homebrew cannot
