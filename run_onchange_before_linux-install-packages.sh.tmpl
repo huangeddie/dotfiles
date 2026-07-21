@@ -21,9 +21,21 @@ if [ ${#apt_packages[@]} -gt 0 ]; then
     done
 
     if [ ${#missing_apt_packages[@]} -gt 0 ]; then
-      echo "==> Installing apt packages: ${missing_apt_packages[*]}"
       sudo apt-get update
-      sudo apt-get install -y "${missing_apt_packages[@]}"
+      
+      available_missing_packages=()
+      for pkg in "${missing_apt_packages[@]}"; do
+        if apt-cache show "$pkg" >/dev/null 2>&1; then
+          available_missing_packages+=("$pkg")
+        else
+          echo "⚠️ Warning: Package '$pkg' is not available in apt cache. Skipping." >&2
+        fi
+      done
+
+      if [ ${#available_missing_packages[@]} -gt 0 ]; then
+        echo "==> Installing apt packages: ${available_missing_packages[*]}"
+        sudo apt-get install -y "${available_missing_packages[@]}"
+      fi
     fi
   fi
 fi
