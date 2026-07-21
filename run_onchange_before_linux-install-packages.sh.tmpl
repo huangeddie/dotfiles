@@ -3,8 +3,18 @@
 set -euo pipefail
 
 apt_install_packages=(
+{{- $blocked_prefixes := .blocked_prefixes -}}
 {{- range .packages.linux.apt.install }}
-  {{ . | quote }}
+  {{- $pkg := . -}}
+  {{- $blocked := false -}}
+  {{- range $blocked_prefixes }}
+    {{- if hasPrefix . $pkg }}
+      {{- $blocked = true -}}
+    {{- end }}
+  {{- end }}
+  {{- if not $blocked }}
+  {{ $pkg | quote }}
+  {{- end }}
 {{- end }}
 )
 
