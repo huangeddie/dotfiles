@@ -72,4 +72,6 @@ packages:
         "lazygit",
         "gh",
         "curl",
+        "nodejs",
+        "npm",
       ]
