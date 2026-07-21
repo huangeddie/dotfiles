@@ -72,8 +72,12 @@ packages:
         "git",
         "lazygit",
         "gh",
+        "git-delta",
         "curl",
         "nodejs",
         "npm",
         "btop",
+        "nvtop",
+        "bat",
+        "ghostty",
       ]
