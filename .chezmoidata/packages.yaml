@@ -68,4 +68,8 @@ packages:
         "golang-go",
         "fd-find",
         "fzf",
+        "git",
+        "lazygit",
+        "gh",
+        "curl",
       ]
