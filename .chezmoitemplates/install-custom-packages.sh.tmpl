@@ -1,17 +1,25 @@
 {{- range $index, $installer := . }}
-{{- $name := get $installer "name" | default "" -}}
-{{- $executable := get $installer "executable" | default "" -}}
-{{- $setup := get $installer "setup" | default "" -}}
-{{- $install := get $installer "install" | default "" -}}
+{{- if not (kindIs "map" $installer) }}{{ fail (printf "custom installer %d: entry must be a map" $index) }}{{ end -}}
+{{- $name := get $installer "name" -}}
+{{- $executable := get $installer "executable" -}}
+{{- $setup := get $installer "setup" -}}
+{{- $install := get $installer "install" -}}
+{{- if not (kindIs "string" $name) }}{{ fail (printf "custom installer %d: name must be a string" $index) }}{{ end -}}
+{{- if not (kindIs "string" $executable) }}{{ fail (printf "custom installer %d: executable must be a string" $index) }}{{ end -}}
+{{- if hasKey $installer "setup" -}}
+  {{- if not (kindIs "string" $setup) }}{{ fail (printf "custom installer %d: setup must be a string" $index) }}{{ end -}}
+{{- end -}}
+{{- if not (kindIs "string" $install) }}{{ fail (printf "custom installer %d: install must be a string" $index) }}{{ end -}}
 {{- if empty ($name | trim) }}{{ fail (printf "custom installer %d: name must not be empty" $index) }}{{ end -}}
 {{- if empty ($executable | trim) }}{{ fail (printf "custom installer %d: executable must not be empty" $index) }}{{ end -}}
-{{- if empty ($install | trim) }}{{ fail (printf "custom installer %d: install must not be empty" $index) }}{{ end }}
-# {{ $name }}
+{{- if not (regexMatch "^[A-Za-z0-9_][A-Za-z0-9_.+:-]*$" $executable) }}{{ fail (printf "custom installer %d: executable must be a command name" $index) }}{{ end -}}
+{{- if empty ($install | trim) }}{{ fail (printf "custom installer %d: install must not be empty" $index) }}{{ end -}}
+{{- $quotedName := $name | replace "'" "'\"'\"'" }}
 {{ with $setup -}}
 {{ . }}
 {{ end -}}
-if ! command -v {{ $executable | quote }} >/dev/null 2>&1; then
-  printf '🚀 Installing %s...\n' {{ $name | quote }}
+if ! command -v '{{ $executable }}' >/dev/null 2>&1; then
+  printf '🚀 Installing %s...\n' '{{ $quotedName }}'
 {{ $install | indent 2 }}
 fi
 
