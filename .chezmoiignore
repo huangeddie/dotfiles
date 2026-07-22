@@ -7,3 +7,6 @@ tests/
 {{ if ne .chezmoi.os "darwin" }}
 Library/Application Support/lazygit/config.yml
 {{ end }}
+{{ if ne .chezmoi.os "linux" }}
+.local/bin/bat
+{{ end }}
