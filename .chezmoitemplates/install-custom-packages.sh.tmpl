@@ -1,3 +1,4 @@
+{{- if not (kindIs "slice" .) }}{{ fail "custom installers: declaration must be a list" }}{{ end -}}
 {{- range $index, $installer := . }}
 {{- if not (kindIs "map" $installer) }}{{ fail (printf "custom installer %d: entry must be a map" $index) }}{{ end -}}
 {{- $name := get $installer "name" -}}
