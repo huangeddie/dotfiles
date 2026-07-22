@@ -35,3 +35,10 @@ refer to those configs by either pointing to the resulting target path
 Note that we have agent-provider specific manifests like `dot_claude-plugin`
 within our config. This is ok because it doesn't compromise the content of our
 agnostic configs.
+
+## Development Guidelines
+
+Despite whatever skills framework like `superpowers` may suggest, this project
+is small enough such that changes can be made _directly_ to main without any
+worktrees. Do NOT ask the user about creating new branches or worktrees. Just
+commit directly to main.
