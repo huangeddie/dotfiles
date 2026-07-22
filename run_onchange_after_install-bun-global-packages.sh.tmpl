@@ -1,0 +1,29 @@
+#!/bin/bash
+set -euo pipefail
+
+if ! command -v bun >/dev/null 2>&1; then
+  echo "bun not found after OS package provisioning" >&2
+  exit 1
+fi
+
+bun_install=${BUN_INSTALL:-$HOME/.bun}
+global_dir=$bun_install/install/global
+mkdir -p "$global_dir"
+
+manifest_tmp=$(mktemp "$global_dir/package.json.XXXXXX")
+trap 'rm -f "$manifest_tmp"' EXIT
+cat >"$manifest_tmp" <<'JSON'
+{
+  "dependencies": {
+{{- range $index, $package := .packages.bun.global }}
+{{- if $index }},
+{{- end }}
+    {{ $package | quote }}: "latest"
+{{- end }}
+  }
+}
+JSON
+mv "$manifest_tmp" "$global_dir/package.json"
+trap - EXIT
+
+bun install --cwd "$global_dir"
