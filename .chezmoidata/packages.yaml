@@ -19,6 +19,7 @@ packages:
         "prettier",
       ]
   darwin:
+    custom: []
     taps:
       [
         "modem-dev/tap",
@@ -71,6 +72,26 @@ packages:
         "ghostty",
       ]
   linux:
+    custom:
+      - name: television
+        executable: tv
+        install: |-
+          curl -fsSL https://alexpasmantier.github.io/television/install.sh | bash
+      - name: zoxide
+        executable: zoxide
+        install: |-
+          curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh
+      - name: herdr
+        executable: herdr
+        install: |-
+          curl -fsSL https://herdr.dev/install.sh | sh
+      - name: bun
+        executable: bun
+        setup: |-
+          export BUN_INSTALL="${BUN_INSTALL:-$HOME/.bun}"
+          export PATH="$BUN_INSTALL/bin:$PATH"
+        install: |-
+          curl -fsSL https://bun.com/install | bash
     apt:
       blocked_prefixes: []
       install:
