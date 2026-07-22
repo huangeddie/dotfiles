@@ -66,6 +66,7 @@ packages:
       ]
   linux:
     apt:
+      blocked_prefixes: []
       install:
         [
           "neovim",
