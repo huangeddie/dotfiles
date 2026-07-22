@@ -84,5 +84,7 @@ packages:
           "nvtop",
           "bat",
           "ghostty",
+          "steam-installer",
+          "steam-devices",
         ]
       remove: []
