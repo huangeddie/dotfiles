@@ -5,10 +5,13 @@
 # uninstalled. Adding a package here installs it; removing it uninstalls it.
 # Dependencies of listed packages are retained automatically.
 #
+# On linux, apt.install declares desired packages and apt.remove contains
+# durable removal tombstones. Move a retired package from install to remove;
+# packages absent from both lists are left untouched. Apt-calculated orphan
+# dependencies are purged automatically.
+#
 # Unversioned formulae (python, zig) intentionally track the latest stable
 # release rather than pinning a version.
-#
-# The linux/apt list is install-only; apt has no safe declarative prune.
 packages:
   darwin:
     taps:
@@ -64,20 +67,22 @@ packages:
       ]
   linux:
     apt:
-      [
-        "neovim",
-        "golang-go",
-        "fd-find",
-        "fzf",
-        "git",
-        "lazygit",
-        "gh",
-        "git-delta",
-        "curl",
-        "nodejs",
-        "npm",
-        "btop",
-        "nvtop",
-        "bat",
-        "ghostty",
-      ]
+      install:
+        [
+          "neovim",
+          "golang-go",
+          "fd-find",
+          "fzf",
+          "git",
+          "lazygit",
+          "gh",
+          "git-delta",
+          "curl",
+          "nodejs",
+          "npm",
+          "btop",
+          "nvtop",
+          "bat",
+          "ghostty",
+        ]
+      remove: []
