@@ -1,0 +1,18 @@
+{{- range $index, $installer := . }}
+{{- $name := get $installer "name" | default "" -}}
+{{- $executable := get $installer "executable" | default "" -}}
+{{- $setup := get $installer "setup" | default "" -}}
+{{- $install := get $installer "install" | default "" -}}
+{{- if empty ($name | trim) }}{{ fail (printf "custom installer %d: name must not be empty" $index) }}{{ end -}}
+{{- if empty ($executable | trim) }}{{ fail (printf "custom installer %d: executable must not be empty" $index) }}{{ end -}}
+{{- if empty ($install | trim) }}{{ fail (printf "custom installer %d: install must not be empty" $index) }}{{ end }}
+# {{ $name }}
+{{ with $setup -}}
+{{ . }}
+{{ end -}}
+if ! command -v {{ $executable | quote }} >/dev/null 2>&1; then
+  printf '🚀 Installing %s...\n' {{ $name | quote }}
+{{ $install | indent 2 }}
+fi
+
+{{- end }}

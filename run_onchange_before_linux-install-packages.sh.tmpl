@@ -206,30 +206,6 @@ else
   sync_apt_packages
 fi
 
-# television
-if ! command -v tv >/dev/null 2>&1; then
-  echo "🚀 Installing television..."
-  curl -fsSL https://alexpasmantier.github.io/television/install.sh | bash
-fi
-
-# zoxide
-if ! command -v zoxide >/dev/null 2>&1; then
-  echo "🚀 Installing zoxide..."
-  curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh
-fi
-
-# herdr
-if ! command -v herdr >/dev/null 2>&1; then
-  echo "🚀 Installing herdr..."
-  curl -fsSL https://herdr.dev/install.sh | sh
-fi
-
-# bun
-export BUN_INSTALL="${BUN_INSTALL:-$HOME/.bun}"
-export PATH="$BUN_INSTALL/bin:$PATH"
-if ! command -v bun >/dev/null 2>&1; then
-  echo "🚀 Installing bun..."
-  curl -fsSL https://bun.com/install | bash
-fi
+{{ template "install-custom-packages.sh.tmpl" .packages.linux.custom }}
 
 {{- end }}

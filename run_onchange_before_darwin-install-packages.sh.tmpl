@@ -1,6 +1,6 @@
 {{- if eq .chezmoi.os "darwin" -}}
 #!/bin/bash
-set -eu
+set -euo pipefail
 
 if ! command -v brew >/dev/null 2>&1; then
   echo "==> Installing Homebrew"
@@ -41,5 +41,7 @@ cask {{ . | quote }}
 EOF
 
 grant_tap_trust
+
+{{ template "install-custom-packages.sh.tmpl" .packages.darwin.custom }}
 
 {{- end }}
