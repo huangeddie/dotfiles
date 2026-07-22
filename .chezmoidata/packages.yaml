@@ -13,6 +13,11 @@
 # Unversioned formulae (python, zig) intentionally track the latest stable
 # release rather than pinning a version.
 packages:
+  bun:
+    global:
+      [
+        "prettier",
+      ]
   darwin:
     taps:
       [
@@ -34,6 +39,7 @@ packages:
         "libyaml",
         "openssl@3",
         "bat",
+        "bun",
         "chezmoi",
         "cloudflared",
         "fd",
