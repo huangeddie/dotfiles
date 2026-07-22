@@ -33,7 +33,6 @@ packages:
         "gmp",
         "libyaml",
         "openssl@3",
-
         "bat",
         "chezmoi",
         "cloudflared",
