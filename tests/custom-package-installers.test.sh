@@ -66,10 +66,15 @@ if grep -Fq 'https://alexpasmantier.github.io/television/install.sh' \
   exit 1
 fi
 
-linux_script="$test_root/linux-install-packages.sh"
+linux_template="$test_root/linux-custom-installers.tmpl"
+cat >"$linux_template" <<'TMPL'
+#!/usr/bin/env bash
+set -euo pipefail
+{{ template "install-custom-packages.sh.tmpl" .packages.linux.custom }}
+TMPL
+linux_script="$test_root/linux-custom-installers.sh"
 chezmoi --source "$source_dir" execute-template \
-  -f "$source_dir/run_onchange_before_linux-install-packages.sh.tmpl" \
-  >"$linux_script"
+  -f "$linux_template" >"$linux_script"
 bash -n "$linux_script"
 python3 - "$linux_script" <<'PY'
 import sys
@@ -171,6 +176,14 @@ assert_invalid() {
   grep -Fq "$expected_error" "$test_root/$case_name.err"
 }
 
+assert_invalid \
+  map-container \
+  'custom installers: declaration must be a list' \
+  '{{ template "install-custom-packages.sh.tmpl" (dict "invalid" (dict "name" "invalid" "executable" "invalid" "install" ":")) }}'
+assert_invalid \
+  null-container \
+  'custom installers: declaration must be a list' \
+  '{{ template "install-custom-packages.sh.tmpl" ("null" | fromJson) }}'
 assert_invalid \
   non-map \
   'custom installer 0: entry must be a map' \
