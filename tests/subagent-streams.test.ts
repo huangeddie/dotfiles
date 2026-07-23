@@ -131,6 +131,20 @@ test("fails a Claude result with non-message permission denial metadata", () => 
   });
 });
 
+test("fails when Claude emits a tool outside the configured allowlist", () => {
+  const parser = new ClaudeStreamParser({
+    ...claudeRequest,
+    agent: { ...claudeAgent, tools: ["DefinitelyNotAClaudeTool"] },
+  });
+  parser.accept('{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"README.md"}}]}}');
+  parser.accept('{"type":"result","subtype":"success","is_error":false,"result":"Done","permission_denials":[]}');
+
+  expect(parser.finish({ exitCode: 0, stderr: "", aborted: false })).toMatchObject({
+    status: "failed",
+    diagnostic: 'Claude emitted unconfigured tool "Read".',
+  });
+});
+
 test("retains malformed non-empty Claude JSON as a failure diagnostic", () => {
   const parser = new ClaudeStreamParser(claudeRequest);
   parser.accept("not JSON");
