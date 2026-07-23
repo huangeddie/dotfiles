@@ -71,8 +71,9 @@ export function buildClaudeInvocation(request: AgentRunRequest): ProcessInvocati
 		"Agent",
 		"--permission-mode",
 		"dontAsk",
+		"--append-system-prompt",
+		request.agent.systemPrompt,
 	];
-	if (request.agent.systemPrompt.trim()) args.push("--append-system-prompt", request.agent.systemPrompt);
 
 	return { command: "claude", args, cwd: request.cwd, stdin: `Task: ${request.task}` };
 }
@@ -87,7 +88,8 @@ export class ClaudeStreamParser {
 	private model: string | undefined;
 	private lastAssistantText = "";
 	private finalOutput = "";
-	private hasFinalResult = false;
+	private finalResultEvents = 0;
+	private validFinalResults = 0;
 	private acceptedAssistantMessages = 0;
 
 	constructor(private readonly request: AgentRunRequest) {
@@ -135,7 +137,7 @@ export class ClaudeStreamParser {
 					this.resultErrors.length > 0 ||
 					this.hasPermissionDenials ||
 					outcome.exitCode !== 0 ||
-					!this.hasFinalResult
+					this.validFinalResults !== 1
 				? "failed"
 				: "completed";
 		const diagnostics = [
@@ -149,7 +151,7 @@ export class ClaudeStreamParser {
 			outcome.spawnError,
 			outcome.stderr,
 			status === "aborted" ? "Claude process was aborted." : undefined,
-			status === "failed" && !this.hasFinalResult ? "Claude exited without a final result." : undefined,
+			status === "failed" && this.finalResultEvents === 0 ? "Claude exited without a final result." : undefined,
 		].filter((diagnostic): diagnostic is string => Boolean(diagnostic));
 		return this.result(status, outcome.stderr, outcome.exitCode, diagnostics.join("\n") || undefined);
 	}
@@ -175,14 +177,25 @@ export class ClaudeStreamParser {
 	}
 
 	private acceptResult(event: Record<string, unknown>): void {
-		this.hasFinalResult = true;
-		this.finalOutput = typeof event.result === "string" ? event.result : "";
+		this.finalResultEvents++;
+		const hasStringOutput = typeof event.result === "string";
+		const isSuccessful = event.subtype === "success" && event.is_error !== true;
+		if (isSuccessful && hasStringOutput) this.validFinalResults++;
+
+		if (this.finalResultEvents > 1) {
+			this.resultErrors.push("Claude emitted multiple final results.");
+			return;
+		}
+
+		this.finalOutput = hasStringOutput ? event.result : "";
 		this.usage = usageFromResult(event);
 
 		if (event.subtype !== "success") {
 			this.resultErrors.push(`Claude result ${typeof event.subtype === "string" ? event.subtype : "unknown"}.`);
 		} else if (event.is_error === true) {
 			this.resultErrors.push("Claude result reported an error.");
+		} else if (!hasStringOutput) {
+			this.resultErrors.push("Claude final result is missing string output.");
 		}
 
 		if (Array.isArray(event.permission_denials)) {
