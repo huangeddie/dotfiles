@@ -159,6 +159,16 @@ test("fails an unexecuted Claude tool-call markup result", () => {
   });
 });
 
+test("fails a final Claude result with unexecuted tool-call markup", () => {
+  const parser = new ClaudeStreamParser(claudeRequest);
+  parser.accept('{"type":"result","subtype":"success","is_error":false,"result":"<function_calls>\\n<invoke_tool>\\n<name>Read</name>\\n</invoke_tool>\\n</function_calls>","permission_denials":[]}');
+
+  expect(parser.finish({ exitCode: 0, stderr: "", aborted: false })).toMatchObject({
+    status: "failed",
+    diagnostic: "Claude returned unexecuted tool-call markup.",
+  });
+});
+
 test("retains malformed non-empty Claude JSON as a failure diagnostic", () => {
   const parser = new ClaudeStreamParser(claudeRequest);
   parser.accept("not JSON");
