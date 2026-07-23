@@ -31,7 +31,7 @@ export interface SubagentExecution {
 	usage: UsageStats;
 }
 
-export function truncateTaskOutput(output: string): string {
+function truncateModelVisibleContent(output: string): string {
 	const bytes = Buffer.from(output, "utf8");
 	if (bytes.length <= PER_TASK_OUTPUT_CAP) return output;
 
@@ -128,7 +128,7 @@ function invalidExecution(): SubagentExecution {
 	return {
 		mode: "single",
 		results: [],
-		content: "Invalid parameters. Provide exactly one non-empty mode.",
+		content: truncateModelVisibleContent("Invalid parameters. Provide exactly one non-empty mode."),
 		usage: emptyUsage(),
 	};
 }
@@ -195,7 +195,7 @@ export async function executeSubagentMode(input: ExecuteSubagentModeInput): Prom
 		return {
 			mode,
 			results: [result],
-			content: truncateTaskOutput(outputFor(result)),
+			content: truncateModelVisibleContent(outputFor(result)),
 			usage: aggregateUsage([result]),
 		};
 	}
@@ -206,19 +206,19 @@ export async function executeSubagentMode(input: ExecuteSubagentModeInput): Prom
 			return {
 				mode,
 				results: [],
-				content: `Too many parallel tasks (${tasks.length}). Max is ${MAX_PARALLEL_TASKS}.`,
+				content: truncateModelVisibleContent(`Too many parallel tasks (${tasks.length}). Max is ${MAX_PARALLEL_TASKS}.`),
 				usage: emptyUsage(),
 			};
 		}
 		const results = await mapWithConcurrencyLimit(tasks, MAX_CONCURRENCY, (task, index) => run(task, index));
 		const successCount = results.filter((result) => !isFailed(result)).length;
-		const summaries = results.map(
-			(result) => `### [${result.agent}] ${result.status}\n\n${truncateTaskOutput(outputFor(result))}`,
-		);
+		const summaries = results.map((result) => `### [${result.agent}] ${result.status}\n\n${outputFor(result)}`);
 		return {
 			mode,
 			results,
-			content: `Parallel: ${successCount}/${results.length} succeeded\n\n${summaries.join("\n\n---\n\n")}`,
+			content: truncateModelVisibleContent(
+				`Parallel: ${successCount}/${results.length} succeeded\n\n${summaries.join("\n\n---\n\n")}`,
+			),
 			usage: aggregateUsage(results),
 		};
 	}
@@ -234,7 +234,9 @@ export async function executeSubagentMode(input: ExecuteSubagentModeInput): Prom
 			return {
 				mode,
 				results,
-				content: `Chain stopped at step ${index + 1} (${step.agent}): ${truncateTaskOutput(outputFor(result))}`,
+				content: truncateModelVisibleContent(
+					`Chain stopped at step ${index + 1} (${step.agent}): ${outputFor(result)}`,
+				),
 				usage: aggregateUsage(results),
 			};
 		}
@@ -245,7 +247,7 @@ export async function executeSubagentMode(input: ExecuteSubagentModeInput): Prom
 	return {
 		mode,
 		results,
-		content: truncateTaskOutput(finalResult.output || "(no output)"),
+		content: truncateModelVisibleContent(finalResult.output || "(no output)"),
 		usage: aggregateUsage(results),
 	};
 }
