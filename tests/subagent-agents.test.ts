@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { parseAgentDefinition } from "../dot_pi/agent/exact_extensions/subagent/agents";
 
 const parse = (frontmatter: string) =>
@@ -45,6 +47,32 @@ describe("subagent definitions", () => {
 				name: "bad",
 				filePath: "/agents/example.md",
 				message: expect.stringContaining(message),
+			});
+		});
+	}
+});
+
+const fixturePath = (fileName: string) =>
+	path.join(import.meta.dir, "fixtures", "subagent-agents", fileName);
+
+describe("malformed subagent definitions", () => {
+	for (const [fileName, name, message] of [
+		["malformed-yaml.md", null, "could not parse YAML"],
+		["non-string-backend.md", "invalid-backend", 'requires "backend" to be a string'],
+		["non-string-model.md", "invalid-model", 'requires "model" to be a string'],
+		["non-string-tools.md", "invalid-tools", 'requires "tools" to be a string'],
+	] as const) {
+		test(`returns a diagnostic for ${fileName}`, () => {
+			const filePath = fixturePath(fileName);
+			const parsed = parseAgentDefinition(fs.readFileSync(filePath, "utf-8"), filePath, "project");
+
+			expect(parsed).toEqual({
+				agent: null,
+				diagnostic: {
+					name,
+					filePath,
+					message: expect.stringContaining(message),
+				},
 			});
 		});
 	}
