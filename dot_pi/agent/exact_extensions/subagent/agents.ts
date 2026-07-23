@@ -43,30 +43,83 @@ export type ParsedAgentDefinition =
 	| { agent: null; diagnostic: AgentDiagnostic };
 
 export function parseAgentDefinition(
-	_content: string,
+	content: string,
 	filePath: string,
-	_source: "user" | "project",
+	source: "user" | "project",
 ): ParsedAgentDefinition {
-	throw new Error(`Agent parsing not implemented for ${filePath}`);
+	const { frontmatter, body } = parseFrontmatter<Record<string, string>>(content);
+	const name = frontmatter.name;
+	const description = frontmatter.description;
+	const backend = frontmatter.backend?.trim() || "pi";
+	const model = frontmatter.model?.trim();
+	const tools = frontmatter.tools
+		?.split(",")
+		.map((tool) => tool.trim())
+		.filter(Boolean);
+
+	const diagnostic = (message: string): ParsedAgentDefinition => ({
+		agent: null,
+		diagnostic: { name: name || null, filePath, message },
+	});
+
+	if (!name) return diagnostic('requires a non-empty "name"');
+	if (!description) return diagnostic(`Agent "${name}" requires a non-empty "description"`);
+	if (backend !== "pi" && backend !== "claude") {
+		return diagnostic(`Agent "${name}" has unsupported backend "${backend}"`);
+	}
+
+	if (backend === "claude") {
+		if (!model) return diagnostic(`Agent "${name}" requires a non-empty "model" for backend "claude"`);
+		if (!tools?.length) return diagnostic(`Agent "${name}" requires a non-empty "tools" for backend "claude"`);
+		if (tools.includes("Agent")) {
+			return diagnostic(`Agent "${name}" with backend "claude" must not include the nested "Agent" tool`);
+		}
+
+		return {
+			agent: { name, description, backend, model, tools, systemPrompt: body, source, filePath },
+			diagnostic: null,
+		};
+	}
+
+	return {
+		agent: {
+			name,
+			description,
+			backend,
+			...(tools?.length ? { tools } : {}),
+			...(model ? { model } : {}),
+			systemPrompt: body,
+			source,
+			filePath,
+		},
+		diagnostic: null,
+	};
 }
 
 export interface AgentDiscoveryResult {
 	agents: AgentConfig[];
+	diagnostics: AgentDiagnostic[];
 	projectAgentsDir: string | null;
 }
 
-function loadAgentsFromDir(dir: string, source: "user" | "project"): AgentConfig[] {
+interface LoadedAgents {
+	agents: AgentConfig[];
+	diagnostics: AgentDiagnostic[];
+}
+
+function loadAgentsFromDir(dir: string, source: "user" | "project"): LoadedAgents {
 	const agents: AgentConfig[] = [];
+	const diagnostics: AgentDiagnostic[] = [];
 
 	if (!fs.existsSync(dir)) {
-		return agents;
+		return { agents, diagnostics };
 	}
 
 	let entries: fs.Dirent[];
 	try {
 		entries = fs.readdirSync(dir, { withFileTypes: true });
 	} catch {
-		return agents;
+		return { agents, diagnostics };
 	}
 
 	for (const entry of entries) {
@@ -81,29 +134,12 @@ function loadAgentsFromDir(dir: string, source: "user" | "project"): AgentConfig
 			continue;
 		}
 
-		const { frontmatter, body } = parseFrontmatter<Record<string, string>>(content);
-
-		if (!frontmatter.name || !frontmatter.description) {
-			continue;
-		}
-
-		const tools = frontmatter.tools
-			?.split(",")
-			.map((t: string) => t.trim())
-			.filter(Boolean);
-
-		agents.push({
-			name: frontmatter.name,
-			description: frontmatter.description,
-			tools: tools && tools.length > 0 ? tools : undefined,
-			model: frontmatter.model,
-			systemPrompt: body,
-			source,
-			filePath,
-		});
+		const parsed = parseAgentDefinition(content, filePath, source);
+		if (parsed.agent) agents.push(parsed.agent);
+		else diagnostics.push(parsed.diagnostic);
 	}
 
-	return agents;
+	return { agents, diagnostics };
 }
 
 function isDirectory(p: string): boolean {
@@ -130,21 +166,28 @@ export function discoverAgents(cwd: string, scope: AgentScope): AgentDiscoveryRe
 	const userDir = path.join(getAgentDir(), "agents");
 	const projectAgentsDir = findNearestProjectAgentsDir(cwd);
 
-	const userAgents = scope === "project" ? [] : loadAgentsFromDir(userDir, "user");
-	const projectAgents = scope === "user" || !projectAgentsDir ? [] : loadAgentsFromDir(projectAgentsDir, "project");
+	const userAgents = scope === "project" ? { agents: [], diagnostics: [] } : loadAgentsFromDir(userDir, "user");
+	const projectAgents =
+		scope === "user" || !projectAgentsDir
+			? { agents: [], diagnostics: [] }
+			: loadAgentsFromDir(projectAgentsDir, "project");
 
 	const agentMap = new Map<string, AgentConfig>();
 
 	if (scope === "both") {
-		for (const agent of userAgents) agentMap.set(agent.name, agent);
-		for (const agent of projectAgents) agentMap.set(agent.name, agent);
+		for (const agent of userAgents.agents) agentMap.set(agent.name, agent);
+		for (const agent of projectAgents.agents) agentMap.set(agent.name, agent);
 	} else if (scope === "user") {
-		for (const agent of userAgents) agentMap.set(agent.name, agent);
+		for (const agent of userAgents.agents) agentMap.set(agent.name, agent);
 	} else {
-		for (const agent of projectAgents) agentMap.set(agent.name, agent);
+		for (const agent of projectAgents.agents) agentMap.set(agent.name, agent);
 	}
 
-	return { agents: Array.from(agentMap.values()), projectAgentsDir };
+	return {
+		agents: Array.from(agentMap.values()),
+		diagnostics: [...userAgents.diagnostics, ...projectAgents.diagnostics],
+		projectAgentsDir,
+	};
 }
 
 export function formatAgentList(agents: AgentConfig[], maxItems: number): { text: string; remaining: number } {
