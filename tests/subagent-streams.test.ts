@@ -145,6 +145,30 @@ test("fails when Claude emits a tool outside the configured allowlist", () => {
   });
 });
 
+test("accepts literal function-calls markup in Claude assistant text", () => {
+  const text = '<function_calls><invoke name="Read">README.md</invoke></function_calls>';
+  const parser = new ClaudeStreamParser(claudeRequest);
+  parser.accept(JSON.stringify({ type: "assistant", message: { content: [{ type: "text", text }] } }));
+  parser.accept('{"type":"result","subtype":"success","is_error":false,"result":"Done","permission_denials":[]}');
+
+  expect(parser.finish({ exitCode: 0, stderr: "", aborted: false })).toMatchObject({
+    status: "completed",
+    output: "Done",
+    events: [{ type: "text", text }],
+  });
+});
+
+test("accepts literal function-calls markup in Claude canonical final-result text", () => {
+  const output = '<function_calls><invoke name="Read">README.md</invoke></function_calls>';
+  const parser = new ClaudeStreamParser(claudeRequest);
+  parser.accept(JSON.stringify({ type: "result", subtype: "success", is_error: false, result: output, permission_denials: [] }));
+
+  expect(parser.finish({ exitCode: 0, stderr: "", aborted: false })).toMatchObject({
+    status: "completed",
+    output,
+  });
+});
+
 test("retains malformed non-empty Claude JSON as a failure diagnostic", () => {
   const parser = new ClaudeStreamParser(claudeRequest);
   parser.accept("not JSON");

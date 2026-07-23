@@ -10,7 +10,6 @@ import type {
 import {
 	executeSubagentMode,
 	PER_TASK_OUTPUT_CAP,
-	truncateTaskOutput,
 } from "../dot_pi/agent/exact_extensions/subagent/orchestrator.ts";
 
 const piAgent: PiAgentConfig = {
@@ -301,17 +300,49 @@ test("forwards the identical aborted signal to every started backend run", async
 	await executionPromise;
 });
 
-test("truncates ASCII and multibyte task output at a UTF-8 boundary within the content cap", () => {
-	const ascii = `${"a".repeat(PER_TASK_OUTPUT_CAP)}x`;
-	const asciiTruncated = truncateTaskOutput(ascii);
-	expect(Buffer.byteLength(asciiTruncated, "utf8")).toBeLessThanOrEqual(PER_TASK_OUTPUT_CAP);
-	expect(asciiTruncated).toContain("[Output truncated:");
+test("caps the complete formatted parallel result once while preserving full task results", async () => {
+	const firstOutput = `first ${"a".repeat(Math.floor(PER_TASK_OUTPUT_CAP * 0.55))}`;
+	const secondOutput = `second ${"b".repeat(Math.floor(PER_TASK_OUTPUT_CAP * 0.55))}`;
+	const pi = new FakeBackend(async (request) => completed(request, firstOutput));
+	const claude = new FakeBackend(async (request) => completed(request, secondOutput));
 
-	const multibyte = `${"a".repeat(PER_TASK_OUTPUT_CAP - 1)}€`;
-	const multibyteTruncated = truncateTaskOutput(multibyte);
-	expect(Buffer.byteLength(multibyteTruncated, "utf8")).toBeLessThanOrEqual(PER_TASK_OUTPUT_CAP);
-	expect(multibyteTruncated).toContain("[Output truncated:");
-	expect(multibyteTruncated).not.toContain("�");
+	const execution = await executeSubagentMode(
+		input(
+			{
+				tasks: [
+					{ agent: "gpt-worker", task: "first" },
+					{ agent: "claude-worker", task: "second" },
+				],
+			},
+			new Map([["pi", pi], ["claude", claude]]),
+		),
+	);
+
+	expect(Buffer.byteLength(execution.content, "utf8")).toBeLessThanOrEqual(PER_TASK_OUTPUT_CAP);
+	expect(execution.content).toContain("Parallel: 2/2 succeeded");
+	expect(execution.content).toContain("### [gpt-worker] completed");
+	expect(execution.content).toContain("\n\n---\n\n### [claude-worker] completed");
+	expect((execution.content.match(/\[Output truncated:/g) ?? []).length).toBe(1);
+	expect(execution.results.map((result) => result.output)).toEqual([firstOutput, secondOutput]);
+});
+
+test("caps complete failed-chain formatting at a UTF-8 boundary while preserving the diagnostic", async () => {
+	const diagnostic = "€".repeat(PER_TASK_OUTPUT_CAP);
+	const claude = new FakeBackend(async (request) => failed(request, diagnostic));
+
+	const execution = await executeSubagentMode(
+		input(
+			{ chain: [{ agent: "claude-worker", task: "first" }] },
+			new Map([["claude", claude]]),
+		),
+	);
+
+	expect(Buffer.byteLength(execution.content, "utf8")).toBeLessThanOrEqual(PER_TASK_OUTPUT_CAP);
+	expect(execution.content).toStartWith("Chain stopped at step 1 (claude-worker): ");
+	expect(execution.content).toContain("[Output truncated:");
+	expect((execution.content.match(/\[Output truncated:/g) ?? []).length).toBe(1);
+	expect(execution.content).not.toContain("�");
+	expect(execution.results[0].diagnostic).toBe(diagnostic);
 });
 
 test("aggregates final result usage and costs exactly once", async () => {
