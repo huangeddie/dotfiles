@@ -82,6 +82,7 @@ export class ClaudeStreamParser {
 	private readonly malformedEvents: string[] = [];
 	private readonly permissionDenials: string[] = [];
 	private readonly resultErrors: string[] = [];
+	private hasPermissionDenials = false;
 	private usage = emptyUsage();
 	private model: string | undefined;
 	private lastAssistantText = "";
@@ -132,14 +133,18 @@ export class ClaudeStreamParser {
 			? "aborted"
 			: this.malformedEvents.length > 0 ||
 					this.resultErrors.length > 0 ||
-					this.permissionDenials.length > 0 ||
+					this.hasPermissionDenials ||
 					outcome.exitCode !== 0 ||
 					!this.hasFinalResult
 				? "failed"
 				: "completed";
 		const diagnostics = [
 			...this.resultErrors,
-			...this.permissionDenials,
+			...(this.permissionDenials.length > 0
+				? this.permissionDenials
+				: this.hasPermissionDenials
+					? ["Claude permission was denied."]
+					: []),
 			...this.malformedEvents,
 			outcome.spawnError,
 			outcome.stderr,
@@ -181,6 +186,7 @@ export class ClaudeStreamParser {
 		}
 
 		if (Array.isArray(event.permission_denials)) {
+			this.hasPermissionDenials ||= event.permission_denials.length > 0;
 			for (const denial of event.permission_denials) {
 				const message = permissionDenialMessage(denial);
 				if (message) this.permissionDenials.push(message);
