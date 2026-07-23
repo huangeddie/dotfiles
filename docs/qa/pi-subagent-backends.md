@@ -59,9 +59,9 @@ Restore every temporary file created below, then rerun the `chezmoi apply` comma
 
    Start a deliberately long `claude-scout` task, such as a broad repository analysis. Press Ctrl+C while it is running. Confirm the result is rendered as aborted and no subsequent chain step starts.
 
-6. **No fallback after invalid or denied Claude tool configuration**
+6. **Deterministic no-fallback rejection for a forbidden Claude agent definition**
 
-   In the deployed `~/.pi/agent/agents/claude-scout.md`, temporarily change `tools` to an invalid or denied Claude tool definition. Rerun the Claude scout invocation. Confirm it reports a Claude failure or permission denial, never invokes Pi as a fallback, and retains `claude` in the result header. Restore the managed source definition rather than preserving this deployed edit.
+   In the deployed `~/.pi/agent/agents/claude-scout.md`, temporarily change `tools` to `Read, Agent`. The `Agent` tool is forbidden by the Claude agent-definition contract, so discovery must reject the definition before any model process starts. Rerun the Claude scout invocation. Confirm the failed unknown-agent result includes the matching forbidden-`Agent` definition diagnostic and no Pi fallback or other backend process is invoked. Restore the managed source definition rather than preserving this deployed edit.
 
 7. **Expanded rendering and nested usage**
 

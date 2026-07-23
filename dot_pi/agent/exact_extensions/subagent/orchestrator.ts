@@ -34,10 +34,18 @@ export interface SubagentExecution {
 export function truncateTaskOutput(output: string): string {
 	const bytes = Buffer.from(output, "utf8");
 	if (bytes.length <= PER_TASK_OUTPUT_CAP) return output;
+
 	let end = PER_TASK_OUTPUT_CAP;
-	while (end > 0 && (bytes[end] & 0b1100_0000) === 0b1000_0000) end--;
-	const kept = bytes.subarray(0, end).toString("utf8");
-	return `${kept}\n\n[Output truncated: ${bytes.length - end} bytes omitted. Full output preserved in tool details.]`;
+	while (end > 0) {
+		while (end > 0 && (bytes[end] & 0b1100_0000) === 0b1000_0000) end--;
+		const suffix = `\n\n[Output truncated: ${bytes.length - end} bytes omitted. Full output preserved in tool details.]`;
+		if (end + Buffer.byteLength(suffix, "utf8") <= PER_TASK_OUTPUT_CAP) {
+			return `${bytes.subarray(0, end).toString("utf8")}${suffix}`;
+		}
+		end--;
+	}
+
+	return "[Output truncated. Full output preserved in tool details.]";
 }
 
 export async function mapWithConcurrencyLimit<TIn, TOut>(
@@ -80,6 +88,21 @@ function failedResult(
 		diagnostic,
 		...(step === undefined ? {} : { step }),
 	};
+}
+
+function unknownAgentResult(
+	agent: string,
+	task: string,
+	step: number | undefined,
+	discoveryDiagnostics: readonly AgentDiagnostic[] | undefined,
+): AgentRunResult {
+	const diagnostic = [
+		`Unknown agent: "${agent}".`,
+		...((discoveryDiagnostics ?? [])
+			.filter((candidate) => candidate.name === agent)
+			.map((candidate) => candidate.message)),
+	].join("\n");
+	return failedResult("pi", agent, task, diagnostic, step);
 }
 
 function outputFor(result: AgentRunResult): string {
@@ -126,7 +149,7 @@ export async function executeSubagentMode(input: ExecuteSubagentModeInput): Prom
 	const run = async (item: TaskRequest, index: number, step?: number): Promise<AgentRunResult> => {
 		const agent = input.agents.find((candidate) => candidate.name === item.agent);
 		if (!agent) {
-			const result = failedResult("pi", item.agent, item.task, `Unknown agent: "${item.agent}".`, step);
+			const result = unknownAgentResult(item.agent, item.task, step, input.discoveryDiagnostics);
 			updates[index] = result;
 			emitUpdate();
 			return result;

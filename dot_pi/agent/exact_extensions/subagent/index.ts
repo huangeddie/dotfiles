@@ -132,19 +132,6 @@ function toPiUsage(usage: UsageStats): Usage {
 	};
 }
 
-function withDiscoveryDiagnostics(
-	results: AgentRunResult[],
-	diagnostics: ReturnType<typeof discoverAgents>["diagnostics"],
-): AgentRunResult[] {
-	return results.map((result) => {
-		if (result.status !== "failed" || result.agentSource !== "unknown") return result;
-		const matching = diagnostics.filter((diagnostic) => diagnostic.name === result.agent).map((diagnostic) => diagnostic.message);
-		if (matching.length === 0) return result;
-		const diagnostic = [result.diagnostic, ...matching].filter((message): message is string => Boolean(message)).join("\n");
-		return { ...result, diagnostic };
-	});
-}
-
 const TaskItem = Type.Object({
 	agent: Type.String({ description: "Name of the agent to invoke" }),
 	task: Type.String({ description: "Task to delegate to the agent" }),
@@ -201,7 +188,7 @@ export default function (pi: ExtensionAPI) {
 				mode,
 				agentScope,
 				projectAgentsDir: discovery.projectAgentsDir,
-				results: withDiscoveryDiagnostics(results, discovery.diagnostics),
+				results,
 			});
 
 			if ((agentScope === "project" || agentScope === "both") && confirmProjectAgents && ctx.hasUI) {
@@ -233,6 +220,7 @@ export default function (pi: ExtensionAPI) {
 			const execution = await executeSubagentMode({
 				params,
 				agents: discovery.agents,
+				discoveryDiagnostics: discovery.diagnostics,
 				backends,
 				defaultCwd: ctx.cwd,
 				signal,
@@ -249,17 +237,11 @@ export default function (pi: ExtensionAPI) {
 					: {}),
 			});
 			const details = makeDetails(execution.mode, execution.results);
-			let content = execution.content;
-			for (let index = 0; index < execution.results.length; index++) {
-				const original = execution.results[index].diagnostic;
-				const enriched = details.results[index].diagnostic;
-				if (original && enriched && original !== enriched) content = content.replace(original, enriched);
-			}
 			const isError =
 				(execution.mode === "single" || execution.mode === "chain") &&
 				details.results.some((result) => result.status === "failed" || result.status === "aborted");
 			return {
-				content: [{ type: "text", text: content }],
+				content: [{ type: "text", text: execution.content }],
 				details,
 				usage: toPiUsage(execution.usage),
 				...(isError ? { isError: true } : {}),

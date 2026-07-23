@@ -84,7 +84,6 @@ export class ClaudeStreamParser {
 	private readonly permissionDenials: string[] = [];
 	private readonly resultErrors: string[] = [];
 	private readonly unconfiguredTools = new Set<string>();
-	private hasUnexecutedToolCallMarkup = false;
 	private hasPermissionDenials = false;
 	private usage = emptyUsage();
 	private model: string | undefined;
@@ -138,7 +137,6 @@ export class ClaudeStreamParser {
 			: this.malformedEvents.length > 0 ||
 					this.resultErrors.length > 0 ||
 					this.unconfiguredTools.size > 0 ||
-					this.hasUnexecutedToolCallMarkup ||
 					this.hasPermissionDenials ||
 					outcome.exitCode !== 0 ||
 					this.validFinalResults !== 1
@@ -147,7 +145,6 @@ export class ClaudeStreamParser {
 		const diagnostics = [
 			...this.resultErrors,
 			...Array.from(this.unconfiguredTools, (tool) => `Claude emitted unconfigured tool "${tool}".`),
-			...(this.hasUnexecutedToolCallMarkup ? ["Claude returned unexecuted tool-call markup."] : []),
 			...(this.permissionDenials.length > 0
 				? this.permissionDenials
 				: this.hasPermissionDenials
@@ -174,7 +171,6 @@ export class ClaudeStreamParser {
 			const part = asRecord(item);
 			if (!part) continue;
 			if (part.type === "text" && typeof part.text === "string") {
-				if (/<function_calls>\s*<invoke(?:_tool)?\b/.test(part.text)) this.hasUnexecutedToolCallMarkup = true;
 				this.events.push({ type: "text", text: part.text });
 				this.lastAssistantText = part.text;
 			} else if (part.type === "tool_use" && typeof part.name === "string") {
@@ -196,7 +192,6 @@ export class ClaudeStreamParser {
 		}
 
 		this.finalOutput = hasStringOutput ? event.result : "";
-		if (/<function_calls>\s*<invoke(?:_tool)?\b/.test(this.finalOutput)) this.hasUnexecutedToolCallMarkup = true;
 		this.usage = usageFromResult(event);
 
 		if (event.subtype !== "success") {
