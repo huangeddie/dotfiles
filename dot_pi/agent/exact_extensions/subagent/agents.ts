@@ -8,14 +8,46 @@ import { CONFIG_DIR_NAME, getAgentDir, parseFrontmatter } from "@earendil-works/
 
 export type AgentScope = "user" | "project" | "both";
 
-export interface AgentConfig {
+export type AgentBackend = "pi" | "claude";
+
+interface BaseAgentConfig {
 	name: string;
 	description: string;
-	tools?: string[];
-	model?: string;
 	systemPrompt: string;
 	source: "user" | "project";
 	filePath: string;
+}
+
+export interface PiAgentConfig extends BaseAgentConfig {
+	backend: "pi";
+	tools?: string[];
+	model?: string;
+}
+
+export interface ClaudeAgentConfig extends BaseAgentConfig {
+	backend: "claude";
+	tools: string[];
+	model: string;
+}
+
+export type AgentConfig = PiAgentConfig | ClaudeAgentConfig;
+
+export interface AgentDiagnostic {
+	name: string | null;
+	filePath: string;
+	message: string;
+}
+
+export type ParsedAgentDefinition =
+	| { agent: AgentConfig; diagnostic: null }
+	| { agent: null; diagnostic: AgentDiagnostic };
+
+export function parseAgentDefinition(
+	_content: string,
+	filePath: string,
+	_source: "user" | "project",
+): ParsedAgentDefinition {
+	throw new Error(`Agent parsing not implemented for ${filePath}`);
 }
 
 export interface AgentDiscoveryResult {
