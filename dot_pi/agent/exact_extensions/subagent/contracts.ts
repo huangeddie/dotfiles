@@ -99,6 +99,7 @@ export function addUsage(left: UsageStats, right: UsageStats): UsageStats {
 			input: left.cost.input + right.cost.input,
 			output: left.cost.output + right.cost.output,
 			cacheRead: left.cost.cacheRead + right.cost.cacheRead,
+			cacheWrite: left.cost.cacheWrite + right.cost.cacheWrite,
 			total: left.cost.total + right.cost.total,
 		},
 	};
