@@ -47,6 +47,14 @@ class FakeChildProcess implements NodeProcessChild {
 		this.killSignals.push(signal);
 	}
 
+	emitStdout(data: Uint8Array): void {
+		this.stdoutListener?.(data);
+	}
+
+	emitError(error: Error): void {
+		this.errorListener?.(error);
+	}
+
 	emitClose(code: number | null): void {
 		this.closeListener?.(code);
 	}
@@ -93,6 +101,43 @@ test("normalizes a synchronous spawn exception as a process outcome", async () =
 		aborted: false,
 		spawnError: "pi executable unavailable",
 	});
+});
+
+test("flushes a final unterminated stdout line on normal close", async () => {
+	const child = new FakeChildProcess();
+	const runner = createNodeProcessRunner({ spawn: () => child, setTimeout, clearTimeout });
+	const stdoutLines: string[] = [];
+
+	const outcome = runner.run(invocation(), { onStdoutLine: (line) => stdoutLines.push(line) });
+	child.emitStdout(new TextEncoder().encode("final unterminated stdout"));
+	child.emitClose(0);
+
+	expect(await outcome).toEqual({ exitCode: 0, stderr: "", aborted: false });
+	expect(stdoutLines).toEqual(["final unterminated stdout"]);
+});
+
+test("flushes partial UTF-8 stdout before async error settlement only once", async () => {
+	const child = new FakeChildProcess();
+	const runner = createNodeProcessRunner({ spawn: () => child, setTimeout, clearTimeout });
+	const stdoutLines: string[] = [];
+	const encoded = new TextEncoder().encode("final €");
+
+	const outcome = runner.run(invocation(), { onStdoutLine: (line) => stdoutLines.push(line) });
+	await Promise.resolve();
+	child.emitStdout(encoded.subarray(0, 7));
+	child.emitStdout(encoded.subarray(7));
+	child.emitError(new Error("pi executable unavailable"));
+
+	expect(await outcome).toEqual({
+		exitCode: 1,
+		stderr: "",
+		aborted: false,
+		spawnError: "pi executable unavailable",
+	});
+	expect(stdoutLines).toEqual(["final €"]);
+
+	child.emitClose(0);
+	expect(stdoutLines).toEqual(["final €"]);
 });
 
 test("aborting closes stdin, escalates termination after five seconds, and cleans up", async () => {

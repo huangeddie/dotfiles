@@ -39,6 +39,28 @@ describe("subagent definitions", () => {
 		expect(parsed.diagnostic).toBeNull();
 	});
 
+	test("rejects a whitespace-only name with a file-specific diagnostic", () => {
+		expect(parse('name: "   "\ndescription: Worker')).toEqual({
+			agent: null,
+			diagnostic: {
+				name: null,
+				filePath: "/agents/example.md",
+				message: 'Agent definition at "/agents/example.md" requires a non-empty "name"',
+			},
+		});
+	});
+
+	test("rejects a whitespace-only description with an agent- and file-specific diagnostic", () => {
+		expect(parse('name: worker\ndescription: " \t "')).toEqual({
+			agent: null,
+			diagnostic: {
+				name: "worker",
+				filePath: "/agents/example.md",
+				message: 'Agent "worker" at "/agents/example.md" requires a non-empty "description"',
+			},
+		});
+	});
+
 	for (const [name, definition, message] of [
 		["backend", "name: bad\ndescription: Bad\nbackend: codex", 'unsupported backend "codex"'],
 		["model", "name: bad\ndescription: Bad\nbackend: claude\ntools: Read", 'requires a non-empty "model"'],

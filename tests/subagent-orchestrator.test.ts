@@ -259,6 +259,32 @@ test("stops a chain after a failed step", async () => {
 	expect(execution.content).toBe("Chain stopped at step 1 (claude-worker): Claude denied the task");
 });
 
+test("stops a chain after an aborted step", async () => {
+	const claude = new FakeBackend(async (request) => ({
+		...completed(request, "partial output"),
+		status: "aborted" as const,
+		diagnostic: "Claude run was canceled",
+	}));
+	const pi = new FakeBackend(async (request) => completed(request));
+
+	const execution = await executeSubagentMode(
+		input(
+			{
+				chain: [
+					{ agent: "claude-worker", task: "first" },
+					{ agent: "gpt-worker", task: "must not run" },
+				],
+			},
+			new Map([["pi", pi], ["claude", claude]]),
+		),
+	);
+
+	expect(pi.requests).toHaveLength(0);
+	expect(execution.results).toHaveLength(1);
+	expect(execution.results[0]).toMatchObject({ status: "aborted", diagnostic: "Claude run was canceled" });
+	expect(execution.content).toBe("Chain stopped at step 1 (claude-worker): Claude run was canceled");
+});
+
 test("preserves successful parallel siblings when one run fails", async () => {
 	const pi = new FakeBackend(async (request) => completed(request, "successful output"));
 	const claude = new FakeBackend(async (request) => failed(request, "failed output"));
@@ -371,6 +397,30 @@ test("aggregates final result usage and costs exactly once", async () => {
 	});
 });
 
+test("preserves complete backend execution results in details", async () => {
+	let backendResult: AgentRunResult | undefined;
+	const pi = new FakeBackend(async (request) => {
+		backendResult = {
+			...completed(request, "canonical output", usage({ input: 3, output: 5 })),
+			events: [
+				{ type: "toolCall", name: "read", args: { path: "/repo/file.ts" } },
+				{ type: "text", text: "canonical output" },
+			],
+			stderr: "backend stderr retained for details",
+			model: "openai-codex/gpt-5.6-terra",
+			exitCode: 0,
+		};
+		return backendResult;
+	});
+
+	const execution = await executeSubagentMode(
+		input({ agent: "gpt-worker", task: "inspect" }, new Map([["pi", pi]])),
+	);
+
+	expect(execution.results).toEqual([backendResult]);
+	expect(execution.content).toBe("canonical output");
+});
+
 test("returns explicit failed results for unknown agents and missing backend adapters without fallback", async () => {
 	const pi = new FakeBackend(async (request) => completed(request));
 
@@ -381,7 +431,11 @@ test("returns explicit failed results for unknown agents and missing backend ada
 		input({ agent: "claude-worker", task: "work" }, new Map([["pi", pi]])),
 	);
 
-	expect(unknown.results[0]).toMatchObject({ status: "failed", agent: "not-configured", diagnostic: 'Unknown agent: "not-configured".' });
+	expect(unknown.results[0]).toMatchObject({
+		status: "failed",
+		agent: "not-configured",
+		diagnostic: 'Unknown agent: "not-configured".\nValid agents: claude-worker (project), gpt-worker (user).',
+	});
 	expect(missingBackend.results[0]).toMatchObject({
 		status: "failed",
 		backend: "claude",
@@ -390,20 +444,40 @@ test("returns explicit failed results for unknown agents and missing backend ada
 	expect(pi.requests).toHaveLength(0);
 });
 
-test("attaches matching discovery diagnostics to an unknown-agent failure before formatting content", async () => {
+test("lists a deterministic bounded set of valid agents before same-name invalid-definition diagnostics", async () => {
 	const pi = new FakeBackend(async (request) => completed(request));
 	const definitionDiagnostic = 'Agent "missing-worker" with backend "claude" must not include the nested "Agent" tool';
+	const availableAgents = Array.from({ length: 12 }, (_, index): PiAgentConfig => {
+		const number = 12 - index;
+		return {
+			...piAgent,
+			name: `agent-${number.toString().padStart(2, "0")}`,
+			source: number % 2 === 0 ? "project" : "user",
+		};
+	});
+	const expectedEntries = Array.from({ length: 10 }, (_, index) => {
+		const number = index + 1;
+		return `agent-${number.toString().padStart(2, "0")} (${number % 2 === 0 ? "project" : "user"})`;
+	});
 
 	const execution = await executeSubagentMode(
 		input(
 			{ agent: "missing-worker", task: "work" },
 			new Map([["pi", pi]]),
-			{ discoveryDiagnostics: [discoveryDiagnostic("missing-worker", definitionDiagnostic)] },
+			{
+				agents: availableAgents,
+				discoveryDiagnostics: [discoveryDiagnostic("missing-worker", definitionDiagnostic)],
+			},
 		),
 	);
+	const expectedDiagnostic = [
+		'Unknown agent: "missing-worker".',
+		`Valid agents: ${expectedEntries.join(", ")}, and 2 more.`,
+		definitionDiagnostic,
+	].join("\n");
 
-	expect(execution.results[0].diagnostic).toBe(`Unknown agent: "missing-worker".\n${definitionDiagnostic}`);
-	expect(execution.content).toBe(`Unknown agent: "missing-worker".\n${definitionDiagnostic}`);
+	expect(execution.results[0].diagnostic).toBe(expectedDiagnostic);
+	expect(execution.content).toBe(expectedDiagnostic);
 	expect(pi.requests).toHaveLength(0);
 });
 
@@ -428,7 +502,9 @@ test("does not enrich a successful sibling that quotes an unknown-agent diagnost
 	expect(execution.results[0].output).toBe(`Quoted protocol text: ${unknownAgentDiagnostic}`);
 	expect(execution.content).toContain(`### [gpt-worker] completed\n\nQuoted protocol text: ${unknownAgentDiagnostic}`);
 	expect(execution.content).not.toContain(`Quoted protocol text: ${unknownAgentDiagnostic}\n${definitionDiagnostic}`);
-	expect(execution.results[1].diagnostic).toBe(`${unknownAgentDiagnostic}\n${definitionDiagnostic}`);
+	expect(execution.results[1].diagnostic).toBe(
+		`${unknownAgentDiagnostic}\nValid agents: claude-worker (project), gpt-worker (user).\n${definitionDiagnostic}`,
+	);
 });
 
 test("caps enriched unknown-agent content while retaining the full discovery diagnostic in results", async () => {
@@ -440,7 +516,7 @@ test("caps enriched unknown-agent content while retaining the full discovery dia
 			{ discoveryDiagnostics: [discoveryDiagnostic("missing-worker", diagnostic)] },
 		),
 	);
-	const fullDiagnostic = `Unknown agent: "missing-worker".\n${diagnostic}`;
+	const fullDiagnostic = `Unknown agent: "missing-worker".\nValid agents: claude-worker (project), gpt-worker (user).\n${diagnostic}`;
 
 	expect(Buffer.byteLength(execution.content, "utf8")).toBeLessThanOrEqual(PER_TASK_OUTPUT_CAP);
 	expect(execution.results[0].diagnostic).toBe(fullDiagnostic);
@@ -458,7 +534,9 @@ test("rejects ambiguous and incomplete modes without starting a backend", async 
 	);
 	const incomplete = await executeSubagentMode(input({ agent: "gpt-worker" }, new Map([["pi", pi]])));
 
-	expect(ambiguous.content).toBe("Invalid parameters. Provide exactly one non-empty mode.");
-	expect(incomplete.content).toBe("Invalid parameters. Provide exactly one non-empty mode.");
+	const diagnostic =
+		"Invalid parameters. Provide exactly one non-empty mode: single { agent, task }, parallel { tasks: [{ agent, task }] }, or chain { chain: [{ agent, task }] }.";
+	expect(ambiguous.content).toBe(diagnostic);
+	expect(incomplete.content).toBe(diagnostic);
 	expect(pi.requests).toHaveLength(0);
 });
