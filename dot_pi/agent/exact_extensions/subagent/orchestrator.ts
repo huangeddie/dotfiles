@@ -138,6 +138,10 @@ function snapshot(results: Array<AgentRunResult | undefined>): AgentRunResult[] 
 	return results.filter((result): result is AgentRunResult => result !== undefined);
 }
 
+function hasNonEmptyAgentAndTask(item: TaskRequest): boolean {
+	return Boolean(item.agent.trim() && item.task.trim());
+}
+
 function invalidExecution(): SubagentExecution {
 	return {
 		mode: "single",
@@ -154,9 +158,12 @@ export async function executeSubagentMode(input: ExecuteSubagentModeInput): Prom
 	const hasSingle = Boolean(params.agent?.trim() && params.task?.trim());
 	const hasParallel = (params.tasks?.length ?? 0) > 0;
 	const hasChain = (params.chain?.length ?? 0) > 0;
+	const hasInvalidTaskEntry =
+		params.tasks?.some((item) => !hasNonEmptyAgentAndTask(item)) ||
+		params.chain?.some((item) => !hasNonEmptyAgentAndTask(item));
 	const hasIncompleteSingle = (params.agent !== undefined || params.task !== undefined) && !hasSingle;
 	const modeCount = Number(hasSingle) + Number(hasParallel) + Number(hasChain);
-	if (modeCount !== 1 || hasIncompleteSingle) return invalidExecution();
+	if (modeCount !== 1 || hasIncompleteSingle || hasInvalidTaskEntry) return invalidExecution();
 
 	const mode: SubagentMode = hasSingle ? "single" : hasParallel ? "parallel" : "chain";
 	const updates: Array<AgentRunResult | undefined> = [];
