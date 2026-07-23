@@ -1,9 +1,3 @@
-Host github.com
-    HostName github.com
-    User git
-    IdentityFile ~/.ssh/id_ed25519_github_aigagror
-    IdentitiesOnly yes
-
 Host main
     HostName 100.83.182.14
     User eddie
