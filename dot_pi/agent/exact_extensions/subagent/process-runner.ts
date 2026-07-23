@@ -1,28 +1,81 @@
 import { spawn } from "node:child_process";
 import { StringDecoder } from "node:string_decoder";
-import type { ProcessOutcome, ProcessRunner } from "./contracts.ts";
+import type { ProcessInvocation, ProcessOutcome, ProcessRunner } from "./contracts.ts";
 
 const ABORT_KILL_DELAY_MS = 5_000;
 
-export function createNodeProcessRunner(): ProcessRunner {
+export interface NodeProcessReadable {
+	on(event: "data", listener: (data: Uint8Array) => void): void;
+}
+
+export interface NodeProcessChild {
+	stdin: { readonly writableEnded: boolean; end(input?: string): void };
+	stdout: NodeProcessReadable;
+	stderr: NodeProcessReadable;
+	on(event: "error", listener: (error: Error) => void): void;
+	on(event: "close", listener: (code: number | null) => void): void;
+	kill(signal: "SIGTERM" | "SIGKILL"): void;
+}
+
+export interface NodeProcessRunnerDependencies {
+	spawn(invocation: ProcessInvocation): NodeProcessChild;
+	setTimeout(callback: () => void, delayMs: number): unknown;
+	clearTimeout(timer: unknown): void;
+}
+
+const nodeProcessRunnerDependencies: NodeProcessRunnerDependencies = {
+	spawn(invocation) {
+		return spawn(invocation.command, invocation.args, {
+			cwd: invocation.cwd,
+			shell: false,
+			stdio: ["pipe", "pipe", "pipe"],
+		}) as unknown as NodeProcessChild;
+	},
+	setTimeout(callback, delayMs) {
+		return globalThis.setTimeout(callback, delayMs);
+	},
+	clearTimeout(timer) {
+		globalThis.clearTimeout(timer as ReturnType<typeof globalThis.setTimeout>);
+	},
+};
+
+function spawnErrorMessage(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
+}
+
+export function createNodeProcessRunner(
+	dependencies: NodeProcessRunnerDependencies = nodeProcessRunnerDependencies,
+): ProcessRunner {
 	return {
 		run(invocation, options) {
 			return new Promise<ProcessOutcome>((resolve) => {
-				const process = spawn(invocation.command, invocation.args, {
-					cwd: invocation.cwd,
-					shell: false,
-					stdio: ["pipe", "pipe", "pipe"],
-				});
+				let process: NodeProcessChild;
+				try {
+					process = dependencies.spawn(invocation);
+				} catch (error) {
+					resolve({ exitCode: 1, stderr: "", aborted: false, spawnError: spawnErrorMessage(error) });
+					return;
+				}
+
 				const stdoutDecoder = new StringDecoder("utf8");
 				const stderrDecoder = new StringDecoder("utf8");
 				let stdoutBuffer = "";
 				let stderr = "";
 				let settled = false;
 				let abortedBySignal = false;
-				let killTimer: ReturnType<typeof setTimeout> | undefined;
+				let killTimer: unknown;
 
+				const abort = () => {
+					if (settled || abortedBySignal) return;
+					abortedBySignal = true;
+					if (!process.stdin.writableEnded) process.stdin.end();
+					process.kill("SIGTERM");
+					killTimer = dependencies.setTimeout(() => {
+						if (!settled) process.kill("SIGKILL");
+					}, ABORT_KILL_DELAY_MS);
+				};
 				const clearAbort = () => {
-					if (killTimer) clearTimeout(killTimer);
+					if (killTimer !== undefined) dependencies.clearTimeout(killTimer);
 					if (options.signal) options.signal.removeEventListener("abort", abort);
 				};
 				const settle = (outcome: ProcessOutcome) => {
@@ -41,22 +94,18 @@ export function createNodeProcessRunner(): ProcessRunner {
 						stdoutBuffer = "";
 					}
 				};
-				const abort = () => {
-					if (settled || abortedBySignal) return;
-					abortedBySignal = true;
-					if (!process.stdin.writableEnded) process.stdin.end();
-					process.kill("SIGTERM");
-					killTimer = setTimeout(() => {
-						if (!settled) process.kill("SIGKILL");
-					}, ABORT_KILL_DELAY_MS);
-				};
 
-				process.stdout.on("data", (data: Buffer) => emitLines(stdoutDecoder.write(data)));
-				process.stderr.on("data", (data: Buffer) => {
+				process.stdout.on("data", (data) => emitLines(stdoutDecoder.write(data)));
+				process.stderr.on("data", (data) => {
 					stderr += stderrDecoder.write(data);
 				});
 				process.on("error", (error) => {
-					settle({ exitCode: 1, stderr: stderr + stderrDecoder.end(), aborted: abortedBySignal, spawnError: error.message });
+					settle({
+						exitCode: 1,
+						stderr: stderr + stderrDecoder.end(),
+						aborted: abortedBySignal,
+						spawnError: error.message,
+					});
 				});
 				process.on("close", (code) => {
 					emitLines(stdoutDecoder.end(), true);
