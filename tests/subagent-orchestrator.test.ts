@@ -33,6 +33,8 @@ const claudeAgent: ClaudeAgentConfig = {
 };
 
 const agents = [piAgent, claudeAgent];
+const invalidParametersDiagnostic =
+	"Invalid parameters. Provide exactly one non-empty mode: single { agent, task }, parallel { tasks: [{ agent, task }] }, or chain { chain: [{ agent, task }] }.";
 
 function discoveryDiagnostic(name: string, message: string): AgentDiagnostic {
 	return { name, filePath: `/agents/${name}.md`, message };
@@ -521,6 +523,24 @@ test("caps enriched unknown-agent content while retaining the full discovery dia
 	expect(Buffer.byteLength(execution.content, "utf8")).toBeLessThanOrEqual(PER_TASK_OUTPUT_CAP);
 	expect(execution.results[0].diagnostic).toBe(fullDiagnostic);
 	expect(Buffer.byteLength(execution.results[0].diagnostic!, "utf8")).toBeGreaterThan(PER_TASK_OUTPUT_CAP);
+});
+
+const invalidTaskEntries: Array<[string, Parameters<typeof executeSubagentMode>[0]["params"]]> = [
+	["parallel item with blank agent", { tasks: [{ agent: " \t", task: "work" }] }],
+	["parallel item with blank task", { tasks: [{ agent: "gpt-worker", task: "\n " }] }],
+	["chain item with blank agent", { chain: [{ agent: " \t", task: "work" }] }],
+	["chain item with blank task", { chain: [{ agent: "gpt-worker", task: "\n " }] }],
+];
+
+test.each(invalidTaskEntries)("rejects a %s before starting any backend", async (_caseName, params) => {
+	const pi = new FakeBackend(async (request) => completed(request));
+	const claude = new FakeBackend(async (request) => completed(request));
+
+	const execution = await executeSubagentMode(input(params, new Map([["pi", pi], ["claude", claude]])));
+
+	expect(execution).toMatchObject({ mode: "single", results: [], content: invalidParametersDiagnostic });
+	expect(pi.requests).toHaveLength(0);
+	expect(claude.requests).toHaveLength(0);
 });
 
 test("rejects ambiguous and incomplete modes without starting a backend", async () => {
