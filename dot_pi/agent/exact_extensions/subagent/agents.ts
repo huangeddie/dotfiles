@@ -47,32 +47,62 @@ export function parseAgentDefinition(
 	filePath: string,
 	source: "user" | "project",
 ): ParsedAgentDefinition {
-	const { frontmatter, body } = parseFrontmatter<Record<string, string>>(content);
-	const name = frontmatter.name;
-	const description = frontmatter.description;
-	const backend = frontmatter.backend?.trim() || "pi";
-	const model = frontmatter.model?.trim();
-	const tools = frontmatter.tools
-		?.split(",")
-		.map((tool) => tool.trim())
-		.filter(Boolean);
-
-	const diagnostic = (message: string): ParsedAgentDefinition => ({
+	const diagnostic = (name: string | null, message: string): ParsedAgentDefinition => ({
 		agent: null,
-		diagnostic: { name: name || null, filePath, message },
+		diagnostic: { name, filePath, message },
 	});
 
-	if (!name) return diagnostic('requires a non-empty "name"');
-	if (!description) return diagnostic(`Agent "${name}" requires a non-empty "description"`);
+	let frontmatter: Record<string, unknown>;
+	let body: string;
+	try {
+		({ frontmatter, body } = parseFrontmatter<Record<string, unknown>>(content));
+	} catch {
+		return diagnostic(null, `Agent definition at "${filePath}" could not parse YAML`);
+	}
+
+	if (typeof frontmatter !== "object" || frontmatter === null || Array.isArray(frontmatter)) {
+		return diagnostic(null, `Agent definition at "${filePath}" requires frontmatter to be a mapping`);
+	}
+
+	const name = frontmatter.name;
+	const description = frontmatter.description;
+	const backendValue = frontmatter.backend;
+	const modelValue = frontmatter.model;
+	const toolsValue = frontmatter.tools;
+
+	if (typeof name !== "string" || !name) return diagnostic(null, 'requires a non-empty "name"');
+	if (typeof description !== "string" || !description) {
+		return diagnostic(name, `Agent "${name}" requires a non-empty "description"`);
+	}
+	if (backendValue !== undefined && typeof backendValue !== "string") {
+		return diagnostic(name, `Agent "${name}" requires "backend" to be a string`);
+	}
+	if (modelValue !== undefined && typeof modelValue !== "string") {
+		return diagnostic(name, `Agent "${name}" requires "model" to be a string`);
+	}
+	if (toolsValue !== undefined && typeof toolsValue !== "string") {
+		return diagnostic(name, `Agent "${name}" requires "tools" to be a string`);
+	}
+
+	const backend = typeof backendValue === "string" ? backendValue.trim() || "pi" : "pi";
+	const model = typeof modelValue === "string" ? modelValue.trim() : undefined;
+	const tools =
+		typeof toolsValue === "string"
+			? toolsValue
+					.split(",")
+					.map((tool) => tool.trim())
+					.filter(Boolean)
+			: undefined;
+
 	if (backend !== "pi" && backend !== "claude") {
-		return diagnostic(`Agent "${name}" has unsupported backend "${backend}"`);
+		return diagnostic(name, `Agent "${name}" has unsupported backend "${backend}"`);
 	}
 
 	if (backend === "claude") {
-		if (!model) return diagnostic(`Agent "${name}" requires a non-empty "model" for backend "claude"`);
-		if (!tools?.length) return diagnostic(`Agent "${name}" requires a non-empty "tools" for backend "claude"`);
+		if (!model) return diagnostic(name, `Agent "${name}" requires a non-empty "model" for backend "claude"`);
+		if (!tools?.length) return diagnostic(name, `Agent "${name}" requires a non-empty "tools" for backend "claude"`);
 		if (tools.includes("Agent")) {
-			return diagnostic(`Agent "${name}" with backend "claude" must not include the nested "Agent" tool`);
+			return diagnostic(name, `Agent "${name}" with backend "claude" must not include the nested "Agent" tool`);
 		}
 
 		return {
