@@ -143,32 +143,47 @@ interface LoadedAgents {
 	diagnostics: AgentDiagnostic[];
 }
 
-function loadAgentsFromDir(dir: string, source: "user" | "project"): LoadedAgents {
+const nodeAgentFileSystem: AgentFileSystem = {
+	isDirectory(directory) {
+		try {
+			return fs.statSync(directory).isDirectory();
+		} catch {
+			return false;
+		}
+	},
+	readDirectory(directory) {
+		try {
+			return fs
+				.readdirSync(directory, { withFileTypes: true })
+				.filter((entry) => entry.name.endsWith(".md") && (entry.isFile() || entry.isSymbolicLink()))
+				.map((entry) => entry.name);
+		} catch {
+			return null;
+		}
+	},
+	readFile(filePath) {
+		try {
+			return fs.readFileSync(filePath, "utf-8");
+		} catch {
+			return null;
+		}
+	},
+};
+
+function loadAgentsFromDir(
+	dir: string,
+	source: "user" | "project",
+	fileSystem: AgentFileSystem,
+): LoadedAgents {
 	const agents: AgentConfig[] = [];
 	const diagnostics: AgentDiagnostic[] = [];
-
-	if (!fs.existsSync(dir)) {
-		return { agents, diagnostics };
-	}
-
-	let entries: fs.Dirent[];
-	try {
-		entries = fs.readdirSync(dir, { withFileTypes: true });
-	} catch {
-		return { agents, diagnostics };
-	}
+	const entries = fileSystem.readDirectory(dir);
+	if (!entries) return { agents, diagnostics };
 
 	for (const entry of entries) {
-		if (!entry.name.endsWith(".md")) continue;
-		if (!entry.isFile() && !entry.isSymbolicLink()) continue;
-
-		const filePath = path.join(dir, entry.name);
-		let content: string;
-		try {
-			content = fs.readFileSync(filePath, "utf-8");
-		} catch {
-			continue;
-		}
+		const filePath = path.join(dir, entry);
+		const content = fileSystem.readFile(filePath);
+		if (content === null) continue;
 
 		const parsed = parseAgentDefinition(content, filePath, source);
 		if (parsed.agent) agents.push(parsed.agent);
@@ -178,19 +193,11 @@ function loadAgentsFromDir(dir: string, source: "user" | "project"): LoadedAgent
 	return { agents, diagnostics };
 }
 
-function isDirectory(p: string): boolean {
-	try {
-		return fs.statSync(p).isDirectory();
-	} catch {
-		return false;
-	}
-}
-
-function findNearestProjectAgentsDir(cwd: string): string | null {
+function findNearestProjectAgentsDir(cwd: string, fileSystem: AgentFileSystem): string | null {
 	let currentDir = cwd;
 	while (true) {
 		const candidate = path.join(currentDir, CONFIG_DIR_NAME, "agents");
-		if (isDirectory(candidate)) return candidate;
+		if (fileSystem.isDirectory(candidate)) return candidate;
 
 		const parentDir = path.dirname(currentDir);
 		if (parentDir === currentDir) return null;
@@ -200,15 +207,20 @@ function findNearestProjectAgentsDir(cwd: string): string | null {
 
 export function discoverAgents(cwd: string, scope: AgentScope): AgentDiscoveryResult;
 export function discoverAgents(cwd: string, scope: AgentScope, fileSystem: AgentFileSystem): AgentDiscoveryResult;
-export function discoverAgents(cwd: string, scope: AgentScope): AgentDiscoveryResult {
+export function discoverAgents(
+	cwd: string,
+	scope: AgentScope,
+	fileSystem: AgentFileSystem = nodeAgentFileSystem,
+): AgentDiscoveryResult {
 	const userDir = path.join(getAgentDir(), "agents");
-	const projectAgentsDir = findNearestProjectAgentsDir(cwd);
+	const projectAgentsDir = findNearestProjectAgentsDir(cwd, fileSystem);
 
-	const userAgents = scope === "project" ? { agents: [], diagnostics: [] } : loadAgentsFromDir(userDir, "user");
+	const userAgents =
+		scope === "project" ? { agents: [], diagnostics: [] } : loadAgentsFromDir(userDir, "user", fileSystem);
 	const projectAgents =
 		scope === "user" || !projectAgentsDir
 			? { agents: [], diagnostics: [] }
-			: loadAgentsFromDir(projectAgentsDir, "project");
+			: loadAgentsFromDir(projectAgentsDir, "project", fileSystem);
 
 	const agentMap = new Map<string, AgentConfig>();
 
