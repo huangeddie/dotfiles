@@ -145,6 +145,20 @@ test("fails when Claude emits a tool outside the configured allowlist", () => {
   });
 });
 
+test("fails an unexecuted Claude tool-call markup result", () => {
+  const parser = new ClaudeStreamParser({
+    ...claudeRequest,
+    agent: { ...claudeAgent, tools: ["DefinitelyNotAClaudeTool"] },
+  });
+  parser.accept('{"type":"assistant","message":{"content":[{"type":"text","text":"<function_calls>\\n<invoke name=\\"Read\\">\\n<parameter name=\\"path\\">README.md</parameter>\\n</invoke>\\n</function_calls>"}]}}');
+  parser.accept('{"type":"result","subtype":"success","is_error":false,"result":"<function_calls>\\n<invoke name=\\"Read\\">\\n<parameter name=\\"path\\">README.md</parameter>\\n</invoke>\\n</function_calls>","permission_denials":[]}');
+
+  expect(parser.finish({ exitCode: 0, stderr: "", aborted: false })).toMatchObject({
+    status: "failed",
+    diagnostic: "Claude returned unexecuted tool-call markup.",
+  });
+});
+
 test("retains malformed non-empty Claude JSON as a failure diagnostic", () => {
   const parser = new ClaudeStreamParser(claudeRequest);
   parser.accept("not JSON");
