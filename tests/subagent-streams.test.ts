@@ -1,7 +1,8 @@
 import { expect, test } from "bun:test";
 
-import type { PiAgentConfig } from "../dot_pi/agent/exact_extensions/subagent/agents";
+import type { ClaudeAgentConfig, PiAgentConfig } from "../dot_pi/agent/exact_extensions/subagent/agents";
 import type { AgentRunRequest, ProcessRunner } from "../dot_pi/agent/exact_extensions/subagent/contracts";
+import { ClaudeStreamParser, createClaudeBackend } from "../dot_pi/agent/exact_extensions/subagent/claude-backend";
 import { createPiBackend, PiStreamParser } from "../dot_pi/agent/exact_extensions/subagent/pi-backend";
 
 const agent: PiAgentConfig = {
@@ -20,9 +21,140 @@ const request: AgentRunRequest = {
   step: 2,
 };
 
+const claudeAgent: ClaudeAgentConfig = {
+  name: "claude-worker",
+  description: "Implements features.",
+  backend: "claude",
+  tools: ["Read", "Write", "Edit", "Glob", "Grep", "Bash", "WebSearch", "WebFetch"],
+  model: "sonnet",
+  systemPrompt: "Worker prompt.",
+  source: "project",
+  filePath: "/project/.pi/agents/claude-worker.md",
+};
+
+const claudeRequest: AgentRunRequest = {
+  agent: claudeAgent,
+  task: "implement feature",
+  cwd: "/repo",
+  step: 2,
+};
+
+const claudeStreamLines = [
+  '{"type":"system","subtype":"init","model":"claude-sonnet-4-6"}',
+  '{"type":"assistant","message":{"model":"claude-sonnet-4-6","content":[{"type":"tool_use","id":"toolu_1","name":"Read","input":{"file_path":"/repo/a.ts"}},{"type":"text","text":"Working"}],"usage":{"input_tokens":10,"output_tokens":4,"cache_read_input_tokens":3,"cache_creation_input_tokens":2}}}',
+  '{"type":"result","subtype":"success","is_error":false,"num_turns":2,"result":"Done","total_cost_usd":0.012,"usage":{"input_tokens":20,"output_tokens":8,"cache_read_input_tokens":5,"cache_creation_input_tokens":3},"permission_denials":[]}',
+];
+
 function messageLine(message: Record<string, unknown>): string {
   return JSON.stringify({ type: "message_end", message });
 }
+
+test("normalizes Claude stream content and final result accounting", () => {
+  const parser = new ClaudeStreamParser(claudeRequest);
+  for (const line of claudeStreamLines) parser.accept(line);
+
+  expect(parser.finish({ exitCode: 0, stderr: "", aborted: false })).toEqual({
+    backend: "claude",
+    agent: "claude-worker",
+    agentSource: "project",
+    task: "implement feature",
+    step: 2,
+    status: "completed",
+    output: "Done",
+    events: [
+      { type: "toolCall", name: "Read", args: { file_path: "/repo/a.ts" } },
+      { type: "text", text: "Working" },
+    ],
+    stderr: "",
+    usage: {
+      input: 20,
+      output: 8,
+      cacheRead: 5,
+      cacheWrite: 3,
+      contextTokens: 0,
+      turns: 2,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0.012 },
+    },
+    model: "claude-sonnet-4-6",
+    exitCode: 0,
+  });
+});
+
+test("fails a Claude execution error and reports permission denials", () => {
+  const parser = new ClaudeStreamParser(claudeRequest);
+  parser.accept('{"type":"result","subtype":"error_during_execution","is_error":true,"result":"Stopped","permission_denials":[{"message":"Bash denied"},{"message":"Read denied"}]}');
+
+  expect(parser.finish({ exitCode: 0, stderr: "", aborted: false })).toMatchObject({
+    status: "failed",
+    output: "Stopped",
+    diagnostic: "Claude result error_during_execution.\nBash denied\nRead denied",
+  });
+});
+
+test("retains malformed non-empty Claude JSON as a failure diagnostic", () => {
+  const parser = new ClaudeStreamParser(claudeRequest);
+  parser.accept("not JSON");
+  parser.accept(claudeStreamLines[2]);
+
+  expect(parser.finish({ exitCode: 0, stderr: "", aborted: false })).toMatchObject({
+    status: "failed",
+    diagnostic: "Malformed Claude JSON event: not JSON",
+  });
+});
+
+test("fails a Claude process that exits without a final result", () => {
+  const parser = new ClaudeStreamParser(claudeRequest);
+  parser.accept(claudeStreamLines[1]);
+
+  expect(parser.finish({ exitCode: 0, stderr: "", aborted: false })).toMatchObject({
+    status: "failed",
+    output: "",
+    diagnostic: "Claude exited without a final result.",
+  });
+});
+
+test("marks a nonzero Claude process exit as failed and retains stderr", () => {
+  const parser = new ClaudeStreamParser(claudeRequest);
+  parser.accept(claudeStreamLines[2]);
+
+  expect(parser.finish({ exitCode: 1, stderr: "Claude crashed.", aborted: false })).toMatchObject({
+    status: "failed",
+    output: "Done",
+    stderr: "Claude crashed.",
+    diagnostic: "Claude crashed.",
+    exitCode: 1,
+  });
+});
+
+test("marks an aborted Claude process as aborted", () => {
+  const parser = new ClaudeStreamParser(claudeRequest);
+  parser.accept(claudeStreamLines[2]);
+
+  expect(parser.finish({ exitCode: 1, stderr: "", aborted: true })).toMatchObject({
+    status: "aborted",
+    output: "Done",
+    diagnostic: "Claude process was aborted.",
+  });
+});
+
+test("emits running Claude snapshots from assistant events", async () => {
+  const runner: ProcessRunner = {
+    async run(invocation, options) {
+      expect(invocation).toMatchObject({ command: "claude", cwd: "/repo", stdin: "Task: implement feature" });
+      options.onStdoutLine(claudeStreamLines[1]);
+      options.onStdoutLine(claudeStreamLines[2]);
+      return { exitCode: 0, stderr: "", aborted: false };
+    },
+  };
+  const updates: unknown[] = [];
+
+  const result = await createClaudeBackend(runner).run(claudeRequest, undefined, (update) => updates.push(update));
+
+  expect(updates).toEqual([
+    expect.objectContaining({ status: "running", output: "Working" }),
+  ]);
+  expect(result).toMatchObject({ status: "completed", output: "Done" });
+});
 
 test("normalizes assistant text and tool calls while summing usage", () => {
   const parser = new PiStreamParser(request);
