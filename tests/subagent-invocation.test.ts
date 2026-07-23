@@ -77,6 +77,28 @@ test("builds a Claude worker invocation with backend-native permissions", () => 
   expect(buildClaudeInvocation(request).args).not.toContain("--setting-sources");
 });
 
+test("includes an empty Claude system prompt in the exact invocation", () => {
+  const request: AgentRunRequest = {
+    ...claudeRequest,
+    agent: { ...claudeAgent, systemPrompt: "" },
+  };
+
+  expect(buildClaudeInvocation(request)).toEqual({
+    command: "claude",
+    cwd: "/repo",
+    stdin: "Task: implement feature",
+    args: [
+      "-p", "--output-format", "stream-json", "--verbose", "--no-session-persistence",
+      "--model", "sonnet",
+      "--tools", "Read,Write,Edit,Glob,Grep,Bash,WebSearch,WebFetch",
+      "--allowedTools", "Read,Write,Edit,Glob,Grep,Bash,WebSearch,WebFetch",
+      "--disallowedTools", "Agent",
+      "--permission-mode", "dontAsk",
+      "--append-system-prompt", "",
+    ],
+  });
+});
+
 test("rejects a non-Claude agent definition", () => {
   expect(() => buildClaudeInvocation({ ...claudeRequest, agent: piAgent })).toThrow(
     "Claude backend requires a Claude agent definition",

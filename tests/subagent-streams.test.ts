@@ -45,6 +45,14 @@ const claudeStreamLines = [
   '{"type":"result","subtype":"success","is_error":false,"num_turns":2,"result":"Done","total_cost_usd":0.012,"usage":{"input_tokens":20,"output_tokens":8,"cache_read_input_tokens":5,"cache_creation_input_tokens":3},"permission_denials":[]}',
 ];
 
+const incompleteClaudeResultLine =
+  '{"type":"result","subtype":"success","is_error":false,"num_turns":2,"total_cost_usd":0.012,"usage":{"input_tokens":20,"output_tokens":8,"cache_read_input_tokens":5,"cache_creation_input_tokens":3},"permission_denials":[]}';
+
+const duplicateClaudeResultLines = [
+  claudeStreamLines[2],
+  '{"type":"result","subtype":"success","is_error":false,"num_turns":3,"result":"Duplicate","total_cost_usd":0.024,"usage":{"input_tokens":40,"output_tokens":16,"cache_read_input_tokens":10,"cache_creation_input_tokens":6},"permission_denials":[]}',
+];
+
 function messageLine(message: Record<string, unknown>): string {
   return JSON.stringify({ type: "message_end", message });
 }
@@ -77,6 +85,28 @@ test("normalizes Claude stream content and final result accounting", () => {
     },
     model: "claude-sonnet-4-6",
     exitCode: 0,
+  });
+});
+
+test("fails an incomplete Claude final result with an actionable diagnostic", () => {
+  const parser = new ClaudeStreamParser(claudeRequest);
+  parser.accept(incompleteClaudeResultLine);
+
+  expect(parser.finish({ exitCode: 0, stderr: "", aborted: false })).toMatchObject({
+    status: "failed",
+    output: "",
+    diagnostic: "Claude final result is missing string output.",
+  });
+});
+
+test("fails duplicate Claude final results with an actionable diagnostic", () => {
+  const parser = new ClaudeStreamParser(claudeRequest);
+  for (const line of duplicateClaudeResultLines) parser.accept(line);
+
+  expect(parser.finish({ exitCode: 0, stderr: "", aborted: false })).toMatchObject({
+    status: "failed",
+    output: "Done",
+    diagnostic: "Claude emitted multiple final results.",
   });
 });
 
