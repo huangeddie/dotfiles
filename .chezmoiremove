@@ -3,3 +3,7 @@
 .tmux.conf
 .tmux
 .config/television/cable/sesh.toml
+.pi/agent/agents/scout.md
+.pi/agent/agents/planner.md
+.pi/agent/agents/reviewer.md
+.pi/agent/agents/worker.md
