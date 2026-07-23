@@ -132,6 +132,12 @@ export interface AgentDiscoveryResult {
 	projectAgentsDir: string | null;
 }
 
+export interface AgentFileSystem {
+	isDirectory(directory: string): boolean;
+	readDirectory(directory: string): string[] | null;
+	readFile(filePath: string): string | null;
+}
+
 interface LoadedAgents {
 	agents: AgentConfig[];
 	diagnostics: AgentDiagnostic[];
@@ -192,6 +198,8 @@ function findNearestProjectAgentsDir(cwd: string): string | null {
 	}
 }
 
+export function discoverAgents(cwd: string, scope: AgentScope): AgentDiscoveryResult;
+export function discoverAgents(cwd: string, scope: AgentScope, fileSystem: AgentFileSystem): AgentDiscoveryResult;
 export function discoverAgents(cwd: string, scope: AgentScope): AgentDiscoveryResult {
 	const userDir = path.join(getAgentDir(), "agents");
 	const projectAgentsDir = findNearestProjectAgentsDir(cwd);
