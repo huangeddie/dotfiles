@@ -91,6 +91,16 @@ test("fails a Claude execution error and reports permission denials", () => {
   });
 });
 
+test("fails a Claude result with non-message permission denial metadata", () => {
+  const parser = new ClaudeStreamParser(claudeRequest);
+  parser.accept('{"type":"result","subtype":"success","is_error":false,"result":"Stopped","permission_denials":[{"tool_name":"Bash","tool_use_id":"toolu_1"}]}');
+
+  expect(parser.finish({ exitCode: 0, stderr: "", aborted: false })).toMatchObject({
+    status: "failed",
+    diagnostic: "Claude permission was denied.",
+  });
+});
+
 test("retains malformed non-empty Claude JSON as a failure diagnostic", () => {
   const parser = new ClaudeStreamParser(claudeRequest);
   parser.accept("not JSON");
