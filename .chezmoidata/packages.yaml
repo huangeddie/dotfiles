@@ -93,7 +93,14 @@ packages:
         install: |-
           curl -fsSL https://bun.com/install | bash
     apt:
-      blocked_prefixes: []
+      blocked_prefixes:
+        [
+          "neovim",
+          "npm",
+          "nodejs",
+          "steam-installer",
+          "steam-devices",
+        ]
       install:
         [
           "neovim",
