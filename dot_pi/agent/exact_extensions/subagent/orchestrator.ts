@@ -4,6 +4,7 @@ import { addUsage, emptyUsage, type AgentRunResult, type SubagentBackend, type U
 export const MAX_PARALLEL_TASKS = 8;
 export const MAX_CONCURRENCY = 4;
 export const PER_TASK_OUTPUT_CAP = 50 * 1024;
+const MAX_UNKNOWN_AGENT_ENTRIES = 10;
 
 type SubagentMode = "single" | "parallel" | "chain";
 type TaskRequest = { agent: string; task: string; cwd?: string };
@@ -90,14 +91,27 @@ function failedResult(
 	};
 }
 
+function validAgentDiagnostic(agents: readonly AgentConfig[]): string {
+	if (agents.length === 0) return "Valid agents: none.";
+
+	const entries = agents
+		.map((agent) => `${agent.name} (${agent.source})`)
+		.sort((left, right) => (left < right ? -1 : left > right ? 1 : 0));
+	const listed = entries.slice(0, MAX_UNKNOWN_AGENT_ENTRIES);
+	const remaining = entries.length - listed.length;
+	return `Valid agents: ${listed.join(", ")}${remaining ? `, and ${remaining} more` : ""}.`;
+}
+
 function unknownAgentResult(
 	agent: string,
 	task: string,
 	step: number | undefined,
+	agents: readonly AgentConfig[],
 	discoveryDiagnostics: readonly AgentDiagnostic[] | undefined,
 ): AgentRunResult {
 	const diagnostic = [
 		`Unknown agent: "${agent}".`,
+		validAgentDiagnostic(agents),
 		...((discoveryDiagnostics ?? [])
 			.filter((candidate) => candidate.name === agent)
 			.map((candidate) => candidate.message)),
@@ -128,7 +142,9 @@ function invalidExecution(): SubagentExecution {
 	return {
 		mode: "single",
 		results: [],
-		content: truncateModelVisibleContent("Invalid parameters. Provide exactly one non-empty mode."),
+		content: truncateModelVisibleContent(
+			"Invalid parameters. Provide exactly one non-empty mode: single { agent, task }, parallel { tasks: [{ agent, task }] }, or chain { chain: [{ agent, task }] }.",
+		),
 		usage: emptyUsage(),
 	};
 }
@@ -149,7 +165,7 @@ export async function executeSubagentMode(input: ExecuteSubagentModeInput): Prom
 	const run = async (item: TaskRequest, index: number, step?: number): Promise<AgentRunResult> => {
 		const agent = input.agents.find((candidate) => candidate.name === item.agent);
 		if (!agent) {
-			const result = unknownAgentResult(item.agent, item.task, step, input.discoveryDiagnostics);
+			const result = unknownAgentResult(item.agent, item.task, step, input.agents, input.discoveryDiagnostics);
 			updates[index] = result;
 			emitUpdate();
 			return result;

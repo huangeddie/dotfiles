@@ -78,12 +78,6 @@ export function createNodeProcessRunner(
 					if (killTimer !== undefined) dependencies.clearTimeout(killTimer);
 					if (options.signal) options.signal.removeEventListener("abort", abort);
 				};
-				const settle = (outcome: ProcessOutcome) => {
-					if (settled) return;
-					settled = true;
-					clearAbort();
-					resolve(outcome);
-				};
 				const emitLines = (text: string, final = false) => {
 					stdoutBuffer += text;
 					const lines = stdoutBuffer.split("\n");
@@ -95,23 +89,34 @@ export function createNodeProcessRunner(
 					}
 				};
 
-				process.stdout.on("data", (data) => emitLines(stdoutDecoder.write(data)));
-				process.stderr.on("data", (data) => {
-					stderr += stderrDecoder.write(data);
-				});
-				process.on("error", (error) => {
-					settle({
-						exitCode: 1,
-						stderr: stderr + stderrDecoder.end(),
-						aborted: abortedBySignal,
-						spawnError: error.message,
-					});
-				});
-				process.on("close", (code) => {
+				let terminalFlushed = false;
+				const flushTerminalState = () => {
+					if (terminalFlushed) return;
+					terminalFlushed = true;
 					emitLines(stdoutDecoder.end(), true);
 					stderr += stderrDecoder.end();
-					settle({ exitCode: code ?? 1, stderr, aborted: abortedBySignal });
+				};
+				const settle = (exitCode: number, spawnError?: string) => {
+					if (settled) return;
+					flushTerminalState();
+					settled = true;
+					clearAbort();
+					resolve({
+						exitCode,
+						stderr,
+						aborted: abortedBySignal,
+						...(spawnError === undefined ? {} : { spawnError }),
+					});
+				};
+
+				process.stdout.on("data", (data) => {
+					if (!settled) emitLines(stdoutDecoder.write(data));
 				});
+				process.stderr.on("data", (data) => {
+					if (!settled) stderr += stderrDecoder.write(data);
+				});
+				process.on("error", (error) => settle(1, error.message));
+				process.on("close", (code) => settle(code ?? 1));
 
 				process.stdin.end(invocation.stdin);
 				if (options.signal) {

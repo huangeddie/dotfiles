@@ -64,15 +64,18 @@ export function parseAgentDefinition(
 		return diagnostic(null, `Agent definition at "${filePath}" requires frontmatter to be a mapping`);
 	}
 
-	const name = frontmatter.name;
-	const description = frontmatter.description;
+	const nameValue = frontmatter.name;
+	const descriptionValue = frontmatter.description;
 	const backendValue = frontmatter.backend;
 	const modelValue = frontmatter.model;
 	const toolsValue = frontmatter.tools;
 
-	if (typeof name !== "string" || !name) return diagnostic(null, 'requires a non-empty "name"');
-	if (typeof description !== "string" || !description) {
-		return diagnostic(name, `Agent "${name}" requires a non-empty "description"`);
+	const name = typeof nameValue === "string" ? nameValue.trim() : undefined;
+	if (!name) return diagnostic(null, `Agent definition at "${filePath}" requires a non-empty "name"`);
+
+	const description = typeof descriptionValue === "string" ? descriptionValue.trim() : undefined;
+	if (!description) {
+		return diagnostic(name, `Agent "${name}" at "${filePath}" requires a non-empty "description"`);
 	}
 	if (backendValue !== undefined && typeof backendValue !== "string") {
 		return diagnostic(name, `Agent "${name}" requires "backend" to be a string`);
