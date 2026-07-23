@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import type { ClaudeAgentConfig, PiAgentConfig } from "../dot_pi/agent/exact_extensions/subagent/agents.ts";
+import type { AgentDiagnostic, ClaudeAgentConfig, PiAgentConfig } from "../dot_pi/agent/exact_extensions/subagent/agents.ts";
 import type {
 	AgentRunRequest,
 	AgentRunResult,
@@ -34,6 +34,10 @@ const claudeAgent: ClaudeAgentConfig = {
 };
 
 const agents = [piAgent, claudeAgent];
+
+function discoveryDiagnostic(name: string, message: string): AgentDiagnostic {
+	return { name, filePath: `/agents/${name}.md`, message };
+}
 
 function usage(overrides: Partial<UsageStats> = {}): UsageStats {
 	return {
@@ -297,18 +301,16 @@ test("forwards the identical aborted signal to every started backend run", async
 	await executionPromise;
 });
 
-test("truncates ASCII and multibyte task output at a UTF-8 boundary", () => {
+test("truncates ASCII and multibyte task output at a UTF-8 boundary within the content cap", () => {
 	const ascii = `${"a".repeat(PER_TASK_OUTPUT_CAP)}x`;
 	const asciiTruncated = truncateTaskOutput(ascii);
-	expect(asciiTruncated).toBe(
-		`${"a".repeat(PER_TASK_OUTPUT_CAP)}\n\n[Output truncated: 1 bytes omitted. Full output preserved in tool details.]`,
-	);
+	expect(Buffer.byteLength(asciiTruncated, "utf8")).toBeLessThanOrEqual(PER_TASK_OUTPUT_CAP);
+	expect(asciiTruncated).toContain("[Output truncated:");
 
 	const multibyte = `${"a".repeat(PER_TASK_OUTPUT_CAP - 1)}€`;
 	const multibyteTruncated = truncateTaskOutput(multibyte);
-	expect(multibyteTruncated).toBe(
-		`${"a".repeat(PER_TASK_OUTPUT_CAP - 1)}\n\n[Output truncated: 3 bytes omitted. Full output preserved in tool details.]`,
-	);
+	expect(Buffer.byteLength(multibyteTruncated, "utf8")).toBeLessThanOrEqual(PER_TASK_OUTPUT_CAP);
+	expect(multibyteTruncated).toContain("[Output truncated:");
 	expect(multibyteTruncated).not.toContain("�");
 });
 
@@ -355,6 +357,63 @@ test("returns explicit failed results for unknown agents and missing backend ada
 		diagnostic: 'No backend adapter is configured for "claude".',
 	});
 	expect(pi.requests).toHaveLength(0);
+});
+
+test("attaches matching discovery diagnostics to an unknown-agent failure before formatting content", async () => {
+	const pi = new FakeBackend(async (request) => completed(request));
+	const definitionDiagnostic = 'Agent "missing-worker" with backend "claude" must not include the nested "Agent" tool';
+
+	const execution = await executeSubagentMode(
+		input(
+			{ agent: "missing-worker", task: "work" },
+			new Map([["pi", pi]]),
+			{ discoveryDiagnostics: [discoveryDiagnostic("missing-worker", definitionDiagnostic)] },
+		),
+	);
+
+	expect(execution.results[0].diagnostic).toBe(`Unknown agent: "missing-worker".\n${definitionDiagnostic}`);
+	expect(execution.content).toBe(`Unknown agent: "missing-worker".\n${definitionDiagnostic}`);
+	expect(pi.requests).toHaveLength(0);
+});
+
+test("does not enrich a successful sibling that quotes an unknown-agent diagnostic", async () => {
+	const unknownAgentDiagnostic = 'Unknown agent: "missing-worker".';
+	const definitionDiagnostic = 'Agent "missing-worker" with backend "claude" must not include the nested "Agent" tool';
+	const pi = new FakeBackend(async (request) => completed(request, `Quoted protocol text: ${unknownAgentDiagnostic}`));
+
+	const execution = await executeSubagentMode(
+		input(
+			{
+				tasks: [
+					{ agent: "gpt-worker", task: "quote" },
+					{ agent: "missing-worker", task: "work" },
+				],
+			},
+			new Map([["pi", pi]]),
+			{ discoveryDiagnostics: [discoveryDiagnostic("missing-worker", definitionDiagnostic)] },
+		),
+	);
+
+	expect(execution.results[0].output).toBe(`Quoted protocol text: ${unknownAgentDiagnostic}`);
+	expect(execution.content).toContain(`### [gpt-worker] completed\n\nQuoted protocol text: ${unknownAgentDiagnostic}`);
+	expect(execution.content).not.toContain(`Quoted protocol text: ${unknownAgentDiagnostic}\n${definitionDiagnostic}`);
+	expect(execution.results[1].diagnostic).toBe(`${unknownAgentDiagnostic}\n${definitionDiagnostic}`);
+});
+
+test("caps enriched unknown-agent content while retaining the full discovery diagnostic in results", async () => {
+	const diagnostic = `Agent "missing-worker" is invalid: ${"x".repeat(PER_TASK_OUTPUT_CAP)}`;
+	const execution = await executeSubagentMode(
+		input(
+			{ agent: "missing-worker", task: "work" },
+			new Map(),
+			{ discoveryDiagnostics: [discoveryDiagnostic("missing-worker", diagnostic)] },
+		),
+	);
+	const fullDiagnostic = `Unknown agent: "missing-worker".\n${diagnostic}`;
+
+	expect(Buffer.byteLength(execution.content, "utf8")).toBeLessThanOrEqual(PER_TASK_OUTPUT_CAP);
+	expect(execution.results[0].diagnostic).toBe(fullDiagnostic);
+	expect(Buffer.byteLength(execution.results[0].diagnostic!, "utf8")).toBeGreaterThan(PER_TASK_OUTPUT_CAP);
 });
 
 test("rejects ambiguous and incomplete modes without starting a backend", async () => {

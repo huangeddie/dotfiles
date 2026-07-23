@@ -1,4 +1,4 @@
-import type { AgentConfig } from "./agents.ts";
+import type { AgentConfig, AgentDiagnostic } from "./agents.ts";
 import { addUsage, emptyUsage, type AgentRunResult, type SubagentBackend, type UsageStats } from "./contracts.ts";
 
 export const MAX_PARALLEL_TASKS = 8;
@@ -17,6 +17,7 @@ export interface ExecuteSubagentModeInput {
 		chain?: TaskRequest[];
 	};
 	agents: AgentConfig[];
+	discoveryDiagnostics?: readonly AgentDiagnostic[];
 	backends: ReadonlyMap<"pi" | "claude", SubagentBackend>;
 	defaultCwd: string;
 	signal?: AbortSignal;
