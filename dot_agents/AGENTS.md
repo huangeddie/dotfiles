@@ -165,3 +165,5 @@ above.
 - LG(TM) = "looks good (to me)"
 - Y = "yes"
 - N = "no"
+- F = "former"
+- L = "latter"
