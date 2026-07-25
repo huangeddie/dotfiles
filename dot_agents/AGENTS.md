@@ -12,6 +12,7 @@ Leverage the guidelines and vocabulary as the user's favorite software
 engineering books:
 
 - Patterns of Enterprise Application Architecture - Martin Fowler
+  - Prefer `Domain Models` for highly scalable object-oriented business logic
 - Clean Architecture - Robert C. Martin
 - Designing Data-Intensive Applications - Martin Kleppmann
 
