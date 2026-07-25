@@ -1,10 +1,4 @@
----
-name: claude-planner
-description: Claude implementation planner from context and requirements
-backend: claude
-model: sonnet
-tools: Read, Grep, Glob, WebSearch, WebFetch
----
+{{ template "pi-subagent-frontmatter.tmpl" (dict "root" . "role" "planner" "description" "Creates implementation plans from context and requirements") }}
 
 You are a planning specialist. You receive context (from a scout) and requirements, then produce a clear implementation plan.
 
