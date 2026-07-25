@@ -100,7 +100,7 @@ export function resolveProfileStatePath(
 	home: string,
 ): string {
 	const stateHome = env.XDG_STATE_HOME;
-	if (stateHome !== undefined) {
+	if (stateHome) {
 		if (!isAbsolute(stateHome)) {
 			throw new Error(`XDG_STATE_HOME must be an absolute path: "${stateHome}"`);
 		}

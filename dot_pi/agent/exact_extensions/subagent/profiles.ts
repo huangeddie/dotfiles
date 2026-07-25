@@ -42,7 +42,7 @@ function fail(sourcePath: string, path: string, requirement: string): never {
 }
 
 function failSelection(selectionPath: string, requirement: string): never {
-	throw new ProfileConfigurationError(
+	throw new ProfileSelectionError(
 		`Subagent profile selection at "${selectionPath}": ${requirement}`,
 	);
 }

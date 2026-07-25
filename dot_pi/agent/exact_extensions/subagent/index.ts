@@ -33,11 +33,9 @@ import {
 	NodeProfileSelectionStore,
 	resolveProfileStatePath,
 } from "./profile-files.ts";
-import type { SubagentExecution } from "./orchestrator.ts";
 import { createNodeProcessRunner } from "./process-runner.ts";
 import {
 	executeWithRuntimeProfile,
-	formatRuntimeProfileError,
 	type RuntimeProfileLoader,
 } from "./runtime-profiles.ts";
 
@@ -239,38 +237,28 @@ export default function (pi: ExtensionAPI) {
 				}
 			}
 
-			let execution: SubagentExecution;
-			try {
-				execution = await executeWithRuntimeProfile(
-					{
-						params,
-						agents: discovery.agents,
-						discoveryDiagnostics: discovery.diagnostics,
-						backends,
-						defaultCwd: ctx.cwd,
-						signal,
-						...(onUpdate
-							? {
-								onUpdate(mode, results) {
-									const details = makeDetails(mode, results);
-									onUpdate({
-										content: [{ type: "text", text: "(running...)" }],
-										details,
-									});
-								},
-							}
-							: {}),
-					},
-					profileLoader,
-				);
-			} catch (error) {
-				const diagnostic = formatRuntimeProfileError(error);
-				return {
-					content: [{ type: "text", text: diagnostic }],
-					details: makeDetails(requestedMode, []),
-					isError: true,
-				};
-			}
+			const execution = await executeWithRuntimeProfile(
+				{
+					params,
+					agents: discovery.agents,
+					discoveryDiagnostics: discovery.diagnostics,
+					backends,
+					defaultCwd: ctx.cwd,
+					signal,
+					...(onUpdate
+						? {
+							onUpdate(mode, results) {
+								const details = makeDetails(mode, results);
+								onUpdate({
+									content: [{ type: "text", text: "(running...)" }],
+									details,
+								});
+							},
+						}
+						: {}),
+				},
+				profileLoader,
+			);
 			const details = makeDetails(execution.mode, execution.results);
 			const isError =
 				(execution.mode === "single" || execution.mode === "chain") &&

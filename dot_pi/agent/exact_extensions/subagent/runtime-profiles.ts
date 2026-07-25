@@ -1,6 +1,6 @@
 import type { AgentConfig } from "./agents.ts";
 import { executeSubagentMode, type ExecuteSubagentModeInput, type SubagentExecution } from "./orchestrator.ts";
-import type { ResolvedProfile } from "./profiles.ts";
+import { ProfileSelectionError, type ResolvedProfile } from "./profiles.ts";
 
 export interface RuntimeProfileLoader {
 	load(): Promise<ResolvedProfile>;
@@ -36,11 +36,20 @@ export async function executeWithRuntimeProfile(
 	input: ExecuteSubagentModeInput,
 	loader: RuntimeProfileLoader,
 ): Promise<SubagentExecution> {
-	const profile = await loader.load();
-	return executeSubagentMode({ ...input, agents: applyRuntimeProfile(input.agents, profile) });
+	let agents: AgentConfig[];
+	try {
+		const profile = await loader.load();
+		agents = applyRuntimeProfile(input.agents, profile);
+	} catch (error) {
+		throw new Error(formatRuntimeProfileError(error), { cause: error });
+	}
+	return executeSubagentMode({ ...input, agents });
 }
 
 export function formatRuntimeProfileError(error: unknown): string {
 	const message = error instanceof Error ? error.message : String(error);
-	return `Subagent profile resolution failed: ${message}`;
+	const diagnostic = `Subagent profile resolution failed: ${message}`;
+	return error instanceof ProfileSelectionError
+		? `${diagnostic}\nSelect a valid profile with: pi-subagents use <profile>`
+		: diagnostic;
 }
