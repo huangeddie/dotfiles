@@ -30,6 +30,8 @@ export interface ResolvedProfile {
 
 export class ProfileConfigurationError extends Error {}
 
+export class ProfileSelectionError extends ProfileConfigurationError {}
+
 const PROFILE_NAME = /^[A-Za-z0-9._-]+$/;
 const BACKENDS = ["pi", "claude"] as const;
 

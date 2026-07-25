@@ -169,4 +169,10 @@ describe("profile CLI paths", () => {
 		expect(resolveProfileStatePath({}, "/home/me")).toBe("/home/me/.local/state/pi/subagents-profile");
 		expect(() => resolveProfileStatePath({ XDG_STATE_HOME: "state" }, "/home/me")).toThrow("XDG_STATE_HOME must be an absolute path");
 	});
+
+	test("uses the default state directory when XDG_STATE_HOME is empty", () => {
+		expect(resolveProfileStatePath({ XDG_STATE_HOME: "" }, "/home/me")).toBe(
+			"/home/me/.local/state/pi/subagents-profile",
+		);
+	});
 });

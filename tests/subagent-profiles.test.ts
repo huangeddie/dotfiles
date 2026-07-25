@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
 	ProfileConfigurationError,
+	ProfileSelectionError,
 	parseProfileCatalog,
 	resolveProfile,
 } from "../dot_pi/agent/exact_extensions/subagent/profiles.ts";
@@ -187,12 +188,25 @@ describe("runtime subagent profile catalog", () => {
 		test(`rejects invalid selection ${JSON.stringify(content)}`, () => {
 			expect(() =>
 				resolveProfile(parse(), content, "/state/subagents-profile"),
-			).toThrow(ProfileConfigurationError);
+			).toThrow(ProfileSelectionError);
 			expect(() =>
 				resolveProfile(parse(), content, "/state/subagents-profile"),
 			).toThrow("/state/subagents-profile");
 		});
 	}
+
+	test("keeps catalog failures as generic profile configuration errors", () => {
+		const invalid = structuredClone(rawCatalog);
+		invalid.version = 2;
+
+		try {
+			parse(invalid);
+			throw new Error("expected catalog parsing to reject");
+		} catch (error) {
+			expect(error).toBeInstanceOf(ProfileConfigurationError);
+			expect(error).not.toBeInstanceOf(ProfileSelectionError);
+		}
+	});
 
 	test("defensively copies the catalog and resolves fresh role records and tools", () => {
 		const input = structuredClone(rawCatalog);

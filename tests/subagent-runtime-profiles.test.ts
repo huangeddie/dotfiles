@@ -1,9 +1,9 @@
 import { expect, test } from "bun:test";
 
-import type { AgentConfig, ClaudeAgentConfig, PiAgentConfig } from "../dot_pi/agent/exact_extensions/subagent/agents.ts";
+import type { AgentConfig } from "../dot_pi/agent/exact_extensions/subagent/agents.ts";
 import type { AgentRunRequest, AgentRunResult, SubagentBackend } from "../dot_pi/agent/exact_extensions/subagent/contracts.ts";
 import type { ExecuteSubagentModeInput } from "../dot_pi/agent/exact_extensions/subagent/orchestrator.ts";
-import type { ResolvedProfile } from "../dot_pi/agent/exact_extensions/subagent/profiles.ts";
+import { ProfileSelectionError, type ResolvedProfile } from "../dot_pi/agent/exact_extensions/subagent/profiles.ts";
 import {
 	applyRuntimeProfile,
 	executeWithRuntimeProfile,
@@ -221,29 +221,52 @@ test("keeps the first profile snapshot for every chain step", async () => {
 	]);
 });
 
-test("does not start a backend when profile resolution rejects", async () => {
+test("throws a formatted selection diagnostic before starting a backend", async () => {
 	const pi = new FakeBackend();
 	const claude = new FakeBackend();
+	const selectionError = new ProfileSelectionError(
+		'Subagent profile selection at "/state/pi/subagents-profile": references unknown profile "missing"',
+	);
 	const loader: RuntimeProfileLoader = {
 		async load() {
-			throw new Error("catalog diagnostic");
+			throw selectionError;
 		},
 	};
 
-	await expect(
-		executeWithRuntimeProfile(
+	let rejection: unknown;
+	try {
+		await executeWithRuntimeProfile(
 			executionInput(
 				{ agent: "scout", task: "inspect" },
 				[userAgent("scout", { backend: "pi", model: "stale", tools: ["stale"] })],
 				new Map([["pi", pi], ["claude", claude]]),
 			),
 			loader,
-		),
-	).rejects.toThrow("catalog diagnostic");
+		);
+	} catch (error) {
+		rejection = error;
+	}
+
+	expect(rejection).toBeInstanceOf(Error);
+	expect((rejection as Error).message).toBe(
+		'Subagent profile resolution failed: Subagent profile selection at "/state/pi/subagents-profile": references unknown profile "missing"\n' +
+			"Select a valid profile with: pi-subagents use <profile>",
+	);
+	expect((rejection as Error).cause).toBe(selectionError);
 	expect(pi.requests).toEqual([]);
 	expect(claude.requests).toEqual([]);
 });
 
-test("formats runtime profile resolution errors", () => {
-	expect(formatRuntimeProfileError(new Error("bad state"))).toBe("Subagent profile resolution failed: bad state");
+test("formats generic runtime profile errors without selection repair guidance", () => {
+	expect(formatRuntimeProfileError(new Error("bad catalog"))).toBe(
+		"Subagent profile resolution failed: bad catalog",
+	);
+});
+
+test("formats selection errors with exact repair guidance", () => {
+	const error = new ProfileSelectionError("bad selection");
+	expect(formatRuntimeProfileError(error)).toBe(
+		"Subagent profile resolution failed: bad selection\n" +
+			"Select a valid profile with: pi-subagents use <profile>",
+	);
 });
