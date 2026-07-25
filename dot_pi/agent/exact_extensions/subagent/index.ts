@@ -27,8 +27,19 @@ import { type AgentConfig, type AgentScope, discoverAgents } from "./agents.ts";
 import { createClaudeBackend } from "./claude-backend.ts";
 import type { AgentRunResult, SubagentDetails, UsageStats } from "./contracts.ts";
 import { createPiBackend } from "./pi-backend.ts";
+import {
+	loadResolvedProfile,
+	NodeProfileCatalogRepository,
+	NodeProfileSelectionStore,
+	resolveProfileStatePath,
+} from "./profile-files.ts";
+import type { SubagentExecution } from "./orchestrator.ts";
 import { createNodeProcessRunner } from "./process-runner.ts";
-import { executeSubagentMode } from "./orchestrator.ts";
+import {
+	executeWithRuntimeProfile,
+	formatRuntimeProfileError,
+	type RuntimeProfileLoader,
+} from "./runtime-profiles.ts";
 
 const COLLAPSED_ITEM_COUNT = 10;
 
@@ -167,6 +178,17 @@ export default function (pi: ExtensionAPI) {
 		["pi", createPiBackend(runner)],
 		["claude", createClaudeBackend(runner)],
 	] as const);
+	const catalogRepository = new NodeProfileCatalogRepository(
+		path.join(getAgentDir(), "subagent-profiles.json"),
+	);
+	const profileLoader: RuntimeProfileLoader = {
+		async load() {
+			const selectionStore = new NodeProfileSelectionStore(
+				resolveProfileStatePath(process.env, os.homedir()),
+			);
+			return loadResolvedProfile(catalogRepository, selectionStore);
+		},
+	};
 
 	pi.registerTool({
 		name: "subagent",
@@ -217,25 +239,38 @@ export default function (pi: ExtensionAPI) {
 				}
 			}
 
-			const execution = await executeSubagentMode({
-				params,
-				agents: discovery.agents,
-				discoveryDiagnostics: discovery.diagnostics,
-				backends,
-				defaultCwd: ctx.cwd,
-				signal,
-				...(onUpdate
-					? {
-							onUpdate(mode, results) {
-								const details = makeDetails(mode, results);
-								onUpdate({
-									content: [{ type: "text", text: "(running...)" }],
-									details,
-								});
-							},
-						}
-					: {}),
-			});
+			let execution: SubagentExecution;
+			try {
+				execution = await executeWithRuntimeProfile(
+					{
+						params,
+						agents: discovery.agents,
+						discoveryDiagnostics: discovery.diagnostics,
+						backends,
+						defaultCwd: ctx.cwd,
+						signal,
+						...(onUpdate
+							? {
+								onUpdate(mode, results) {
+									const details = makeDetails(mode, results);
+									onUpdate({
+										content: [{ type: "text", text: "(running...)" }],
+										details,
+									});
+								},
+							}
+							: {}),
+					},
+					profileLoader,
+				);
+			} catch (error) {
+				const diagnostic = formatRuntimeProfileError(error);
+				return {
+					content: [{ type: "text", text: diagnostic }],
+					details: makeDetails(requestedMode, []),
+					isError: true,
+				};
+			}
 			const details = makeDetails(execution.mode, execution.results);
 			const isError =
 				(execution.mode === "single" || execution.mode === "chain") &&
