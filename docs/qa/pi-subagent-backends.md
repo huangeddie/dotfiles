@@ -4,64 +4,74 @@
 
 ## Prerequisites
 
-- Apply the managed source state: `chezmoi apply ~/.pi/agent/extensions/subagent ~/.pi/agent/agents ~/.pi/agent/prompts`.
 - Authenticate both production CLIs: `pi` and `claude`.
 - Use a trusted, disposable repository. These checks invoke production models and may read or modify files according to the selected agent tools.
-- Start Pi from that repository after each configuration change.
+- Back up `.chezmoidata/pi/subagents.yaml`, then temporarily use this assignment matrix:
 
-Restore every temporary file created below, then rerun the `chezmoi apply` command above before considering this procedure complete.
+  ```yaml
+  assignments:
+    scout: claude-haiku-5
+    planner: gpt-5.6-terra
+    reviewer: claude-sonnet-5
+    worker: gpt-5.6-terra
+  ```
+
+- Apply the managed source state: `chezmoi apply ~/.pi/agent/agents ~/.pi/agent/prompts`.
+- Start Pi from the disposable repository and run `/reload` after applying configuration changes.
+
+Restore the original assignment data and every temporary deployed-file edit before considering this procedure complete.
 
 ## Checks
 
-1. **GPT scout read-only success**
+1. **Pi planner read-only success**
 
    In Pi, invoke:
 
    ```text
-   Use subagent with agent "gpt-scout" and task "Read the repository README and summarize its first heading. Do not modify files."
+   Use subagent with agent "planner" and task "Read and summarize README.md. Do not modify files."
    ```
 
-   Confirm it completes, uses only the configured Pi-native read-only tools, and the result header identifies `gpt-scout (user, pi)`.
+   Confirm it completes, uses only the configured Pi-native read-only tools, and the result header identifies `planner (user, pi)`.
 
 2. **Claude scout tool success**
 
    Invoke:
 
    ```text
-   Use subagent with agent "claude-scout" and task "Use Read or WebSearch to identify the repository's primary purpose. Return a two-sentence summary."
+   Use subagent with agent "scout" and task "Use Read or WebSearch to identify the repository's primary purpose. Return a two-sentence summary."
    ```
 
-   Confirm completion, a Claude `Read` or `WebSearch` event, and a `claude-scout (user, claude)` header.
+   Confirm completion, a Claude `Read` or `WebSearch` event, and a `scout (user, claude)` header.
 
 3. **Mixed parallel invocation**
 
    Invoke parallel tasks:
 
    ```text
-   gpt-scout: "Find the repository license. Do not modify files."
-   claude-scout: "Find the repository license. Do not modify files."
+   planner: "Find the repository license. Do not modify files."
+   scout: "Find the repository license. Do not modify files."
    ```
 
    Confirm both terminal results are retained in input order and are labeled with their respective `pi` and `claude` backends.
 
-4. **Claude-to-GPT chain**
+4. **Claude-to-Pi chain**
 
    Invoke the chain:
 
    ```text
-   claude-scout: "Read the README and return its key facts."
-   gpt-planner: "Create a three-step documentation plan from this context: {previous}"
+   scout: "Read the README and return its key facts."
+   planner: "Create a three-step documentation plan from this context: {previous}"
    ```
 
-   Confirm the planner receives the scout output, the final content is the GPT planner output, and each chain step has its backend label.
+   Confirm the planner receives the scout output, the final content is the Pi planner output, and each chain step has its backend label.
 
 5. **Claude cancellation**
 
-   Start a deliberately long `claude-scout` task, such as a broad repository analysis. Press Ctrl+C while it is running. Confirm the result is rendered as aborted and no subsequent chain step starts.
+   Start a deliberately long `scout` task, such as a broad repository analysis. Press Ctrl+C while it is running. Confirm the result is rendered as aborted and no subsequent chain step starts.
 
 6. **Deterministic no-fallback rejection for a forbidden Claude agent definition**
 
-   In the deployed `~/.pi/agent/agents/claude-scout.md`, temporarily change `tools` to `Read, Agent`. The `Agent` tool is forbidden by the Claude agent-definition contract, so discovery must reject the definition before any model process starts. Rerun the Claude scout invocation. Confirm the failed unknown-agent result includes the matching forbidden-`Agent` definition diagnostic and no Pi fallback or other backend process is invoked. Restore the managed source definition rather than preserving this deployed edit.
+   In the deployed `~/.pi/agent/agents/scout.md`, temporarily change `tools` to `Read, Agent`. The `Agent` tool is forbidden by the Claude agent-definition contract, so discovery must reject the definition before any model process starts. Rerun the Claude scout invocation. Confirm the failed unknown-agent result includes the matching forbidden-`Agent` definition diagnostic and no Pi fallback or other backend process is invoked. Restore the managed source definition rather than preserving this deployed edit.
 
 7. **Expanded rendering and nested usage**
 
@@ -69,8 +79,10 @@ Restore every temporary file created below, then rerun the `chezmoi apply` comma
 
 ## Cleanup
 
-Remove or revert all disposable-repository changes and any temporary deployed agent edits. Then restore the managed state:
+Restore the backed-up `.chezmoidata/pi/subagents.yaml`, remove or revert all disposable-repository changes, and discard any temporary deployed-agent edit. Then restore managed state:
 
 ```bash
-chezmoi apply ~/.pi/agent/extensions/subagent ~/.pi/agent/agents ~/.pi/agent/prompts
+chezmoi apply ~/.pi/agent/agents ~/.pi/agent/prompts
 ```
+
+Run `/reload` in an existing Pi session, or start a fresh session.
