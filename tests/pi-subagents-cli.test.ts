@@ -14,11 +14,13 @@ const usage = "Usage: pi-subagents [list | use <profile>]";
 
 class FakeSelectionStore implements ProfileSelectionStore {
 	readonly filePath = "/state/pi/subagents-profile";
+	reads = 0;
 	writes: string[] = [];
 
 	constructor(public content: string | undefined) {}
 
 	async read() {
+		this.reads++;
 		return this.content;
 	}
 
@@ -85,6 +87,7 @@ describe("pi-subagents CLI", () => {
 			},
 		});
 		expect(code).toBe(0);
+		expect(store.reads).toBe(0);
 		expect(store.writes).toEqual(["claude"]);
 		expect(output[0]).toBe("Active profile: claude");
 		expect(output).toContain("scout: claude/haiku tools=Read,Grep,Glob,Bash,WebSearch,WebFetch");
@@ -97,6 +100,7 @@ describe("pi-subagents CLI", () => {
 		expect(code).toBe(0);
 		expect(stdout).toEqual(["claude", "gpt (default)"]);
 		expect(stderr).toEqual([]);
+		expect(store.reads).toBe(0);
 		expect(store.writes).toEqual([]);
 	});
 
