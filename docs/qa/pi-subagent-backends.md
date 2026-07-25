@@ -6,86 +6,48 @@
 
 - Authenticate both production CLIs: `pi` and `claude`.
 - Use a trusted, disposable repository. These checks invoke production models and may read or modify files according to the selected agent tools.
-- Back up `.chezmoidata/pi/subagents.yaml`. In its existing `subagents.assignments` mapping, replace **only** these four assignment values; do not replace the whole file or alter the sibling `subagents.models` and `subagents.tools` mappings:
+- Record the profile active before QA so cleanup can restore it.
+- Confirm the deployed profile catalog and CLI:
 
-  ```yaml
-  subagents:
-    assignments:
-      scout: claude-haiku-5
-      planner: gpt-5.6-terra
-      reviewer: claude-sonnet-5
-      worker: gpt-5.6-terra
-
-    # Preserve the existing `models` and `tools` mappings below unchanged.
+  ```bash
+  pi-subagents list
+  pi-subagents
+  pi-subagents use claude
+  pi-subagents use gpt
   ```
 
-- Apply the managed source state: `chezmoi apply ~/.pi/agent/agents ~/.pi/agent/prompts`.
-- Start Pi from the disposable repository and run `/reload` after applying configuration changes.
-
-Restore the original assignment data and every temporary deployed-file edit before considering this procedure complete.
+> **Production model checks are manual.** Run them only with authenticated CLIs in a disposable repository; do not run them automatically.
 
 ## Checks
 
-1. **Pi planner read-only success**
-
-   In Pi, invoke:
+1. **Missing state defaults to GPT.** Remove only the runtime selection state file, run `pi-subagents`, and confirm it reports GPT as active. Invoke:
 
    ```text
    Use subagent with agent "planner" and task "Read and summarize README.md. Do not modify files."
    ```
 
-   Confirm it completes, uses only the configured Pi-native read-only tools, and the result header identifies `planner (user, pi)`.
+   Confirm the planner uses the GPT/Pi assignment.
 
-2. **Claude scout tool success**
-
-   Invoke:
+2. **Claude selection and worker tool event.** Run `pi-subagents use claude`, then confirm `pi-subagents` reports Claude as active. Invoke:
 
    ```text
    Use subagent with agent "scout" and task "Use Read or WebSearch to identify the repository's primary purpose. Return a two-sentence summary."
    ```
 
-   Confirm completion, a Claude `Read` or `WebSearch` event, and a `scout (user, claude)` header.
+   Confirm the scout uses Claude. Then invoke a worker task that requires a permitted tool and confirm a Claude worker tool event is rendered.
 
-3. **Mixed parallel invocation**
+3. **Profile snapshot is homogeneous for parallel and chain calls.** With one profile selected, invoke parallel scout and planner tasks and confirm every result uses that profile's backend. Invoke a scout-to-planner chain and confirm both steps use the same selected profile.
 
-   Invoke parallel tasks:
+4. **A switch during a long chain affects only the next invocation.** Start a deliberately long chain under one selected profile. While it runs, switch with `pi-subagents use gpt` or `pi-subagents use claude`. Confirm every step in the running chain keeps its original profile snapshot; the next subagent tool invocation uses the newly selected profile.
 
-   ```text
-   planner: "Find the repository license. Do not modify files."
-   scout: "Find the repository license. Do not modify files."
-   ```
+5. **Project-local shadowing remains direct.** In the disposable repository, create a project-local `scout` with direct front matter and invoke it with `agentScope: both`. Confirm it retains its own direct front matter. Confirm the global user `scout` remains runtime-profiled when the project-local shadow is absent.
 
-   Confirm both terminal results are retained in input order and are labeled with their respective `pi` and `claude` backends.
+6. **Corrupt state fails before a backend starts and CLI repair works.** Directly replace the runtime state token with an invalid value. Invoke any configured global role and confirm an actionable selection diagnostic appears before any Pi or Claude backend starts. Run `pi-subagents use gpt`, then confirm GPT selection is restored.
 
-4. **Claude-to-Pi chain**
+7. **Claude cancellation and expanded rendering.** Select Claude and start a deliberately long scout task. Press Ctrl+C and confirm it renders as aborted. Run a completed invocation, expand it with Ctrl+O, and confirm the expanded result exposes normalized tool events, final output, per-agent usage, and aggregate usage while collapsed rendering remains concise.
 
-   Invoke the chain:
-
-   ```text
-   scout: "Read the README and return its key facts."
-   planner: "Create a three-step documentation plan from this context: {previous}"
-   ```
-
-   Confirm the planner receives the scout output, the final content is the Pi planner output, and each chain step has its backend label.
-
-5. **Claude cancellation**
-
-   Start a deliberately long `scout` task, such as a broad repository analysis. Press Ctrl+C while it is running. Confirm the result is rendered as aborted and no subsequent chain step starts.
-
-6. **Deterministic no-fallback rejection for a forbidden Claude agent definition**
-
-   In the deployed `~/.pi/agent/agents/scout.md`, temporarily change `tools` to `Read, Agent`. The `Agent` tool is forbidden by the Claude agent-definition contract, so discovery must reject the definition before any model process starts. Rerun the Claude scout invocation. Confirm the failed unknown-agent result includes the matching forbidden-`Agent` definition diagnostic and no Pi fallback or other backend process is invoked. Restore the managed source definition rather than preserving this deployed edit.
-
-7. **Expanded rendering and nested usage**
-
-   Run a completed mixed invocation, expand its result with Ctrl+O, and inspect tool events, final output, per-agent usage, and aggregate usage in the nested session details. Confirm collapsed rendering remains concise and expanded rendering exposes the normalized events.
+8. **Cleanup restores prior state.** Restore the profile that was active before QA and remove all disposable project-agent files. Confirm `pi-subagents` reports the restored profile.
 
 ## Cleanup
 
-Restore the backed-up `.chezmoidata/pi/subagents.yaml`, remove or revert all disposable-repository changes, and discard any temporary deployed-agent edit. Then restore managed state:
-
-```bash
-chezmoi apply ~/.pi/agent/agents ~/.pi/agent/prompts
-```
-
-Run `/reload` in an existing Pi session, or start a fresh session.
+Restore the profile active before QA, remove or revert all disposable-repository changes (including project-local agent files), and confirm no production-model QA artifact remains. Do not add this manual procedure to automated hooks or CI.
