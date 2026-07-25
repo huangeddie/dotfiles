@@ -69,7 +69,7 @@ The catalog is an invocation-routing catalog, not a replacement for Pi's live pr
 
 ### Tool policies
 
-`tools` is keyed by role and backend because permissions depend on both responsibilities and backend-native tool names. A string is rendered as the front matter's comma-separated `tools` value. `null` means omit `tools` and use that backend's defaults. The subagent extension continues to exclude nested `subagent` execution from Pi children, and Claude definitions continue to reject the nested `Agent` tool.
+`tools` is keyed by role and backend because permissions depend on both responsibilities and backend-native tool names. A string is rendered as the front matter's comma-separated `tools` value. For the Pi backend, `null` means omit `tools` and use Pi's defaults. Claude definitions require an explicit non-empty tool allowlist, so a Claude `null` is invalid. The subagent extension continues to exclude nested `subagent` execution from Pi children, and Claude definitions continue to reject the nested `Agent` tool.
 
 ## Agent definition contract
 
@@ -143,7 +143,8 @@ Template rendering fails before deployment with an actionable diagnostic when:
 - an assignment references an unknown alias;
 - a model entry omits `backend` or `model`;
 - a model entry names a backend other than `pi` or `claude`;
-- a role has no tool-policy mapping for the resolved backend; or
+- a role has no tool-policy mapping for the resolved backend;
+- a Claude tool policy is `null`; or
 - a non-null tool policy is blank.
 
 There is no fallback to another model or backend. Runtime validation in `parseAgentDefinition` remains a second boundary against malformed rendered definitions.
