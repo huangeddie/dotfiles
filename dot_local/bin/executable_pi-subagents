@@ -1,0 +1,5 @@
+#!/usr/bin/env bun
+
+import { runNodeProfileCli } from "../../.pi/agent/extensions/subagent/profile-cli.ts";
+
+process.exitCode = await runNodeProfileCli(process.argv.slice(2));
