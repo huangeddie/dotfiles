@@ -1,9 +1,9 @@
 subagents:
   assignments:
-    scout: claude-haiku-5
-    planner: claude-sonnet-5
-    reviewer: claude-sonnet-5
-    worker: claude-sonnet-5
+    scout: gpt-5.6-luna
+    planner: gpt-5.6-terra
+    reviewer: gpt-5.6-terra
+    worker: gpt-5.6-terra
 
   models:
     gpt-5.6-luna:
