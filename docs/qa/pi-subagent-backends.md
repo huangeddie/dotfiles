@@ -6,14 +6,17 @@
 
 - Authenticate both production CLIs: `pi` and `claude`.
 - Use a trusted, disposable repository. These checks invoke production models and may read or modify files according to the selected agent tools.
-- Back up `.chezmoidata/pi/subagents.yaml`, then temporarily use this assignment matrix:
+- Back up `.chezmoidata/pi/subagents.yaml`. In its existing `subagents.assignments` mapping, replace **only** these four assignment values; do not replace the whole file or alter the sibling `subagents.models` and `subagents.tools` mappings:
 
   ```yaml
-  assignments:
-    scout: claude-haiku-5
-    planner: gpt-5.6-terra
-    reviewer: claude-sonnet-5
-    worker: gpt-5.6-terra
+  subagents:
+    assignments:
+      scout: claude-haiku-5
+      planner: gpt-5.6-terra
+      reviewer: claude-sonnet-5
+      worker: gpt-5.6-terra
+
+    # Preserve the existing `models` and `tools` mappings below unchanged.
   ```
 
 - Apply the managed source state: `chezmoi apply ~/.pi/agent/agents ~/.pi/agent/prompts`.

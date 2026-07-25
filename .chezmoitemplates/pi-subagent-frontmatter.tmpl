@@ -43,11 +43,12 @@
   {{- fail (printf "pi subagent role %q has no tool policy for backend %q" $role $backend) -}}
 {{- end -}}
 {{- $tools := index $roleTools $backend -}}
-{{- if and (eq $backend "claude") (eq $tools nil) -}}
-  {{- fail (printf "pi subagent role %q requires non-empty tools for backend %q" $role $backend) -}}
-{{- end -}}
-{{- if and (ne $tools nil) (or (not (kindIs "string" $tools)) (empty (trim $tools))) -}}
-  {{- fail (printf "pi subagent role %q requires non-empty tools for backend %q or explicit null" $role $backend) -}}
+{{- if eq $backend "claude" -}}
+  {{- if or (eq $tools nil) (not (kindIs "string" $tools)) (empty (trim $tools)) -}}
+    {{- fail (printf "pi subagent role %q requires tools to be a non-empty string for Claude backend" $role) -}}
+  {{- end -}}
+{{- else if and (ne $tools nil) (or (not (kindIs "string" $tools)) (empty (trim $tools))) -}}
+  {{- fail (printf "pi subagent role %q requires tools to be a non-empty string for Pi backend or explicit null" $role) -}}
 {{- end -}}
 ---
 name: {{ $role | quote }}
