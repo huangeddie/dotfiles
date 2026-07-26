@@ -36,30 +36,76 @@ mkdir -p "$fake_bin"
 cat >"$fake_bin/bun" <<'FAKE_BUN'
 #!/usr/bin/env bash
 set -euo pipefail
-printf '%s\n' "$@" >"$BUN_INVOCATION_LOG"
+
+case ":$PATH:" in
+  *":$BUN_INSTALL/bin:"*) ;;
+  *)
+    echo "Bun global bin directory is missing from PATH" >&2
+    exit 1
+    ;;
+esac
+
+case "${1:-}" in
+  -e)
+    printf '%s\n' is-number prettier
+    ;;
+  add)
+    printf 'add' >>"$BUN_INVOCATION_LOG"
+    shift
+    printf '\t%s' "$@" >>"$BUN_INVOCATION_LOG"
+    printf '\n' >>"$BUN_INVOCATION_LOG"
+    mkdir -p "$BUN_INSTALL/bin"
+    cat >"$BUN_INSTALL/bin/prettier" <<'PRETTIER'
+#!/usr/bin/env bash
+printf '%s\n' 3.9.6
+PRETTIER
+    chmod +x "$BUN_INSTALL/bin/prettier"
+    ;;
+  remove)
+    printf 'remove' >>"$BUN_INVOCATION_LOG"
+    shift
+    printf '\t%s' "$@" >>"$BUN_INVOCATION_LOG"
+    printf '\n' >>"$BUN_INVOCATION_LOG"
+    ;;
+  *)
+    printf 'unexpected bun command: %s\n' "$*" >&2
+    exit 1
+    ;;
+esac
 FAKE_BUN
 chmod +x "$fake_bin/bun"
 
-export BUN_INSTALL="$test_root/bun-home"
-export BUN_INVOCATION_LOG="$test_root/bun-invocation.log"
-PATH="$fake_bin:$PATH" HOME="$test_root/home" bash "$sync_script"
-
-cat >"$test_root/expected-package.json" <<'JSON'
-{
-  "dependencies": {
-    "prettier": "latest"
-  }
-}
+run_reconciliation_case() {
+  local rendered_script=$1
+  local case_root=$2
+  export BUN_INSTALL="$case_root/bun-home"
+  export BUN_INVOCATION_LOG="$case_root/bun-invocation.log"
+  mkdir -p "$BUN_INSTALL/install/global"
+  cat >"$BUN_INSTALL/install/global/package.json" <<'JSON'
+{"dependencies":{"is-number":"latest","prettier":"latest"}}
 JSON
+  PATH="$fake_bin:/usr/bin:/bin" HOME="$case_root/home" bash "$rendered_script"
+}
 
+run_reconciliation_case "$sync_script" "$test_root/declared-case"
+printf 'add\t--global\tprettier@latest\nremove\t--global\tis-number\n' \
+  >"$test_root/expected-declared-invocations.log"
 diff -u \
-  "$test_root/expected-package.json" \
-  "$BUN_INSTALL/install/global/package.json"
+  "$test_root/expected-declared-invocations.log" \
+  "$test_root/declared-case/bun-invocation.log"
+test -x "$test_root/declared-case/bun-home/bin/prettier"
+PATH="$test_root/declared-case/bun-home/bin:$PATH" prettier --version >/dev/null
 
-cat >"$test_root/expected-invocation.log" <<EOF
-install
---cwd
-$BUN_INSTALL/install/global
-EOF
-
-diff -u "$test_root/expected-invocation.log" "$BUN_INVOCATION_LOG"
+empty_sync_script="$test_root/empty-sync-bun-global-packages.sh"
+chezmoi --source "$source_dir" --override-data '{"packages":{"bun":{"global":[]}}}' \
+  execute-template \
+  -f "$source_dir/run_onchange_after_install-bun-global-packages.sh.tmpl" \
+  >"$empty_sync_script"
+bash -n "$empty_sync_script"
+run_reconciliation_case "$empty_sync_script" "$test_root/empty-case"
+printf 'remove\t--global\tis-number\tprettier\n' \
+  >"$test_root/expected-empty-invocations.log"
+diff -u \
+  "$test_root/expected-empty-invocations.log" \
+  "$test_root/empty-case/bun-invocation.log"
+test ! -e "$test_root/empty-case/bun-home/bin/prettier"

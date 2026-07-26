@@ -23,6 +23,11 @@ if grep -F 'is-number@' "$qa_root/installed.txt"; then
   echo "undeclared Bun package was not removed" >&2
   exit 1
 fi
+
+global_bin=$(BUN_INSTALL="$qa_root/bun-home" bun pm bin --global)
+test "$global_bin" = "$qa_root/bun-home/bin"
+PATH="$global_bin:$PATH" prettier --version
 ```
 
-Passing QA lists Prettier and does not list `is-number`.
+Passing QA lists Prettier, does not list `is-number`, and runs Prettier through
+Bun's global bin directory.
