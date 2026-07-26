@@ -104,6 +104,7 @@ packages:
       install:
         [
           "neovim",
+          "ripgrep",
           "golang-go",
           "fd-find",
           "fzf",
