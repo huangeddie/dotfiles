@@ -1,29 +1,77 @@
 #!/bin/bash
 set -euo pipefail
 
+bun_install=${BUN_INSTALL:-$HOME/.bun}
+export BUN_INSTALL="$bun_install"
+export PATH="$BUN_INSTALL/bin:$PATH"
+
 if ! command -v bun >/dev/null 2>&1; then
   echo "bun not found after OS package provisioning" >&2
   exit 1
 fi
 
-bun_install=${BUN_INSTALL:-$HOME/.bun}
-global_dir=$bun_install/install/global
-mkdir -p "$global_dir"
+desired_packages=(
+{{- range .packages.bun.global }}
+  {{ . | quote }}
+{{- end }}
+)
 
-manifest_tmp=$(mktemp "$global_dir/package.json.XXXXXX")
-trap 'rm -f "$manifest_tmp"' EXIT
-cat >"$manifest_tmp" <<'JSON'
-{
-  "dependencies": {
-{{- range $index, $package := .packages.bun.global }}
-{{- if $index }},
-{{- end }}
-    {{ $package | quote }}: "latest"
-{{- end }}
-  }
+is_desired_package() {
+  local candidate=$1
+  local package
+
+  if (( ${#desired_packages[@]} == 0 )); then
+    return 1
+  fi
+
+  for package in "${desired_packages[@]}"; do
+    if [[ "$candidate" == "$package" ]]; then
+      return 0
+    fi
+  done
+
+  return 1
 }
-JSON
-mv "$manifest_tmp" "$global_dir/package.json"
-trap - EXIT
 
-bun install --cwd "$global_dir"
+global_manifest=$BUN_INSTALL/install/global/package.json
+current_packages=()
+if [[ -f "$global_manifest" ]]; then
+  current_package_output=$(bun -e '
+    const { readFileSync } = require("node:fs");
+    const manifest = JSON.parse(readFileSync(process.argv[1], "utf8"));
+    const dependencies = manifest.dependencies ?? {};
+    if (dependencies === null || typeof dependencies !== "object" || Array.isArray(dependencies)) {
+      throw new Error("global package.json dependencies must be an object");
+    }
+    for (const name of Object.keys(dependencies).sort()) {
+      console.log(name);
+    }
+  ' "$global_manifest")
+
+  while IFS= read -r package; do
+    if [[ -n "$package" ]]; then
+      current_packages+=("$package")
+    fi
+  done <<<"$current_package_output"
+fi
+
+desired_specs=()
+if (( ${#desired_packages[@]} > 0 )); then
+  for package in "${desired_packages[@]}"; do
+    desired_specs+=("$package@latest")
+  done
+  bun add --global "${desired_specs[@]}"
+fi
+
+packages_to_remove=()
+if (( ${#current_packages[@]} > 0 )); then
+  for package in "${current_packages[@]}"; do
+    if ! is_desired_package "$package"; then
+      packages_to_remove+=("$package")
+    fi
+  done
+fi
+
+if (( ${#packages_to_remove[@]} > 0 )); then
+  bun remove --global "${packages_to_remove[@]}"
+fi
