@@ -2,19 +2,34 @@
 set -euo pipefail
 
 source_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-rendered_script=$(mktemp)
-trap 'rm -f "$rendered_script"' EXIT
+test_dir=$(mktemp -d)
+trap 'rm -rf "$test_dir"' EXIT
 
-chezmoi --source "$source_dir" execute-template \
+blocked_script="$test_dir/blocked.sh"
+chezmoi --source "$source_dir" \
+  --override-data '{"blocked_prefixes":["steam-installer"]}' \
+  execute-template \
   -f "$source_dir/run_onchange_before_linux-install-packages.sh.tmpl" \
-  >"$rendered_script"
+  >"$blocked_script"
 
-if ! grep -Fqx '  "steam-installer"' "$rendered_script"; then
-  echo "rendered apt install list omitted declared package steam-installer" >&2
+if grep -Fqx '  "steam-installer"' "$blocked_script"; then
+  echo "rendered apt install list included blocked package steam-installer" >&2
   exit 1
 fi
 
-if ! grep -Fqx '  "golang-go"' "$rendered_script"; then
+unblocked_script="$test_dir/unblocked.sh"
+chezmoi --source "$source_dir" \
+  --override-data '{"blocked_prefixes":[]}' \
+  execute-template \
+  -f "$source_dir/run_onchange_before_linux-install-packages.sh.tmpl" \
+  >"$unblocked_script"
+
+if ! grep -Fqx '  "steam-installer"' "$unblocked_script"; then
+  echo "rendered apt install list omitted unblocked package steam-installer" >&2
+  exit 1
+fi
+
+if ! grep -Fqx '  "golang-go"' "$unblocked_script"; then
   echo "rendered apt install list omitted unblocked package golang-go" >&2
   exit 1
 fi
