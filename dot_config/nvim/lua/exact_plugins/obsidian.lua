@@ -10,6 +10,10 @@ return {
 				name = "personal",
 				path = "~/Documents/Obsidian/main/",
 			},
+			{
+				name = "personal",
+				path = "~/Documents/Obsidian/",
+			},
 		},
 		templates = {
 			folder = "Templates/",
