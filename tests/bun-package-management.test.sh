@@ -14,7 +14,7 @@ import sys
 with open(sys.argv[1], encoding="utf-8") as stream:
     packages = json.load(stream)["packages"]
 
-assert packages["bun"]["global"] == ["prettier"]
+assert packages["bun"]["global"] == ["prettier", "@earendil-works/pi-coding-agent"]
 assert "bun" in packages["darwin"]["brews"]
 PY
 
@@ -88,7 +88,7 @@ JSON
 }
 
 run_reconciliation_case "$sync_script" "$test_root/declared-case"
-printf 'add\t--global\tprettier@latest\nremove\t--global\tis-number\n' \
+printf 'add\t--global\tprettier@latest\t@earendil-works/pi-coding-agent@latest\nremove\t--global\tis-number\n' \
   >"$test_root/expected-declared-invocations.log"
 diff -u \
   "$test_root/expected-declared-invocations.log" \

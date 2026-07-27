@@ -9,8 +9,8 @@ chezmoi --source "$source_dir" execute-template \
   -f "$source_dir/run_onchange_before_linux-install-packages.sh.tmpl" \
   >"$rendered_script"
 
-if grep -Fqx '  "steam-installer"' "$rendered_script"; then
-  echo "rendered apt install list included blocked package steam-installer" >&2
+if ! grep -Fqx '  "steam-installer"' "$rendered_script"; then
+  echo "rendered apt install list omitted declared package steam-installer" >&2
   exit 1
 fi
 
