@@ -26,3 +26,6 @@ key = "ctrl+alt+v"
 type = "pane"
 command = "vcsui"
 description = "run lazygit or jj UI"
+
+[advanced]
+scrollback_limit_bytes = 500000
