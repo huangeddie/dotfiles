@@ -17,6 +17,7 @@ packages:
     global:
       [
         "prettier",
+        "@earendil-works/pi-coding-agent",
       ]
   darwin:
     custom: []
