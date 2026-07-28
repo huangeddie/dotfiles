@@ -36,6 +36,15 @@ Note that we have agent-provider specific manifests like `dot_claude-plugin`
 within our config. This is ok because it doesn't compromise the content of our
 agnostic configs.
 
+## Package Management
+
+Our dotfiles also configures what packages to install / uninstall across
+different platforms: @.chezmoidata/packages.yaml
+
+To ensure stale packages are actively removed. Removed packages MUST be moved
+into the durable tombstone lists e.g. `packages.linux.apt.remove`. NEVER simply
+deleted it from the config file.
+
 ## Development Guidelines
 
 Despite whatever skills framework like `superpowers` may suggest, this project
