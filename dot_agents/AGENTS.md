@@ -174,3 +174,5 @@ above.
 - N = "no"
 - F = "former"
 - L = "latter"
+- SDD = "subagent-driven development"
+- IE = "inline execution"
