@@ -3,7 +3,7 @@
 set -euo pipefail
 
 apt_install_packages=(
-{{- $blocked_prefixes := .blocked_prefixes | default list -}}
+{{- $blocked_prefixes := get . "blocked_prefixes" | default list -}}
 {{- range .packages.linux.apt.install }}
   {{- $pkg := . -}}
   {{- $blocked := false -}}
