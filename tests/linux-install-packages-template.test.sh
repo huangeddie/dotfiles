@@ -5,6 +5,17 @@ source_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 test_dir=$(mktemp -d)
 trap 'rm -rf "$test_dir"' EXIT
 
+default_script="$test_dir/default.sh"
+chezmoi --source "$source_dir" \
+  execute-template \
+  -f "$source_dir/run_onchange_before_linux-install-packages.sh.tmpl" \
+  >"$default_script"
+
+if ! grep -Fqx '  "steam-installer"' "$default_script"; then
+  echo "rendered default apt install list omitted package steam-installer" >&2
+  exit 1
+fi
+
 blocked_script="$test_dir/blocked.sh"
 chezmoi --source "$source_dir" \
   --override-data '{"blocked_prefixes":["steam-installer"]}' \
