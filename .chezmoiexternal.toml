@@ -6,3 +6,8 @@
     stripComponents = 2
     include = ["*/skills/**"]
 
+[".agents/packages/devops/skills/herdr/SKILL.md"]
+    type = "file"
+    url = "https://raw.githubusercontent.com/herdrdev/herdr/master/skills/herdr/SKILL.md"
+    refreshPeriod = "168h"
+
