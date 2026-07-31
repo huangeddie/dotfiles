@@ -20,8 +20,8 @@ alias cl='claude'
 # OpenAI Codex
 alias co='codex'
 
-# Obsidian / Second Brain
-alias vault='cd ~/Documents/Obsidian/main/ && nvim'
+# Obsidian
+alias vault='cd ~/Documents/Obsidian/ && nvim'
 
 # Navigation
 alias la='ls -a'
