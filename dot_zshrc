@@ -2,3 +2,5 @@
 [ -f ~/.bashrc ] && . ~/.bashrc
 
 eval "$(zoxide init zsh)"
+
+bindkey -e
