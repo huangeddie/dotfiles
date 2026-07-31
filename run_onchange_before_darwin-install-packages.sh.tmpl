@@ -29,15 +29,34 @@ grant_tap_trust
 # installed that is not declared there.
 echo "==> Syncing Homebrew packages via brew bundle (strict)"
 brew bundle --file=/dev/stdin --cleanup --force <<EOF
+{{- $blocked_prefixes := get . "blocked_prefixes" | default list -}}
 {{ range .packages.darwin.taps -}}
 tap {{ . | quote }}
 {{ end -}}
 {{ range .packages.darwin.brews -}}
-brew {{ . | quote }}
-{{ end -}}
+  {{- $pkg := . -}}
+  {{- $blocked := false -}}
+  {{- range $blocked_prefixes }}
+    {{- if hasPrefix . $pkg }}
+      {{- $blocked = true -}}
+    {{- end }}
+  {{- end }}
+  {{- if not $blocked }}
+brew {{ $pkg | quote }}
+  {{- end }}
+{{- end -}}
 {{ range .packages.darwin.casks -}}
-cask {{ . | quote }}
-{{ end -}}
+  {{- $pkg := . -}}
+  {{- $blocked := false -}}
+  {{- range $blocked_prefixes }}
+    {{- if hasPrefix . $pkg }}
+      {{- $blocked = true -}}
+    {{- end }}
+  {{- end }}
+  {{- if not $blocked }}
+cask {{ $pkg | quote }}
+  {{- end }}
+{{- end -}}
 EOF
 
 grant_tap_trust
