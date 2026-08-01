@@ -86,6 +86,10 @@ packages:
         executable: herdr
         install: |-
           curl -fsSL https://herdr.dev/install.sh | sh
+      - name: tailscale
+        executable: tailscale
+        install: |-
+          curl -fsSL https://tailscale.com/install.sh | sh
       - name: bun
         executable: bun
         setup: |-

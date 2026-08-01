@@ -31,6 +31,11 @@ expected_linux_custom = [
         "install": "curl -fsSL https://herdr.dev/install.sh | sh",
     },
     {
+        "name": "tailscale",
+        "executable": "tailscale",
+        "install": "curl -fsSL https://tailscale.com/install.sh | sh",
+    },
+    {
         "name": "bun",
         "executable": "bun",
         "setup": 'export BUN_INSTALL="${BUN_INSTALL:-$HOME/.bun}"\n'
@@ -86,6 +91,7 @@ install_commands = [
     "curl -fsSL https://alexpasmantier.github.io/television/install.sh | bash",
     "curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh",
     "curl -fsSL https://herdr.dev/install.sh | sh",
+    "curl -fsSL https://tailscale.com/install.sh | sh",
     "curl -fsSL https://bun.com/install | bash",
 ]
 positions = [script.index(command) for command in install_commands]
