@@ -1,7 +1,7 @@
 # Declarative package manifest.
 #
 # On darwin this list is AUTHORITATIVE: `chezmoi apply` runs `brew bundle`
-# with --cleanup --force, so any Homebrew package NOT listed here is
+# with `install --force-cleanup`, so any Homebrew package NOT listed here is
 # uninstalled. Adding a package here installs it; removing it uninstalls it.
 # Dependencies of listed packages are retained automatically.
 #

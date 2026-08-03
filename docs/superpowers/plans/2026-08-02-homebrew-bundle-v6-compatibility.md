@@ -33,9 +33,11 @@
 
 - [ ] **Step 1: Add the failing process-boundary test**
 
-After rendering `default_script`, create a fake `brew` executable and execute the real rendered script:
+After rendering `default_script`, validate its syntax, create a fake `brew` executable, and execute the real rendered script:
 
 ```bash
+bash -n "$default_script"
+
 fake_bin="$test_dir/bin"
 mkdir -p "$fake_bin"
 cat >"$fake_bin/brew" <<'EOF'
@@ -68,8 +70,9 @@ if ! grep -Fqx 'bundle install --file=/dev/stdin --force-cleanup' "$brew_calls";
   exit 1
 fi
 
-if ! grep -Fqx 'tap "modem-dev/tap"' "$brewfile_input"; then
-  echo "rendered installer did not pass the declared tap through the Brewfile" >&2
+brewfile_first_line=$(head -n 1 "$brewfile_input")
+if [[ $brewfile_first_line != 'tap "modem-dev/tap"' ]]; then
+  echo "rendered installer did not begin the Brewfile with the declared tap" >&2
   exit 1
 fi
 ```

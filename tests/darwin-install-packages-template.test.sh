@@ -11,6 +11,7 @@ chezmoi --source "$source_dir" \
   execute-template \
   -f "$source_dir/run_onchange_before_darwin-install-packages.sh.tmpl" \
   >"$default_script"
+bash -n "$default_script"
 
 fake_bin="$test_dir/bin"
 mkdir -p "$fake_bin"
@@ -44,8 +45,9 @@ if ! grep -Fqx 'bundle install --file=/dev/stdin --force-cleanup' "$brew_calls";
   exit 1
 fi
 
-if ! grep -Fqx 'tap "modem-dev/tap"' "$brewfile_input"; then
-  echo "rendered installer did not pass the declared tap through the Brewfile" >&2
+brewfile_first_line=$(head -n 1 "$brewfile_input")
+if [[ $brewfile_first_line != 'tap "modem-dev/tap"' ]]; then
+  echo "rendered installer did not begin the Brewfile with the declared tap" >&2
   exit 1
 fi
 
