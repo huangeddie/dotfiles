@@ -8,3 +8,8 @@ Host minipc
     User eddie
     RequestTTY yes
     SetEnv TERM=xterm-256color
+Host ubuntu
+    HostName 100.119.103.30
+    User eddie
+    RequestTTY yes
+    SetEnv TERM=xterm-256color
