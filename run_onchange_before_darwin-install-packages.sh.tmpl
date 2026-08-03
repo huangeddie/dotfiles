@@ -14,8 +14,9 @@ fi
 export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 
 # Authorize third-party tap formulae. Called twice: before the bundle, which
-# cannot load them otherwise, and again after, because `brew bundle --cleanup`
-# prunes the allowlist and would leave interactive brew commands untrusted.
+# cannot load them otherwise, and again after, because
+# `brew bundle install --force-cleanup` prunes the allowlist and would leave
+# interactive brew commands untrusted.
 grant_tap_trust() {
 {{ range .packages.darwin.trusted_formulae -}}
   brew trust --formula {{ . | quote }} >/dev/null
@@ -25,11 +26,11 @@ grant_tap_trust() {
 
 grant_tap_trust
 
-# packages.yaml is authoritative: --cleanup --force uninstalls anything
+# packages.yaml is authoritative: --force-cleanup uninstalls anything
 # installed that is not declared there.
 echo "==> Syncing Homebrew packages via brew bundle (strict)"
-brew bundle --file=/dev/stdin --cleanup --force <<EOF
-{{- $blocked_prefixes := get . "blocked_prefixes" | default list -}}
+brew bundle install --file=/dev/stdin --force-cleanup <<EOF
+{{ $blocked_prefixes := get . "blocked_prefixes" | default list -}}
 {{ range .packages.darwin.taps -}}
 tap {{ . | quote }}
 {{ end -}}
@@ -56,7 +57,7 @@ brew {{ $pkg | quote }}
   {{- if not $blocked }}
 cask {{ $pkg | quote }}
   {{- end }}
-{{- end -}}
+{{- end }}
 EOF
 
 grant_tap_trust
