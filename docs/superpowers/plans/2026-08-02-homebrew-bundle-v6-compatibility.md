@@ -57,6 +57,12 @@ BREW_CALLS="$brew_calls" \
 BREWFILE_INPUT="$brewfile_input" \
   bash "$default_script"
 
+trust_call_count=$(grep -Fxc 'trust --formula modem-dev/tap/hunk' "$brew_calls" || true)
+if [[ $trust_call_count -ne 2 ]]; then
+  echo "rendered installer did not close the Brewfile heredoc before restoring tap trust" >&2
+  exit 1
+fi
+
 if ! grep -Fqx 'bundle install --file=/dev/stdin --force-cleanup' "$brew_calls"; then
   echo "rendered installer did not use the supported strict brew bundle invocation" >&2
   exit 1
@@ -76,7 +82,7 @@ Run:
 bash tests/darwin-install-packages-template.test.sh
 ```
 
-Expected: FAIL with `rendered installer did not use the supported strict brew bundle invocation`; the captured bundle call contains the erroneous positional argument `modem-dev/tap`.
+Expected: FAIL with `rendered installer did not close the Brewfile heredoc before restoring tap trust`; only the pre-bundle trust call executes because the malformed heredoc consumes the rest of the script. After fixing that assertion, the captured bundle call must also omit the erroneous positional argument `modem-dev/tap`.
 
 - [ ] **Step 3: Commit the contract**
 
@@ -104,6 +110,13 @@ Replace the legacy command and prevent leading Go-template trimming from consumi
 ```bash
 brew bundle install --file=/dev/stdin --force-cleanup <<EOF
 {{ $blocked_prefixes := get . "blocked_prefixes" | default list -}}
+```
+
+Preserve the newline before the closing delimiter by changing the final cask loop action to:
+
+```bash
+{{- end }}
+EOF
 ```
 
 Replace the associated comments with:

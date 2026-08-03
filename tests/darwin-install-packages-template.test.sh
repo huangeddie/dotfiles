@@ -12,6 +12,43 @@ chezmoi --source "$source_dir" \
   -f "$source_dir/run_onchange_before_darwin-install-packages.sh.tmpl" \
   >"$default_script"
 
+fake_bin="$test_dir/bin"
+mkdir -p "$fake_bin"
+cat >"$fake_bin/brew" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$*" >>"$BREW_CALLS"
+if [[ ${1-} == bundle ]]; then
+  cat >"$BREWFILE_INPUT"
+fi
+EOF
+chmod +x "$fake_bin/brew"
+
+brew_calls="$test_dir/brew-calls"
+brewfile_input="$test_dir/Brewfile"
+PATH="$fake_bin:$PATH" \
+HOME="$test_dir/home" \
+XDG_CONFIG_HOME="$test_dir/config" \
+BREW_CALLS="$brew_calls" \
+BREWFILE_INPUT="$brewfile_input" \
+  bash "$default_script"
+
+trust_call_count=$(grep -Fxc 'trust --formula modem-dev/tap/hunk' "$brew_calls" || true)
+if [[ $trust_call_count -ne 2 ]]; then
+  echo "rendered installer did not close the Brewfile heredoc before restoring tap trust" >&2
+  exit 1
+fi
+
+if ! grep -Fqx 'bundle install --file=/dev/stdin --force-cleanup' "$brew_calls"; then
+  echo "rendered installer did not use the supported strict brew bundle invocation" >&2
+  exit 1
+fi
+
+if ! grep -Fqx 'tap "modem-dev/tap"' "$brewfile_input"; then
+  echo "rendered installer did not pass the declared tap through the Brewfile" >&2
+  exit 1
+fi
+
 if ! grep -Fqx 'cask "codex"' "$default_script"; then
   echo "rendered default brew bundle list omitted declared cask codex" >&2
   exit 1
