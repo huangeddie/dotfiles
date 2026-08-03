@@ -110,6 +110,7 @@ packages:
           "gh",
           "git-delta",
           "curl",
+          "openssh-server",
           "nodejs",
           "npm",
           "btop",
