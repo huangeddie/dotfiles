@@ -170,6 +170,7 @@ above.
 
 - SG(TM) = "sounds good (to me)"
 - LG(TM) = "looks good (to me)"
+- WDYM = "what do you mean"
 - Y = "yes"
 - N = "no"
 - F = "former"

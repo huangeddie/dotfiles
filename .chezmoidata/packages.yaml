@@ -18,6 +18,7 @@ packages:
       [
         "prettier",
         "@earendil-works/pi-coding-agent",
+        "hunkdiff",
       ]
   darwin:
     custom: []
