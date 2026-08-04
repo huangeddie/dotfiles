@@ -50,7 +50,7 @@ if packages["linux"]["custom"] != expected_linux_custom:
     raise AssertionError(f'unexpected Linux custom installers: {packages["linux"]["custom"]!r}')
 PY
 
-shared_template_call='{{ template "install-custom-packages.sh.tmpl" .packages.%s.custom }}'
+shared_template_call='{{ template "install-custom-packages.sh.tmpl" (dict "custom" .packages.%s.custom "blocked_prefixes" $blocked_prefixes) }}'
 printf -v linux_template_call "$shared_template_call" linux
 printf -v darwin_template_call "$shared_template_call" darwin
 
@@ -226,3 +226,33 @@ assert_invalid \
   missing-install \
   'custom installer 0: install must not be empty' \
   '{{ template "install-custom-packages.sh.tmpl" (list (dict "name" "invalid" "executable" "invalid")) }}'
+
+blocked_test_template="$test_root/blocked.tmpl"
+cat >"$blocked_test_template" <<'TMPL'
+#!/usr/bin/env bash
+set -euo pipefail
+{{ template "install-custom-packages.sh.tmpl" (dict
+  "custom" (list
+    (dict "name" "tailscale" "executable" "tailscale" "install" "echo tailscale-install >>\"$INSTALL_LOG\"")
+    (dict "name" "allowed tool" "executable" "chezmoi-test-allowed-tool" "install" "echo allowed-install >>\"$INSTALL_LOG\"")
+  )
+  "blocked_prefixes" (list "tailscale")
+) }}
+TMPL
+blocked_test_script="$test_root/blocked.sh"
+chezmoi --source "$source_dir" execute-template \
+  -f "$blocked_test_template" >"$blocked_test_script"
+bash -n "$blocked_test_script"
+
+if grep -Fq 'echo tailscale-install' "$blocked_test_script"; then
+  echo "blocked custom installer was rendered" >&2
+  exit 1
+fi
+if ! grep -Fq '🚫 Skipping tailscale (blocked prefix)' "$blocked_test_script"; then
+  echo "missing skip notification for blocked custom installer" >&2
+  exit 1
+fi
+if ! grep -Fq 'echo allowed-install' "$blocked_test_script"; then
+  echo "allowed custom installer was not rendered" >&2
+  exit 1
+fi
