@@ -206,6 +206,6 @@ else
   sync_apt_packages
 fi
 
-{{ template "install-custom-packages.sh.tmpl" .packages.linux.custom }}
+{{ template "install-custom-packages.sh.tmpl" (dict "custom" .packages.linux.custom "blocked_prefixes" $blocked_prefixes) }}
 
 {{- end }}

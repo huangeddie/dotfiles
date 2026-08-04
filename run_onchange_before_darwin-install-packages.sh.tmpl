@@ -62,6 +62,6 @@ EOF
 
 grant_tap_trust
 
-{{ template "install-custom-packages.sh.tmpl" .packages.darwin.custom }}
+{{ template "install-custom-packages.sh.tmpl" (dict "custom" .packages.darwin.custom "blocked_prefixes" $blocked_prefixes) }}
 
 {{- end }}

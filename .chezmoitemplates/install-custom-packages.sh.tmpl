@@ -1,5 +1,11 @@
-{{- if not (kindIs "slice" .) }}{{ fail "custom installers: declaration must be a list" }}{{ end -}}
-{{- range $index, $installer := . }}
+{{- $installers := . -}}
+{{- $blockedPrefixes := list -}}
+{{- if kindIs "map" . -}}
+{{-   $installers = get . "custom" -}}
+{{-   $blockedPrefixes = get . "blocked_prefixes" | default list -}}
+{{- end -}}
+{{- if not (kindIs "slice" $installers) }}{{ fail "custom installers: declaration must be a list" }}{{ end -}}
+{{- range $index, $installer := $installers }}
 {{- if not (kindIs "map" $installer) }}{{ fail (printf "custom installer %d: entry must be a map" $index) }}{{ end -}}
 {{- $name := get $installer "name" -}}
 {{- $executable := get $installer "executable" -}}
@@ -15,7 +21,16 @@
 {{- if empty ($executable | trim) }}{{ fail (printf "custom installer %d: executable must not be empty" $index) }}{{ end -}}
 {{- if not (regexMatch "^[A-Za-z0-9_][A-Za-z0-9_.+:-]*$" $executable) }}{{ fail (printf "custom installer %d: executable must be a command name" $index) }}{{ end -}}
 {{- if empty ($install | trim) }}{{ fail (printf "custom installer %d: install must not be empty" $index) }}{{ end -}}
-{{- $quotedName := $name | replace "'" "'\"'\"'" }}
+{{- $quotedName := $name | replace "'" "'\"'\"'" -}}
+{{- $blocked := false -}}
+{{- range $prefix := $blockedPrefixes -}}
+{{-   if hasPrefix $prefix $name -}}
+{{-     $blocked = true -}}
+{{-   end -}}
+{{- end -}}
+{{- if $blocked }}
+echo '🚫 Skipping {{ $quotedName }} (blocked prefix)'
+{{- else }}
 {{ with $setup -}}
 {{ . }}
 {{ end -}}
@@ -23,5 +38,5 @@ if ! command -v '{{ $executable }}' >/dev/null 2>&1; then
   printf '🚀 Installing %s...\n' '{{ $quotedName }}'
 {{ $install | indent 2 }}
 fi
-
+{{- end }}
 {{- end }}
