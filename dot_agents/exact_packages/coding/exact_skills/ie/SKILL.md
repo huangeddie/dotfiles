@@ -1,8 +1,8 @@
 ---
 name: ie
-description: Approve of plan and do inline execution
+description: Do inline execution
 disable-model-invocation: true
 ---
 
-I hereby approve all remaining parts of the spec / plan. Once you finish with
-planning, implement with inline execution.
+Once you finish with planning and self-reviewing, implement with inline
+execution.
