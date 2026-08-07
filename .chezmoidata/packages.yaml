@@ -112,6 +112,7 @@ packages:
           "git-delta",
           "curl",
           "openssh-server",
+          "ffmpeg",
           "nodejs",
           "npm",
           "btop",
