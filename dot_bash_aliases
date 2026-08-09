@@ -1,5 +1,8 @@
-# NVIM
+# Editors
 alias n='nvim'
+
+# SSH
+alias sm='ssh main'
 
 # Version control
 alias g='git'
@@ -11,21 +14,18 @@ alias j='jj'
 alias ji='jjui'
 alias jd='jj diff'
 
-# Diff
+# Diff tools
 alias h='hunk'
 
-# Claude Code
+# Agent harnesses
 alias cl='claude'
-
-# OpenAI Codex
 alias co='codex'
 
 # Obsidian
 alias vault='cd ~/Documents/Obsidian/ && nvim'
 
-# Navigation
+# Files
 alias la='ls -a'
-[[ -d ~/Documents/GitHub/LearnLingo/ ]] && alias lingo='cd ~/Documents/GitHub/LearnLingo/'
 
 # Chezmoi
 alias cz='chezmoi'
