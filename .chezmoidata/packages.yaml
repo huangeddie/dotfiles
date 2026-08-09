@@ -57,6 +57,7 @@ packages:
         "mise",
         "modem-dev/tap/hunk",
         "neovim",
+        "node",
         "python",
         "rust-analyzer",
         "stylua",
