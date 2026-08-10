@@ -49,7 +49,7 @@ script_path, expected_install, expected_remove = sys.argv[1:]
 script = open(script_path, encoding="utf-8").read()
 
 def array(name):
-    match = re.search(rf"^{name}=\\(\\n(.*?)^\\)", script, re.MULTILINE | re.DOTALL)
+    match = re.search(rf"^{name}=\(\n(.*?)^\)", script, re.MULTILINE | re.DOTALL)
     if not match:
         raise AssertionError(f"missing {name} array")
     return [shlex.split(line)[0] for line in match.group(1).splitlines() if line.strip()]

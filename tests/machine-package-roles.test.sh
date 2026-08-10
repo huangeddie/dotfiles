@@ -39,9 +39,18 @@ assert_validation_failure missing-roles \
 assert_validation_failure empty-roles \
   '{"chezmoi":{"os":"linux"},"machineRoles":[]}' \
   'machineRoles must be a non-empty list of roles'
+assert_validation_failure scalar-roles \
+  '{"chezmoi":{"os":"linux"},"machineRoles":"base"}' \
+  'machineRoles must be a non-empty list of roles'
+assert_validation_failure non-string-role \
+  '{"chezmoi":{"os":"linux"},"machineRoles":["base",42]}' \
+  'machineRoles[1] must be a non-empty string'
 assert_validation_failure duplicate-role \
   '{"chezmoi":{"os":"linux"},"machineRoles":["base","base"]}' \
   'machineRoles contains duplicate role "base"'
+assert_validation_failure duplicate-non-base-role \
+  '{"chezmoi":{"os":"linux"},"machineRoles":["base","gaming","gaming"]}' \
+  'machineRoles contains duplicate role "gaming"'
 assert_validation_failure unknown-role \
   '{"chezmoi":{"os":"linux"},"machineRoles":["base","work"]}' \
   'machine role "work" is not supported on linux'
@@ -57,6 +66,9 @@ assert_validation_failure scalar-policy \
 assert_validation_failure empty-new-prefix \
   '{"machineRoles":["base"],"packagePolicy":{"deniedPrefixes":[""]}}' \
   'packagePolicy.deniedPrefixes[0] must be a non-empty string'
+assert_validation_failure non-string-new-prefix \
+  '{"machineRoles":["base"],"packagePolicy":{"deniedPrefixes":[42]}}' \
+  'packagePolicy.deniedPrefixes[0] must be a non-empty string'
 assert_validation_failure duplicate-new-prefix \
   '{"machineRoles":["base"],"packagePolicy":{"deniedPrefixes":["steam","steam"]}}' \
   'packagePolicy.deniedPrefixes contains duplicate prefix "steam"'
@@ -65,6 +77,9 @@ assert_validation_failure scalar-legacy-policy \
   'blocked_prefixes must be a list'
 assert_validation_failure empty-legacy-prefix \
   '{"machineRoles":["base"],"blocked_prefixes":[""]}' \
+  'blocked_prefixes[0] must be a non-empty string'
+assert_validation_failure non-string-legacy-prefix \
+  '{"machineRoles":["base"],"blocked_prefixes":[42]}' \
   'blocked_prefixes[0] must be a non-empty string'
 
 chezmoi --source "$source_dir" \
