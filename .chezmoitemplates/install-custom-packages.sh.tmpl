@@ -2,7 +2,11 @@
 {{- $deniedPrefixes := list -}}
 {{- if kindIs "map" . -}}
 {{-   $installers = get . "custom" -}}
-{{-   $deniedPrefixes = get . "denied_prefixes" | default list -}}
+{{-   $newDeniedPrefixes := get . "denied_prefixes" | default list -}}
+{{-   $legacyDeniedPrefixes := get . "blocked_prefixes" | default list -}}
+{{-   if not (kindIs "slice" $newDeniedPrefixes) }}{{ fail "custom installers: denied prefixes must be a list" }}{{ end -}}
+{{-   if not (kindIs "slice" $legacyDeniedPrefixes) }}{{ fail "custom installers: denied prefixes must be a list" }}{{ end -}}
+{{-   $deniedPrefixes = concat $newDeniedPrefixes $legacyDeniedPrefixes | uniq -}}
 {{- end -}}
 {{- if not (kindIs "slice" $installers) }}{{ fail "custom installers: declaration must be a list" }}{{ end -}}
 {{- if not (kindIs "slice" $deniedPrefixes) }}{{ fail "custom installers: denied prefixes must be a list" }}{{ end -}}
