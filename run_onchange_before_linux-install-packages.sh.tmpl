@@ -1,26 +1,70 @@
 {{- if eq .chezmoi.os "linux" -}}
+{{ template "validate-machine-package-data.tmpl" . }}
+{{- $root := . -}}
+{{- $aptRoles := $root.packages.linux.apt.roles -}}
+{{- $packagePolicy := get $root "packagePolicy" | default dict -}}
+{{- $newDenied := get $packagePolicy "deniedPrefixes" | default list -}}
+{{- $legacyDenied := get $root "blocked_prefixes" | default list -}}
+{{- $deniedPrefixes := concat $newDenied $legacyDenied | uniq -}}
+{{- $linuxRoles := get $root.machineRolePolicy.platforms "linux" -}}
+{{- if not (kindIs "map" $aptRoles) }}{{ fail "packages.linux.apt.roles must be a map" }}{{ end -}}
+{{- $aptRemove := $root.packages.linux.apt.remove -}}
+{{- if not (kindIs "slice" $aptRemove) }}{{ fail "packages.linux.apt.remove must be a list" }}{{ end -}}
+{{- $aptPackageOwners := dict -}}
+{{- range $role, $rolePackages := $aptRoles -}}
+  {{- if not (has $role $linuxRoles) }}{{ fail (printf "packages.linux.apt.roles contains unsupported linux role %q" $role) }}{{ end -}}
+  {{- if not (kindIs "slice" $rolePackages) }}{{ fail (printf "packages.linux.apt.roles.%s must be a list" $role) }}{{ end -}}
+  {{- $seenRolePackages := dict -}}
+  {{- range $index, $package := $rolePackages -}}
+    {{- if or (not (kindIs "string" $package)) (empty ($package | trim)) }}{{ fail (printf "packages.linux.apt.roles.%s[%d] must be a non-empty string" $role $index) }}{{ end -}}
+    {{- if hasKey $seenRolePackages $package }}{{ fail (printf "packages.linux.apt.roles.%s contains duplicate package %q" $role $package) }}{{ end -}}
+    {{- if hasKey $aptPackageOwners $package }}{{ fail (printf "apt package %q belongs to both roles %q and %q" $package (get $aptPackageOwners $package) $role) }}{{ end -}}
+    {{- $_ := set $seenRolePackages $package true -}}
+    {{- $_ := set $aptPackageOwners $package $role -}}
+  {{- end -}}
+{{- end -}}
+{{- $seenAptRemove := dict -}}
+{{- range $index, $package := $aptRemove -}}
+  {{- if or (not (kindIs "string" $package)) (empty ($package | trim)) }}{{ fail (printf "packages.linux.apt.remove[%d] must be a non-empty string" $index) }}{{ end -}}
+  {{- if hasKey $seenAptRemove $package }}{{ fail (printf "packages.linux.apt.remove contains duplicate package %q" $package) }}{{ end -}}
+  {{- if hasKey $aptPackageOwners $package }}{{ fail (printf "apt package %q cannot be both role-managed and a removal tombstone" $package) }}{{ end -}}
+  {{- $_ := set $seenAptRemove $package true -}}
+{{- end -}}
 #!/bin/bash
 set -euo pipefail
 
 apt_install_packages=(
-{{- $blocked_prefixes := get . "blocked_prefixes" | default list -}}
-{{- range .packages.linux.apt.install }}
-  {{- $pkg := . -}}
-  {{- $blocked := false -}}
-  {{- range $blocked_prefixes }}
-    {{- if hasPrefix . $pkg }}
-      {{- $blocked = true -}}
+{{- range $role := $root.machineRoles }}
+  {{- range $package := (get $aptRoles $role | default list) }}
+    {{- $denied := false -}}
+    {{- range $prefix := $deniedPrefixes }}
+      {{- if hasPrefix $prefix $package }}
+        {{- $denied = true -}}
+      {{- end }}
     {{- end }}
-  {{- end }}
-  {{- if not $blocked }}
-  {{ $pkg | quote }}
+    {{- if not $denied }}
+  {{ $package | quote }}
+    {{- end }}
   {{- end }}
 {{- end }}
 )
 
 apt_remove_packages=(
-{{- range .packages.linux.apt.remove }}
-  {{ . | quote }}
+{{- range $package := $aptRemove }}
+  {{ $package | quote }}
+{{- end }}
+{{- range $role, $rolePackages := $aptRoles }}
+  {{- range $package := $rolePackages }}
+    {{- $denied := false -}}
+    {{- range $prefix := $deniedPrefixes }}
+      {{- if hasPrefix $prefix $package }}
+        {{- $denied = true -}}
+      {{- end }}
+    {{- end }}
+    {{- if or (not (has $role $root.machineRoles)) $denied }}
+  {{ $package | quote }}
+    {{- end }}
+  {{- end }}
 {{- end }}
 )
 
@@ -124,7 +168,7 @@ assert_safe_removal_plan() {
   done
 
   if (( ${#unexpected[@]} > 0 )); then
-    echo "apt $operation simulation proposed removals outside apt.remove" >&2
+    echo "apt $operation simulation proposed removals outside the calculated purge set" >&2
     echo "allowed removals: ${*:-<none>}" >&2
     echo "planned removals: ${planned[*]}" >&2
     echo "unexpected removals: ${unexpected[*]}" >&2
@@ -206,6 +250,11 @@ else
   sync_apt_packages
 fi
 
-{{ template "install-custom-packages.sh.tmpl" (dict "custom" .packages.linux.custom "blocked_prefixes" $blocked_prefixes) }}
+{{- $selectedCustom := list -}}
+{{- range $role := $root.machineRoles -}}
+  {{- $roleCustom := get $root.packages.linux.custom.roles $role | default list -}}
+  {{- $selectedCustom = concat $selectedCustom $roleCustom -}}
+{{- end -}}
+{{ template "install-custom-packages.sh.tmpl" (dict "custom" $selectedCustom "denied_prefixes" $deniedPrefixes) }}
 
 {{- end }}

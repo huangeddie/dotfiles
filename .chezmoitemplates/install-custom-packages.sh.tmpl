@@ -1,10 +1,11 @@
 {{- $installers := . -}}
-{{- $blockedPrefixes := list -}}
+{{- $deniedPrefixes := list -}}
 {{- if kindIs "map" . -}}
 {{-   $installers = get . "custom" -}}
-{{-   $blockedPrefixes = get . "blocked_prefixes" | default list -}}
+{{-   $deniedPrefixes = get . "denied_prefixes" | default list -}}
 {{- end -}}
 {{- if not (kindIs "slice" $installers) }}{{ fail "custom installers: declaration must be a list" }}{{ end -}}
+{{- if not (kindIs "slice" $deniedPrefixes) }}{{ fail "custom installers: denied prefixes must be a list" }}{{ end -}}
 {{- range $index, $installer := $installers }}
 {{- if not (kindIs "map" $installer) }}{{ fail (printf "custom installer %d: entry must be a map" $index) }}{{ end -}}
 {{- $name := get $installer "name" -}}
@@ -22,14 +23,14 @@
 {{- if not (regexMatch "^[A-Za-z0-9_][A-Za-z0-9_.+:-]*$" $executable) }}{{ fail (printf "custom installer %d: executable must be a command name" $index) }}{{ end -}}
 {{- if empty ($install | trim) }}{{ fail (printf "custom installer %d: install must not be empty" $index) }}{{ end -}}
 {{- $quotedName := $name | replace "'" "'\"'\"'" -}}
-{{- $blocked := false -}}
-{{- range $prefix := $blockedPrefixes -}}
+{{- $denied := false -}}
+{{- range $prefix := $deniedPrefixes -}}
 {{-   if hasPrefix $prefix $name -}}
-{{-     $blocked = true -}}
+{{-     $denied = true -}}
 {{-   end -}}
 {{- end -}}
-{{- if $blocked }}
-echo '🚫 Skipping {{ $quotedName }} (blocked prefix)'
+{{- if $denied }}
+echo '🚫 Skipping {{ $quotedName }} (denied prefix)'
 {{- else }}
 {{ with $setup -}}
 {{ . }}
