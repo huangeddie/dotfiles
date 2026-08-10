@@ -1,5 +1,7 @@
-{{- $roles := get . "machineRoles" | default list -}}
-{{- if eq (len $roles) 0 -}}
+{{- $roles := list -}}
+{{- if hasKey . "machineRoles" -}}
+  {{- $roles = get . "machineRoles" -}}
+{{- else -}}
   {{- $roles = list "base" -}}
   {{- if eq .chezmoi.os "linux" -}}
     {{- if promptBool "Install gaming packages" -}}
@@ -7,9 +9,25 @@
     {{- end -}}
   {{- end -}}
 {{- end -}}
-{{- $packagePolicy := get . "packagePolicy" | default dict -}}
-{{- $newDenied := get $packagePolicy "deniedPrefixes" | default list -}}
-{{- $legacyDenied := get . "blocked_prefixes" | default list -}}
+{{- $validationRoot := deepCopy . -}}
+{{- $_ := set $validationRoot "machineRoles" $roles -}}
+{{- if not (hasKey $validationRoot "machineRolePolicy") -}}
+  {{- $sourceData := include ".chezmoidata/packages.yaml" | fromYaml -}}
+  {{- $_ = set $validationRoot "machineRolePolicy" (get $sourceData "machineRolePolicy") -}}
+{{- end -}}
+{{- includeTemplate "validate-machine-package-data.tmpl" $validationRoot -}}
+{{- $packagePolicy := dict -}}
+{{- if hasKey . "packagePolicy" -}}
+  {{- $packagePolicy = get . "packagePolicy" -}}
+{{- end -}}
+{{- $newDenied := list -}}
+{{- if hasKey $packagePolicy "deniedPrefixes" -}}
+  {{- $newDenied = get $packagePolicy "deniedPrefixes" -}}
+{{- end -}}
+{{- $legacyDenied := list -}}
+{{- if hasKey . "blocked_prefixes" -}}
+  {{- $legacyDenied = get . "blocked_prefixes" -}}
+{{- end -}}
 {{- $denied := concat $newDenied $legacyDenied | uniq -}}
 
 [data]

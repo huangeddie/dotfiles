@@ -62,11 +62,17 @@
   {{- end -}}
 {{- end -}}
 
-{{- $packagePolicy := get $root "packagePolicy" | default dict -}}
+{{- $packagePolicy := dict -}}
+{{- if hasKey $root "packagePolicy" -}}
+  {{- $packagePolicy = get $root "packagePolicy" -}}
+{{- end -}}
 {{- if not (kindIs "map" $packagePolicy) -}}
   {{- fail "packagePolicy must be a map" -}}
 {{- end -}}
-{{- $newDenied := get $packagePolicy "deniedPrefixes" | default list -}}
+{{- $newDenied := list -}}
+{{- if hasKey $packagePolicy "deniedPrefixes" -}}
+  {{- $newDenied = get $packagePolicy "deniedPrefixes" -}}
+{{- end -}}
 {{- if not (kindIs "slice" $newDenied) -}}
   {{- fail "packagePolicy.deniedPrefixes must be a list" -}}
 {{- end -}}
@@ -81,7 +87,10 @@
   {{- $_ := set $seenNewDenied $prefix true -}}
 {{- end -}}
 
-{{- $legacyDenied := get $root "blocked_prefixes" | default list -}}
+{{- $legacyDenied := list -}}
+{{- if hasKey $root "blocked_prefixes" -}}
+  {{- $legacyDenied = get $root "blocked_prefixes" -}}
+{{- end -}}
 {{- if not (kindIs "slice" $legacyDenied) -}}
   {{- fail "blocked_prefixes must be a list" -}}
 {{- end -}}
