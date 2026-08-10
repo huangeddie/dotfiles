@@ -242,3 +242,37 @@ if ! grep -Fq 'echo allowed-install' "$blocked_test_script"; then
   echo "allowed custom installer was not rendered" >&2
   exit 1
 fi
+
+legacy_map_template="$test_root/legacy-map.tmpl"
+cat >"$legacy_map_template" <<'TMPL'
+#!/usr/bin/env bash
+set -euo pipefail
+{{ template "install-custom-packages.sh.tmpl" (dict
+  "custom" (list
+    (dict "name" "new-denied" "executable" "chezmoi-test-new-denied" "install" "echo new-denied >>\"$INSTALL_LOG\"")
+    (dict "name" "legacy-denied" "executable" "chezmoi-test-legacy-denied" "install" "echo legacy-denied >>\"$INSTALL_LOG\"")
+    (dict "name" "shared-denied" "executable" "chezmoi-test-shared-denied" "install" "echo shared-denied >>\"$INSTALL_LOG\"")
+    (dict "name" "allowed" "executable" "chezmoi-test-allowed" "install" "echo allowed >>\"$INSTALL_LOG\"")
+  )
+  "denied_prefixes" (list "new-denied" "shared-denied")
+  "blocked_prefixes" (list "legacy-denied" "shared-denied")
+) }}
+TMPL
+legacy_map_script="$test_root/legacy-map.sh"
+chezmoi --source "$source_dir" execute-template \
+  -f "$legacy_map_template" >"$legacy_map_script"
+bash -n "$legacy_map_script"
+if grep -Fq 'echo new-denied' "$legacy_map_script" ||
+  grep -Fq 'echo legacy-denied' "$legacy_map_script" ||
+  grep -Fq 'echo shared-denied' "$legacy_map_script"; then
+  echo "custom installer map denial union rendered a denied installer" >&2
+  exit 1
+fi
+if [[ $(grep -Fxc "echo '🚫 Skipping shared-denied (denied prefix)'" "$legacy_map_script") -ne 1 ]]; then
+  echo "custom installer map denial union did not deduplicate legacy denial" >&2
+  exit 1
+fi
+if ! grep -Fq 'echo allowed' "$legacy_map_script"; then
+  echo "custom installer map denial union suppressed an allowed installer" >&2
+  exit 1
+fi
