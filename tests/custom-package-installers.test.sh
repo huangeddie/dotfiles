@@ -44,44 +44,22 @@ expected_linux_custom = [
     },
 ]
 
-if packages["darwin"]["custom"] != []:
-    raise AssertionError(f'unexpected Darwin custom installers: {packages["darwin"]["custom"]!r}')
-if packages["linux"]["custom"] != expected_linux_custom:
-    raise AssertionError(f'unexpected Linux custom installers: {packages["linux"]["custom"]!r}')
+assert packages["darwin"]["custom"]["roles"]["base"] == []
+assert packages["linux"]["custom"]["roles"]["base"] == expected_linux_custom
 PY
 
-shared_template_call='{{ template "install-custom-packages.sh.tmpl" (dict "custom" .packages.%s.custom "blocked_prefixes" $blocked_prefixes) }}'
-printf -v linux_template_call "$shared_template_call" linux
-printf -v darwin_template_call "$shared_template_call" darwin
-
-grep -Fq "$linux_template_call" \
-  "$source_dir/run_onchange_before_linux-install-packages.sh.tmpl" || {
-  echo "Linux package script does not render packages.linux.custom" >&2
-  exit 1
-}
-grep -Fq "$darwin_template_call" \
-  "$source_dir/run_onchange_before_darwin-install-packages.sh.tmpl" || {
-  echo "Darwin package script does not render packages.darwin.custom" >&2
-  exit 1
+render_linux() {
+  local name=$1
+  local override=$2
+  chezmoi --source "$source_dir" --override-data "$override" \
+    execute-template \
+    -f "$source_dir/run_onchange_before_linux-install-packages.sh.tmpl" \
+    >"$test_root/$name.sh"
+  bash -n "$test_root/$name.sh"
 }
 
-if grep -Fq 'https://alexpasmantier.github.io/television/install.sh' \
-  "$source_dir/run_onchange_before_linux-install-packages.sh.tmpl"; then
-  echo "Linux package script still contains inline custom installers" >&2
-  exit 1
-fi
-
-linux_template="$test_root/linux-custom-installers.tmpl"
-cat >"$linux_template" <<'TMPL'
-#!/usr/bin/env bash
-set -euo pipefail
-{{ template "install-custom-packages.sh.tmpl" .packages.linux.custom }}
-TMPL
-linux_script="$test_root/linux-custom-installers.sh"
-chezmoi --source "$source_dir" execute-template \
-  -f "$linux_template" >"$linux_script"
-bash -n "$linux_script"
-python3 - "$linux_script" <<'PY'
+render_linux base '{"machineRoles":["base"]}'
+python3 - "$test_root/base.sh" <<'PY'
 import sys
 
 with open(sys.argv[1], encoding="utf-8") as stream:
@@ -106,6 +84,18 @@ bun_setup_position = script.index('export PATH="$BUN_INSTALL/bin:$PATH"')
 if bun_check_position < 0 or bun_setup_position >= bun_check_position:
     raise AssertionError("Bun setup did not render before executable discovery")
 PY
+
+render_linux new-denial '{"machineRoles":["base"],"packagePolicy":{"deniedPrefixes":["tailscale"]}}'
+if grep -Fq 'curl -fsSL https://tailscale.com/install.sh | sh' "$test_root/new-denial.sh"; then
+  echo "new package-policy denial rendered a matching custom installer" >&2
+  exit 1
+fi
+
+render_linux legacy-denial '{"machineRoles":["base"],"blocked_prefixes":["tailscale"]}'
+if grep -Fq 'curl -fsSL https://tailscale.com/install.sh | sh' "$test_root/legacy-denial.sh"; then
+  echo "legacy package-policy denial rendered a matching custom installer" >&2
+  exit 1
+fi
 
 synthetic_template="$test_root/synthetic.tmpl"
 cat >"$synthetic_template" <<'TMPL'
@@ -236,7 +226,7 @@ set -euo pipefail
     (dict "name" "tailscale" "executable" "tailscale" "install" "echo tailscale-install >>\"$INSTALL_LOG\"")
     (dict "name" "allowed tool" "executable" "chezmoi-test-allowed-tool" "install" "echo allowed-install >>\"$INSTALL_LOG\"")
   )
-  "blocked_prefixes" (list "tailscale")
+  "denied_prefixes" (list "tailscale")
 ) }}
 TMPL
 blocked_test_script="$test_root/blocked.sh"
@@ -245,11 +235,7 @@ chezmoi --source "$source_dir" execute-template \
 bash -n "$blocked_test_script"
 
 if grep -Fq 'echo tailscale-install' "$blocked_test_script"; then
-  echo "blocked custom installer was rendered" >&2
-  exit 1
-fi
-if ! grep -Fq '🚫 Skipping tailscale (blocked prefix)' "$blocked_test_script"; then
-  echo "missing skip notification for blocked custom installer" >&2
+  echo "denied custom installer was rendered" >&2
   exit 1
 fi
 if ! grep -Fq 'echo allowed-install' "$blocked_test_script"; then

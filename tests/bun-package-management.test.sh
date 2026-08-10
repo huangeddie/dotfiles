@@ -5,6 +5,8 @@ source_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 test_root=$(mktemp -d)
 trap 'rm -rf "$test_root"' EXIT
 
+base_linux='{"machineRoles":["base"]}'
+
 schema_json="$test_root/schema.json"
 chezmoi --source "$source_dir" data --format json >"$schema_json"
 python3 - "$schema_json" <<'PY'
@@ -14,22 +16,33 @@ import sys
 with open(sys.argv[1], encoding="utf-8") as stream:
     packages = json.load(stream)["packages"]
 
-assert packages["bun"]["global"] == ["prettier", "@earendil-works/pi-coding-agent"]
-assert "bun" in packages["darwin"]["brews"]
+assert packages["bun"]["global"]["roles"]["base"] == [
+    "prettier",
+    "@earendil-works/pi-coding-agent",
+    "hunkdiff",
+]
+assert "bun" in packages["darwin"]["brews"]["roles"]["base"]
 PY
 
 linux_script="$test_root/linux-install-packages.sh"
-chezmoi --source "$source_dir" execute-template \
+chezmoi --source "$source_dir" --override-data "$base_linux" \
+  execute-template \
   -f "$source_dir/run_onchange_before_linux-install-packages.sh.tmpl" \
   >"$linux_script"
 grep -Fqx '  curl -fsSL https://bun.com/install | bash' "$linux_script"
 grep -Fqx 'export PATH="$BUN_INSTALL/bin:$PATH"' "$linux_script"
 
-sync_script="$test_root/sync-bun-global-packages.sh"
-chezmoi --source "$source_dir" execute-template \
-  -f "$source_dir/run_onchange_after_install-bun-global-packages.sh.tmpl" \
-  >"$sync_script"
-bash -n "$sync_script"
+render_bun() {
+  local name=$1
+  local override=$2
+  chezmoi --source "$source_dir" --override-data "$override" \
+    execute-template \
+    -f "$source_dir/run_onchange_after_install-bun-global-packages.sh.tmpl" \
+    >"$test_root/$name.sh"
+  bash -n "$test_root/$name.sh"
+}
+
+render_bun base "$base_linux"
 
 fake_bin="$test_root/fake-bin"
 mkdir -p "$fake_bin"
@@ -47,7 +60,7 @@ esac
 
 case "${1:-}" in
   -e)
-    printf '%s\n' is-number prettier
+    printf '%s\n' $BUN_CURRENT_PACKAGES
     ;;
   add)
     printf 'add' >>"$BUN_INVOCATION_LOG"
@@ -78,17 +91,20 @@ chmod +x "$fake_bin/bun"
 run_reconciliation_case() {
   local rendered_script=$1
   local case_root=$2
+  local current_packages=$3
   export BUN_INSTALL="$case_root/bun-home"
   export BUN_INVOCATION_LOG="$case_root/bun-invocation.log"
+  export BUN_CURRENT_PACKAGES="$current_packages"
   mkdir -p "$BUN_INSTALL/install/global"
   cat >"$BUN_INSTALL/install/global/package.json" <<'JSON'
-{"dependencies":{"is-number":"latest","prettier":"latest"}}
+{"dependencies":{"hunkdiff":"latest","is-number":"latest","prettier":"latest"}}
 JSON
   PATH="$fake_bin:/usr/bin:/bin" HOME="$case_root/home" bash "$rendered_script"
 }
 
-run_reconciliation_case "$sync_script" "$test_root/declared-case"
-printf 'add\t--global\tprettier@latest\t@earendil-works/pi-coding-agent@latest\nremove\t--global\tis-number\n' \
+run_reconciliation_case "$test_root/base.sh" "$test_root/declared-case" \
+  'is-number prettier'
+printf 'add\t--global\tprettier@latest\t@earendil-works/pi-coding-agent@latest\thunkdiff@latest\nremove\t--global\tis-number\n' \
   >"$test_root/expected-declared-invocations.log"
 diff -u \
   "$test_root/expected-declared-invocations.log" \
@@ -96,16 +112,11 @@ diff -u \
 test -x "$test_root/declared-case/bun-home/bin/prettier"
 PATH="$test_root/declared-case/bun-home/bin:$PATH" prettier --version >/dev/null
 
-empty_sync_script="$test_root/empty-sync-bun-global-packages.sh"
-chezmoi --source "$source_dir" --override-data '{"packages":{"bun":{"global":[]}}}' \
-  execute-template \
-  -f "$source_dir/run_onchange_after_install-bun-global-packages.sh.tmpl" \
-  >"$empty_sync_script"
-bash -n "$empty_sync_script"
-run_reconciliation_case "$empty_sync_script" "$test_root/empty-case"
-printf 'remove\t--global\tis-number\tprettier\n' \
-  >"$test_root/expected-empty-invocations.log"
+render_bun denied-hunkdiff '{"machineRoles":["base"],"packagePolicy":{"deniedPrefixes":["hunkdiff"]}}'
+run_reconciliation_case "$test_root/denied-hunkdiff.sh" "$test_root/denied-case" \
+  'hunkdiff is-number prettier'
+printf 'add\t--global\tprettier@latest\t@earendil-works/pi-coding-agent@latest\nremove\t--global\thunkdiff\tis-number\n' \
+  >"$test_root/expected-denied-invocations.log"
 diff -u \
-  "$test_root/expected-empty-invocations.log" \
-  "$test_root/empty-case/bun-invocation.log"
-test ! -e "$test_root/empty-case/bun-home/bin/prettier"
+  "$test_root/expected-denied-invocations.log" \
+  "$test_root/denied-case/bun-invocation.log"
