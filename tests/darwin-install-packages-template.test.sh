@@ -38,6 +38,48 @@ render_darwin() {
   bash -n "$test_dir/$name.sh"
 }
 
+assert_render_failure() {
+  local name=$1
+  local override=$2
+  local expected_error=$3
+
+  if chezmoi --source "$source_dir" --override-data "$override" \
+    execute-template \
+    -f "$source_dir/run_onchange_before_darwin-install-packages.sh.tmpl" \
+    >"$test_dir/$name.out" 2>"$test_dir/$name.err"; then
+    echo "Darwin renderer accepted invalid declaration: $name" >&2
+    exit 1
+  fi
+  grep -Fq "$expected_error" "$test_dir/$name.err"
+}
+
+assert_string_category_validation() {
+  local category=$1
+  local identifier=$2
+  local ownership_identifier=${3:-$identifier}
+
+  assert_render_failure \
+    "$category-unsupported-role" \
+    "{\"chezmoi\":{\"os\":\"darwin\"},\"machineRoles\":[\"base\"],\"packages\":{\"darwin\":{\"$category\":{\"roles\":{\"work\":[]}}}}}" \
+    "packages.darwin.$category.roles contains unsupported darwin role \"work\""
+  assert_render_failure \
+    "$category-non-list-role" \
+    "{\"chezmoi\":{\"os\":\"darwin\"},\"machineRoles\":[\"base\"],\"packages\":{\"darwin\":{\"$category\":{\"roles\":{\"base\":\"$identifier\"}}}}}" \
+    "packages.darwin.$category.roles.base must be a list"
+  assert_render_failure \
+    "$category-empty-identifier" \
+    "{\"chezmoi\":{\"os\":\"darwin\"},\"machineRoles\":[\"base\"],\"packages\":{\"darwin\":{\"$category\":{\"roles\":{\"base\":[\"\"]}}}}}" \
+    "packages.darwin.$category.roles.base[0] must be a non-empty string"
+  assert_render_failure \
+    "$category-duplicate-within-role" \
+    "{\"chezmoi\":{\"os\":\"darwin\"},\"machineRoles\":[\"base\"],\"packages\":{\"darwin\":{\"$category\":{\"roles\":{\"base\":[\"shared\",\"shared\"]}}}}}" \
+    "packages.darwin.$category.roles.base contains duplicate $identifier \"shared\""
+  assert_render_failure \
+    "$category-duplicate-ownership" \
+    "{\"chezmoi\":{\"os\":\"darwin\"},\"machineRoles\":[\"base\"],\"machineRolePolicy\":{\"platforms\":{\"darwin\":[\"base\",\"work\"]}},\"packages\":{\"darwin\":{\"$category\":{\"roles\":{\"base\":[\"shared\"],\"work\":[\"shared\"]}}}}}" \
+    "darwin $ownership_identifier \"shared\" belongs to both roles \"base\" and \"work\""
+}
+
 render_darwin base "$base_darwin"
 
 fake_bin="$test_dir/bin"
@@ -114,15 +156,76 @@ assert declarations == [
 ]
 PY
 
-if chezmoi --source "$source_dir" \
-  --override-data '{"chezmoi":{"os":"darwin"},"machineRoles":["base","gaming"]}' \
-  execute-template \
-  -f "$source_dir/run_onchange_before_darwin-install-packages.sh.tmpl" \
-  >"$test_dir/gaming.out" 2>"$test_dir/gaming.err"; then
-  echo "Darwin renderer accepted the unsupported gaming role" >&2
+assert_render_failure \
+  gaming-role \
+  '{"chezmoi":{"os":"darwin"},"machineRoles":["base","gaming"]}' \
+  'machine role "gaming" is not supported on darwin'
+
+assert_string_category_validation taps tap
+assert_string_category_validation trusted_formulae formula 'trusted formula'
+assert_string_category_validation brews brew
+assert_string_category_validation casks cask
+
+assert_render_failure \
+  custom-unsupported-role \
+  '{"chezmoi":{"os":"darwin"},"machineRoles":["base"],"packages":{"darwin":{"custom":{"roles":{"work":[]}}}}}' \
+  'packages.darwin.custom.roles contains unsupported darwin role "work"'
+assert_render_failure \
+  custom-non-list-role \
+  '{"chezmoi":{"os":"darwin"},"machineRoles":["base"],"packages":{"darwin":{"custom":{"roles":{"base":"synthetic-installer"}}}}}' \
+  'packages.darwin.custom.roles.base must be a list'
+assert_render_failure \
+  custom-malformed-record \
+  '{"chezmoi":{"os":"darwin"},"machineRoles":["base"],"packages":{"darwin":{"custom":{"roles":{"base":[{"name":"synthetic-installer","install":"true"}]}}}}}' \
+  'custom installer 0: executable must not be empty'
+assert_render_failure \
+  custom-duplicate-ownership \
+  '{"chezmoi":{"os":"darwin"},"machineRoles":["base"],"machineRolePolicy":{"platforms":{"darwin":["base","work"]}},"packages":{"darwin":{"custom":{"roles":{"base":[{"name":"shared","executable":"shared-base","install":"true"}],"work":[{"name":"shared","executable":"shared-work","install":"true"}]}}}}}' \
+  'darwin custom installer "shared" belongs to both roles "base" and "work"'
+
+render_darwin denied-tap '{"chezmoi":{"os":"darwin"},"machineRoles":["base"],"packagePolicy":{"deniedPrefixes":["modem-dev/tap"]}}'
+denied_tap_calls="$test_dir/denied-tap-calls"
+denied_tap_brewfile="$test_dir/denied-tap-Brewfile"
+PATH="$fake_bin:$PATH" \
+HOME="$test_dir/home" \
+XDG_CONFIG_HOME="$test_dir/config" \
+BREW_CALLS="$denied_tap_calls" \
+BREWFILE_INPUT="$denied_tap_brewfile" \
+  bash "$test_dir/denied-tap.sh"
+if grep -Fq 'trust --formula modem-dev/tap/hunk' "$denied_tap_calls"; then
+  echo "denied tap formula was still granted trust" >&2
   exit 1
 fi
-grep -Fq 'machine role "gaming" is not supported on darwin' "$test_dir/gaming.err"
+python3 - "$denied_tap_brewfile" <<'PY'
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as stream:
+    declarations = {line.rstrip("\n") for line in stream}
+
+for declaration in [
+    'tap "modem-dev/tap"',
+    'brew "modem-dev/tap/hunk"',
+]:
+    assert declaration not in declarations, declaration
+PY
+
+render_darwin custom-denial '{"chezmoi":{"os":"darwin"},"machineRoles":["base"],"packagePolicy":{"deniedPrefixes":["synthetic-installer"]},"packages":{"darwin":{"custom":{"roles":{"base":[{"name":"synthetic-installer","executable":"synthetic-installer","install":"printf custom-denial-marker > \\u0022$CUSTOM_EFFECT\\u0022"}]}}}}}'
+if grep -Fq 'custom-denial-marker' "$test_dir/custom-denial.sh"; then
+  echo "denied custom installer command remained in the rendered script" >&2
+  exit 1
+fi
+custom_effect="$test_dir/custom-effect"
+PATH="$fake_bin:$PATH" \
+HOME="$test_dir/home" \
+XDG_CONFIG_HOME="$test_dir/config" \
+BREW_CALLS="$test_dir/custom-denial-calls" \
+BREWFILE_INPUT="$test_dir/custom-denial-Brewfile" \
+CUSTOM_EFFECT="$custom_effect" \
+  bash "$test_dir/custom-denial.sh"
+if [[ -e $custom_effect ]]; then
+  echo "denied custom installer command executed" >&2
+  exit 1
+fi
 
 render_darwin new-denial '{"chezmoi":{"os":"darwin"},"machineRoles":["base"],"packagePolicy":{"deniedPrefixes":["git-delta","codex"]}}'
 if grep -Fqx 'brew "git-delta"' "$test_dir/new-denial.sh" ||
