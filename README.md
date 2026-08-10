@@ -40,13 +40,14 @@ agnostic configs.
 
 ### Machine roles
 
-Every machine must select `base`. Linux machines may also select `gaming`. Selecting `gaming` on macOS/Darwin fails validation.
+Every machine must select `base`. Linux machines may also select `gaming`.
+Selecting `gaming` on macOS/Darwin fails validation.
 
-| Machine | `machineRoles` |
-|---|---|
-| Ubuntu web host | `["base"]` |
+| Machine                               | `machineRoles`       |
+| ------------------------------------- | -------------------- |
+| Ubuntu web host                       | `["base"]`           |
 | Ubuntu development and gaming machine | `["base", "gaming"]` |
-| macOS machine | `["base"]` |
+| macOS machine                         | `["base"]`           |
 
 New direct installations ask about gaming during `chezmoi init`. To change an
 existing machine, run `chezmoi edit-config`, then inspect `chezmoi diff` before
@@ -75,11 +76,11 @@ can deny a package. New configuration must use `packagePolicy.deniedPrefixes`.
 
 ### Retired apt packages
 
-When a Linux apt package is retired from this repository, move it to the
-durable tombstone list, such as `packages.linux.apt.remove`, rather than simply
-deleting it from the package list. Tombstones tell the next apply to purge the
-retired package. Disabling a role is different: it removes only the packages
-managed exclusively by that inactive role and does not create a tombstone.
+When a Linux apt package is retired from this repository, move it to the durable
+tombstone list, such as `packages.linux.apt.remove`, rather than simply deleting
+it from the package list. Tombstones tell the next apply to purge the retired
+package. Disabling a role is different: it removes only the packages managed
+exclusively by that inactive role and does not create a tombstone.
 
 ### Internal work composition
 
@@ -102,9 +103,9 @@ Migrate an existing work repository in this safe order:
 3. Move the deny list to `[data.packagePolicy] deniedPrefixes`.
 4. Preview and apply normally.
 
-These steps may be committed atomically. The personal `.chezmoi.toml.tmpl`
-does not interfere with the work config: the work script uses `chezmoi apply`,
-while config templates run during `chezmoi init`.
+These steps may be committed atomically. The personal `.chezmoi.toml.tmpl` does
+not interfere with the work config: the work script uses `chezmoi apply`, while
+config templates run during `chezmoi init`.
 
 ### Verify and apply
 
