@@ -1,3 +1,30 @@
+{{ template "validate-machine-package-data.tmpl" . }}
+{{- $root := . -}}
+{{- $packagePolicy := get $root "packagePolicy" | default dict -}}
+{{- $newDenied := get $packagePolicy "deniedPrefixes" | default list -}}
+{{- $legacyDenied := get $root "blocked_prefixes" | default list -}}
+{{- $deniedPrefixes := concat $newDenied $legacyDenied | uniq -}}
+{{- $bunRoles := $root.packages.bun.global.roles -}}
+{{- if not (kindIs "map" $bunRoles) }}{{ fail "packages.bun.global.roles must be a map" }}{{ end -}}
+{{- $knownRoles := list -}}
+{{- range $_, $platformRoles := $root.machineRolePolicy.platforms -}}
+  {{- range $role := $platformRoles -}}
+    {{- $knownRoles = append $knownRoles $role -}}
+  {{- end -}}
+{{- end -}}
+{{- $bunPackageOwners := dict -}}
+{{- range $role, $rolePackages := $bunRoles -}}
+  {{- if not (has $role $knownRoles) }}{{ fail (printf "packages.bun.global.roles contains unknown role %q" $role) }}{{ end -}}
+  {{- if not (kindIs "slice" $rolePackages) }}{{ fail (printf "packages.bun.global.roles.%s must be a list" $role) }}{{ end -}}
+  {{- $seenRolePackages := dict -}}
+  {{- range $index, $package := $rolePackages -}}
+    {{- if or (not (kindIs "string" $package)) (empty ($package | trim)) }}{{ fail (printf "packages.bun.global.roles.%s[%d] must be a non-empty string" $role $index) }}{{ end -}}
+    {{- if hasKey $seenRolePackages $package }}{{ fail (printf "packages.bun.global.roles.%s contains duplicate package %q" $role $package) }}{{ end -}}
+    {{- if hasKey $bunPackageOwners $package }}{{ fail (printf "bun global package %q belongs to both roles %q and %q" $package (get $bunPackageOwners $package) $role) }}{{ end -}}
+    {{- $_ := set $seenRolePackages $package true -}}
+    {{- $_ := set $bunPackageOwners $package $role -}}
+  {{- end -}}
+{{- end -}}
 #!/bin/bash
 set -euo pipefail
 
@@ -11,8 +38,16 @@ if ! command -v bun >/dev/null 2>&1; then
 fi
 
 desired_packages=(
-{{- range .packages.bun.global }}
-  {{ . | quote }}
+{{- range $role := $root.machineRoles }}
+  {{- range $package := (get $bunRoles $role | default list) }}
+    {{- $denied := false -}}
+    {{- range $prefix := $deniedPrefixes }}
+      {{- if hasPrefix $prefix $package }}{{ $denied = true }}{{ end -}}
+    {{- end -}}
+    {{- if not $denied }}
+  {{ $package | quote }}
+    {{- end -}}
+  {{- end -}}
 {{- end }}
 )
 
