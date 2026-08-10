@@ -42,7 +42,41 @@ render_bun() {
   bash -n "$test_root/$name.sh"
 }
 
+assert_render_failure() {
+  local name=$1
+  local override=$2
+  local expected_error=$3
+
+  if chezmoi --source "$source_dir" --override-data "$override" \
+    execute-template \
+    -f "$source_dir/run_onchange_after_install-bun-global-packages.sh.tmpl" \
+    >"$test_root/$name.out" 2>"$test_root/$name.err"; then
+    echo "Bun renderer accepted invalid declaration: $name" >&2
+    exit 1
+  fi
+  grep -Fq "$expected_error" "$test_root/$name.err"
+}
+
 render_bun base "$base_linux"
+
+assert_render_failure unsupported-role \
+  '{"machineRoles":["base"],"packages":{"bun":{"global":{"roles":{"work":[]}}}}}' \
+  'packages.bun.global.roles contains unknown role "work"'
+assert_render_failure non-list-role \
+  '{"machineRoles":["base"],"packages":{"bun":{"global":{"roles":{"base":"prettier"}}}}}' \
+  'packages.bun.global.roles.base must be a list'
+assert_render_failure duplicate-within-role \
+  '{"machineRoles":["base"],"packages":{"bun":{"global":{"roles":{"base":["shared","shared"]}}}}}' \
+  'packages.bun.global.roles.base contains duplicate package "shared"'
+assert_render_failure duplicate-ownership \
+  '{"machineRoles":["base"],"machineRolePolicy":{"platforms":{"linux":["base","work"]}},"packages":{"bun":{"global":{"roles":{"base":["shared"],"work":["shared"]}}}}}' \
+  'bun global package "shared" belongs to both roles "base" and "work"'
+assert_render_failure empty-identifier \
+  '{"machineRoles":["base"],"packages":{"bun":{"global":{"roles":{"base":[""]}}}}}' \
+  'packages.bun.global.roles.base[0] must be a non-empty string'
+assert_render_failure whitespace-identifier \
+  '{"machineRoles":["base"],"packages":{"bun":{"global":{"roles":{"base":[" prettier "]}}}}}' \
+  'packages.bun.global.roles.base[0] must not have leading or trailing whitespace'
 
 fake_bin="$test_root/fake-bin"
 mkdir -p "$fake_bin"
@@ -120,3 +154,21 @@ printf 'add\t--global\tprettier@latest\t@earendil-works/pi-coding-agent@latest\n
 diff -u \
   "$test_root/expected-denied-invocations.log" \
   "$test_root/denied-case/bun-invocation.log"
+
+render_bun legacy-denied-hunkdiff '{"machineRoles":["base"],"blocked_prefixes":["hunkdiff"]}'
+run_reconciliation_case "$test_root/legacy-denied-hunkdiff.sh" "$test_root/legacy-denied-case" \
+  'hunkdiff is-number prettier'
+printf 'add\t--global\tprettier@latest\t@earendil-works/pi-coding-agent@latest\nremove\t--global\thunkdiff\tis-number\n' \
+  >"$test_root/expected-legacy-denied-invocations.log"
+diff -u \
+  "$test_root/expected-legacy-denied-invocations.log" \
+  "$test_root/legacy-denied-case/bun-invocation.log"
+
+render_bun combined-denials '{"machineRoles":["base"],"packagePolicy":{"deniedPrefixes":["prettier","hunkdiff"]},"blocked_prefixes":["hunkdiff","@earendil-works/pi"]}'
+run_reconciliation_case "$test_root/combined-denials.sh" "$test_root/combined-denial-case" \
+  'hunkdiff is-number prettier'
+printf 'remove\t--global\thunkdiff\tis-number\tprettier\n' \
+  >"$test_root/expected-combined-denial-invocations.log"
+diff -u \
+  "$test_root/expected-combined-denial-invocations.log" \
+  "$test_root/combined-denial-case/bun-invocation.log"
