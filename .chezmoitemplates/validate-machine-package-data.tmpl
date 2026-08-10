@@ -1,1 +1,97 @@
-{{ fail "machine package data validation is not implemented" }}
+{{- $root := . -}}
+{{- $rolePolicy := get $root "machineRolePolicy" -}}
+{{- if not (kindIs "map" $rolePolicy) -}}
+  {{- fail "machineRolePolicy must be a map" -}}
+{{- end -}}
+{{- $requiredRoles := get $rolePolicy "required" -}}
+{{- $platforms := get $rolePolicy "platforms" -}}
+{{- if not (kindIs "slice" $requiredRoles) -}}
+  {{- fail "machineRolePolicy.required must be a list" -}}
+{{- end -}}
+{{- if not (kindIs "map" $platforms) -}}
+  {{- fail "machineRolePolicy.platforms must be a map" -}}
+{{- end -}}
+{{- $machineRoles := get $root "machineRoles" -}}
+{{- if not (kindIs "slice" $machineRoles) -}}
+  {{- fail "machineRoles must be a non-empty list of roles" -}}
+{{- end -}}
+{{- if eq (len $machineRoles) 0 -}}
+  {{- fail "machineRoles must be a non-empty list of roles" -}}
+{{- end -}}
+{{- $platformRoles := get $platforms $root.chezmoi.os -}}
+{{- if not (kindIs "slice" $platformRoles) -}}
+  {{- fail (printf "package roles do not support operating system %q" $root.chezmoi.os) -}}
+{{- end -}}
+{{- $seenPlatformRoles := dict -}}
+{{- range $index, $role := $platformRoles -}}
+  {{- if or (not (kindIs "string" $role)) (empty ($role | trim)) -}}
+    {{- fail (printf "machineRolePolicy.platforms.%s[%d] must be a non-empty string" $root.chezmoi.os $index) -}}
+  {{- end -}}
+  {{- if hasKey $seenPlatformRoles $role -}}
+    {{- fail (printf "machineRolePolicy.platforms.%s contains duplicate role %q" $root.chezmoi.os $role) -}}
+  {{- end -}}
+  {{- $_ := set $seenPlatformRoles $role true -}}
+{{- end -}}
+{{- $seenRoles := dict -}}
+{{- range $index, $role := $machineRoles -}}
+  {{- if or (not (kindIs "string" $role)) (empty ($role | trim)) -}}
+    {{- fail (printf "machineRoles[%d] must be a non-empty string" $index) -}}
+  {{- end -}}
+  {{- if hasKey $seenRoles $role -}}
+    {{- fail (printf "machineRoles contains duplicate role %q" $role) -}}
+  {{- end -}}
+  {{- $_ := set $seenRoles $role true -}}
+  {{- if not (has $role $platformRoles) -}}
+    {{- fail (printf "machine role %q is not supported on %s; valid roles: %s" $role $root.chezmoi.os ($platformRoles | join ", ")) -}}
+  {{- end -}}
+{{- end -}}
+{{- $seenRequiredRoles := dict -}}
+{{- range $index, $requiredRole := $requiredRoles -}}
+  {{- if or (not (kindIs "string" $requiredRole)) (empty ($requiredRole | trim)) -}}
+    {{- fail (printf "machineRolePolicy.required[%d] must be a non-empty string" $index) -}}
+  {{- end -}}
+  {{- if hasKey $seenRequiredRoles $requiredRole -}}
+    {{- fail (printf "machineRolePolicy.required contains duplicate role %q" $requiredRole) -}}
+  {{- end -}}
+  {{- $_ := set $seenRequiredRoles $requiredRole true -}}
+  {{- if not (has $requiredRole $platformRoles) -}}
+    {{- fail (printf "required machine role %q is not supported on %s" $requiredRole $root.chezmoi.os) -}}
+  {{- end -}}
+  {{- if not (has $requiredRole $machineRoles) -}}
+    {{- fail (printf "machineRoles must include required role %q" $requiredRole) -}}
+  {{- end -}}
+{{- end -}}
+
+{{- $packagePolicy := get $root "packagePolicy" | default dict -}}
+{{- if not (kindIs "map" $packagePolicy) -}}
+  {{- fail "packagePolicy must be a map" -}}
+{{- end -}}
+{{- $newDenied := get $packagePolicy "deniedPrefixes" | default list -}}
+{{- if not (kindIs "slice" $newDenied) -}}
+  {{- fail "packagePolicy.deniedPrefixes must be a list" -}}
+{{- end -}}
+{{- $seenNewDenied := dict -}}
+{{- range $index, $prefix := $newDenied -}}
+  {{- if or (not (kindIs "string" $prefix)) (empty ($prefix | trim)) -}}
+    {{- fail (printf "packagePolicy.deniedPrefixes[%d] must be a non-empty string" $index) -}}
+  {{- end -}}
+  {{- if hasKey $seenNewDenied $prefix -}}
+    {{- fail (printf "packagePolicy.deniedPrefixes contains duplicate prefix %q" $prefix) -}}
+  {{- end -}}
+  {{- $_ := set $seenNewDenied $prefix true -}}
+{{- end -}}
+
+{{- $legacyDenied := get $root "blocked_prefixes" | default list -}}
+{{- if not (kindIs "slice" $legacyDenied) -}}
+  {{- fail "blocked_prefixes must be a list" -}}
+{{- end -}}
+{{- $seenLegacyDenied := dict -}}
+{{- range $index, $prefix := $legacyDenied -}}
+  {{- if or (not (kindIs "string" $prefix)) (empty ($prefix | trim)) -}}
+    {{- fail (printf "blocked_prefixes[%d] must be a non-empty string" $index) -}}
+  {{- end -}}
+  {{- if hasKey $seenLegacyDenied $prefix -}}
+    {{- fail (printf "blocked_prefixes contains duplicate prefix %q" $prefix) -}}
+  {{- end -}}
+  {{- $_ := set $seenLegacyDenied $prefix true -}}
+{{- end -}}

@@ -1,1 +1,23 @@
-{{ fail "machine role config generation is not implemented" }}
+{{- $roles := get . "machineRoles" | default list -}}
+{{- if eq (len $roles) 0 -}}
+  {{- $roles = list "base" -}}
+  {{- if eq .chezmoi.os "linux" -}}
+    {{- if promptBool "Install gaming packages" -}}
+      {{- $roles = append $roles "gaming" -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- $packagePolicy := get . "packagePolicy" | default dict -}}
+{{- $newDenied := get $packagePolicy "deniedPrefixes" | default list -}}
+{{- $legacyDenied := get . "blocked_prefixes" | default list -}}
+{{- $denied := concat $newDenied $legacyDenied | uniq -}}
+
+[data]
+machineRoles = [
+{{ range $roles }}  {{ . | quote }},
+{{ end }}]
+
+[data.packagePolicy]
+deniedPrefixes = [
+{{ range $denied }}  {{ . | quote }},
+{{ end }}]
