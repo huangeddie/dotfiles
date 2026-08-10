@@ -69,8 +69,8 @@ assert_render_failure duplicate-within-role \
   '{"machineRoles":["base"],"packages":{"bun":{"global":{"roles":{"base":["shared","shared"]}}}}}' \
   'packages.bun.global.roles.base contains duplicate package "shared"'
 assert_render_failure duplicate-ownership \
-  '{"machineRoles":["base"],"machineRolePolicy":{"platforms":{"linux":["base","work"]}},"packages":{"bun":{"global":{"roles":{"base":["shared"],"work":["shared"]}}}}}' \
-  'bun global package "shared" belongs to both roles "base" and "work"'
+  '{"machineRoles":["base"],"packages":{"bun":{"global":{"roles":{"base":["shared"],"gaming":["shared"]}}}}}' \
+  'bun global package "shared" belongs to both roles "base" and "gaming"'
 assert_render_failure empty-identifier \
   '{"machineRoles":["base"],"packages":{"bun":{"global":{"roles":{"base":[""]}}}}}' \
   'packages.bun.global.roles.base[0] must be a non-empty string'

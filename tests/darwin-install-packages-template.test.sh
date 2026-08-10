@@ -56,7 +56,6 @@ assert_render_failure() {
 assert_string_category_validation() {
   local category=$1
   local identifier=$2
-  local ownership_identifier=${3:-$identifier}
 
   assert_render_failure \
     "$category-unsupported-role" \
@@ -74,10 +73,6 @@ assert_string_category_validation() {
     "$category-duplicate-within-role" \
     "{\"chezmoi\":{\"os\":\"darwin\"},\"machineRoles\":[\"base\"],\"packages\":{\"darwin\":{\"$category\":{\"roles\":{\"base\":[\"shared\",\"shared\"]}}}}}" \
     "packages.darwin.$category.roles.base contains duplicate $identifier \"shared\""
-  assert_render_failure \
-    "$category-duplicate-ownership" \
-    "{\"chezmoi\":{\"os\":\"darwin\"},\"machineRoles\":[\"base\"],\"machineRolePolicy\":{\"platforms\":{\"darwin\":[\"base\",\"work\"]}},\"packages\":{\"darwin\":{\"$category\":{\"roles\":{\"base\":[\"shared\"],\"work\":[\"shared\"]}}}}}" \
-    "darwin $ownership_identifier \"shared\" belongs to both roles \"base\" and \"work\""
 }
 
 render_darwin base "$base_darwin"
@@ -162,7 +157,7 @@ assert_render_failure \
   'machine role "gaming" is not supported on darwin'
 
 assert_string_category_validation taps tap
-assert_string_category_validation trusted_formulae formula 'trusted formula'
+assert_string_category_validation trusted_formulae formula
 assert_string_category_validation brews brew
 assert_string_category_validation casks cask
 
@@ -186,10 +181,6 @@ assert_render_failure \
   custom-duplicate-within-role \
   '{"chezmoi":{"os":"darwin"},"machineRoles":["base"],"packages":{"darwin":{"custom":{"roles":{"base":[{"name":"shared","executable":"shared-one","install":"true"},{"name":"shared","executable":"shared-two","install":"true"}]}}}}}' \
   'packages.darwin.custom.roles.base contains duplicate installer "shared"'
-assert_render_failure \
-  custom-duplicate-ownership \
-  '{"chezmoi":{"os":"darwin"},"machineRoles":["base"],"machineRolePolicy":{"platforms":{"darwin":["base","work"]}},"packages":{"darwin":{"custom":{"roles":{"base":[{"name":"shared","executable":"shared-base","install":"true"}],"work":[{"name":"shared","executable":"shared-work","install":"true"}]}}}}}' \
-  'darwin custom installer "shared" belongs to both roles "base" and "work"'
 
 render_darwin denied-tap '{"chezmoi":{"os":"darwin"},"machineRoles":["base"],"packagePolicy":{"deniedPrefixes":["modem-dev/tap"]}}'
 denied_tap_calls="$test_dir/denied-tap-calls"

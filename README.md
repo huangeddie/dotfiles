@@ -111,7 +111,10 @@ while config templates run during `chezmoi init`.
 Run the tests and inspect the selected package data and pending changes:
 
 ```bash
+# One-time deterministic TypeScript test dependency installation.
+bun install --cwd tests --frozen-lockfile
 for test_file in tests/*.test.sh; do bash "$test_file"; done
+bun test tests/*.test.ts
 chezmoi data | jq '{machineRoles, packagePolicy}'
 chezmoi diff
 ```

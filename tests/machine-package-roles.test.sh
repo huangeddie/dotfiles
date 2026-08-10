@@ -73,6 +73,30 @@ assert_validation_failure missing-base \
 assert_validation_failure darwin-gaming \
   '{"chezmoi":{"os":"darwin"},"machineRoles":["base","gaming"]}' \
   'machine role "gaming" is not supported on darwin'
+assert_validation_failure empty-required-role-policy \
+  '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"machineRolePolicy":{"required":[]}}' \
+  'machineRolePolicy.required must exactly equal ["base"]'
+assert_validation_failure changed-required-role-policy \
+  '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"machineRolePolicy":{"required":["gaming"]}}' \
+  'machineRolePolicy.required must exactly equal ["base"]'
+assert_validation_failure malformed-required-role-policy \
+  '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"machineRolePolicy":{"required":"base"}}' \
+  'machineRolePolicy.required must be a list'
+assert_validation_failure darwin-gaming-policy \
+  '{"chezmoi":{"os":"darwin"},"machineRoles":["base"],"machineRolePolicy":{"platforms":{"darwin":["base","gaming"]}}}' \
+  'machineRolePolicy.platforms.darwin must exactly equal ["base"]'
+assert_validation_failure linux-gaming-removed-policy \
+  '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"machineRolePolicy":{"platforms":{"linux":["base"]}}}' \
+  'machineRolePolicy.platforms.linux must exactly equal ["base", "gaming"]'
+assert_validation_failure linux-extra-role-policy \
+  '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"machineRolePolicy":{"platforms":{"linux":["base","gaming","work"]}}}' \
+  'machineRolePolicy.platforms.linux must exactly equal ["base", "gaming"]'
+assert_validation_failure malformed-linux-role-policy \
+  '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"machineRolePolicy":{"platforms":{"linux":"base"}}}' \
+  'machineRolePolicy.platforms.linux must exactly equal ["base", "gaming"]'
+assert_validation_failure extra-platform-policy \
+  '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"machineRolePolicy":{"platforms":{"windows":["base"]}}}' \
+  'machineRolePolicy.platforms must contain exactly linux and darwin'
 assert_validation_failure scalar-policy \
   '{"machineRoles":["base"],"packagePolicy":"deny"}' \
   'packagePolicy must be a map'
@@ -138,6 +162,12 @@ assert_direct_init_failure direct-init-empty-roles \
 assert_direct_init_failure direct-init-unsupported-roles \
   '{"chezmoi":{"os":"linux"},"machineRoles":["base","work"]}' \
   'machine role "work" is not supported on linux'
+assert_direct_init_failure direct-init-empty-required-policy \
+  '{"chezmoi":{"os":"linux"},"machineRolePolicy":{"required":[]}}' \
+  'machineRolePolicy.required must exactly equal ["base"]'
+assert_direct_init_failure direct-init-darwin-gaming-policy \
+  '{"chezmoi":{"os":"darwin"},"machineRolePolicy":{"required":["base"],"platforms":{"linux":["base","gaming"],"darwin":["base","gaming"]}}}' \
+  'machineRolePolicy.platforms.darwin must exactly equal ["base"]'
 
 python3 - "$test_root" <<'PY'
 import sys

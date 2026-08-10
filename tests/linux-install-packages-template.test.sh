@@ -113,6 +113,26 @@ assert_render_failure \
   role-tombstone-overlap \
   '{"machineRoles":["base"],"packages":{"linux":{"apt":{"roles":{"base":["shared"]},"remove":["shared"]}}}}' \
   'apt package "shared" cannot be both role-managed and a removal tombstone'
+assert_render_failure \
+  custom-unsupported-role \
+  '{"machineRoles":["base"],"packages":{"linux":{"custom":{"roles":{"work":[]}}}}}' \
+  'packages.linux.custom.roles contains unsupported linux role "work"'
+assert_render_failure \
+  custom-non-list-role \
+  '{"machineRoles":["base"],"packages":{"linux":{"custom":{"roles":{"base":{}}}}}}' \
+  'packages.linux.custom.roles.base must be a list'
+assert_render_failure \
+  custom-inactive-malformed-record \
+  '{"machineRoles":["base"],"packages":{"linux":{"custom":{"roles":{"gaming":[{"name":"broken","executable":"","install":"true"}]}}}}}' \
+  'packages.linux.custom.roles.gaming 0: executable must not be empty'
+assert_render_failure \
+  custom-duplicate-within-role \
+  '{"machineRoles":["base"],"packages":{"linux":{"custom":{"roles":{"base":[{"name":"shared","executable":"shared","install":"true"},{"name":"shared","executable":"other","install":"true"}]}}}}}' \
+  'packages.linux.custom.roles.base contains duplicate installer "shared"'
+assert_render_failure \
+  custom-duplicate-ownership \
+  '{"machineRoles":["base"],"packages":{"linux":{"custom":{"roles":{"base":[{"name":"shared","executable":"shared","install":"true"}],"gaming":[{"name":"shared","executable":"other","install":"true"}]}}}}}' \
+  'linux custom installer "shared" belongs to both roles "base" and "gaming"'
 
 render_linux execution '{"machineRoles":["base"]}'
 fake_bin="$test_dir/fake-bin"

@@ -4,6 +4,7 @@ AGENTS.md
 LICENSE
 docs/
 tests/
+tsconfig.json
 {{ if ne .chezmoi.os "darwin" }}
 Library/Application Support/lazygit/config.yml
 {{ end }}
