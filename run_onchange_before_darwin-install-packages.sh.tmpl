@@ -1,4 +1,122 @@
 {{- if eq .chezmoi.os "darwin" -}}
+{{ template "validate-machine-package-data.tmpl" . }}
+{{- $root := . -}}
+{{- $darwinRoles := get $root.machineRolePolicy.platforms "darwin" -}}
+{{- $packagePolicy := get $root "packagePolicy" | default dict -}}
+{{- $newDenied := get $packagePolicy "deniedPrefixes" | default list -}}
+{{- $legacyDenied := get $root "blocked_prefixes" | default list -}}
+{{- $deniedPrefixes := concat $newDenied $legacyDenied | uniq -}}
+{{- $customRoles := $root.packages.darwin.custom.roles -}}
+{{- $tapRoles := $root.packages.darwin.taps.roles -}}
+{{- $trustedFormulaRoles := $root.packages.darwin.trusted_formulae.roles -}}
+{{- $brewRoles := $root.packages.darwin.brews.roles -}}
+{{- $caskRoles := $root.packages.darwin.casks.roles -}}
+{{- if not (kindIs "map" $customRoles) }}{{ fail "packages.darwin.custom.roles must be a map" }}{{ end -}}
+{{- if not (kindIs "map" $tapRoles) }}{{ fail "packages.darwin.taps.roles must be a map" }}{{ end -}}
+{{- if not (kindIs "map" $trustedFormulaRoles) }}{{ fail "packages.darwin.trusted_formulae.roles must be a map" }}{{ end -}}
+{{- if not (kindIs "map" $brewRoles) }}{{ fail "packages.darwin.brews.roles must be a map" }}{{ end -}}
+{{- if not (kindIs "map" $caskRoles) }}{{ fail "packages.darwin.casks.roles must be a map" }}{{ end -}}
+
+{{- $customOwners := dict -}}
+{{- range $role, $installers := $customRoles -}}
+  {{- if not (has $role $darwinRoles) }}{{ fail (printf "packages.darwin.custom.roles contains unsupported darwin role %q" $role) }}{{ end -}}
+  {{- if not (kindIs "slice" $installers) }}{{ fail (printf "packages.darwin.custom.roles.%s must be a list" $role) }}{{ end -}}
+  {{- $seenInstallers := dict -}}
+  {{- range $index, $installer := $installers -}}
+    {{- if not (kindIs "map" $installer) }}{{ fail (printf "packages.darwin.custom.roles.%s[%d] must be a map" $role $index) }}{{ end -}}
+    {{- $name := get $installer "name" -}}
+    {{- if or (not (kindIs "string" $name)) (empty ($name | trim)) }}{{ fail (printf "packages.darwin.custom.roles.%s[%d].name must be a non-empty string" $role $index) }}{{ end -}}
+    {{- if hasKey $seenInstallers $name }}{{ fail (printf "packages.darwin.custom.roles.%s contains duplicate installer %q" $role $name) }}{{ end -}}
+    {{- if hasKey $customOwners $name }}{{ fail (printf "darwin custom installer %q belongs to both roles %q and %q" $name (get $customOwners $name) $role) }}{{ end -}}
+    {{- $_ := set $seenInstallers $name true -}}
+    {{- $_ := set $customOwners $name $role -}}
+  {{- end -}}
+{{- end -}}
+
+{{- $tapOwners := dict -}}
+{{- range $role, $taps := $tapRoles -}}
+  {{- if not (has $role $darwinRoles) }}{{ fail (printf "packages.darwin.taps.roles contains unsupported darwin role %q" $role) }}{{ end -}}
+  {{- if not (kindIs "slice" $taps) }}{{ fail (printf "packages.darwin.taps.roles.%s must be a list" $role) }}{{ end -}}
+  {{- $seenTaps := dict -}}
+  {{- range $index, $tap := $taps -}}
+    {{- if or (not (kindIs "string" $tap)) (empty ($tap | trim)) }}{{ fail (printf "packages.darwin.taps.roles.%s[%d] must be a non-empty string" $role $index) }}{{ end -}}
+    {{- if hasKey $seenTaps $tap }}{{ fail (printf "packages.darwin.taps.roles.%s contains duplicate tap %q" $role $tap) }}{{ end -}}
+    {{- if hasKey $tapOwners $tap }}{{ fail (printf "darwin tap %q belongs to both roles %q and %q" $tap (get $tapOwners $tap) $role) }}{{ end -}}
+    {{- $_ := set $seenTaps $tap true -}}
+    {{- $_ := set $tapOwners $tap $role -}}
+  {{- end -}}
+{{- end -}}
+
+{{- $trustedFormulaOwners := dict -}}
+{{- range $role, $formulae := $trustedFormulaRoles -}}
+  {{- if not (has $role $darwinRoles) }}{{ fail (printf "packages.darwin.trusted_formulae.roles contains unsupported darwin role %q" $role) }}{{ end -}}
+  {{- if not (kindIs "slice" $formulae) }}{{ fail (printf "packages.darwin.trusted_formulae.roles.%s must be a list" $role) }}{{ end -}}
+  {{- $seenFormulae := dict -}}
+  {{- range $index, $formula := $formulae -}}
+    {{- if or (not (kindIs "string" $formula)) (empty ($formula | trim)) }}{{ fail (printf "packages.darwin.trusted_formulae.roles.%s[%d] must be a non-empty string" $role $index) }}{{ end -}}
+    {{- if hasKey $seenFormulae $formula }}{{ fail (printf "packages.darwin.trusted_formulae.roles.%s contains duplicate formula %q" $role $formula) }}{{ end -}}
+    {{- if hasKey $trustedFormulaOwners $formula }}{{ fail (printf "darwin trusted formula %q belongs to both roles %q and %q" $formula (get $trustedFormulaOwners $formula) $role) }}{{ end -}}
+    {{- $_ := set $seenFormulae $formula true -}}
+    {{- $_ := set $trustedFormulaOwners $formula $role -}}
+  {{- end -}}
+{{- end -}}
+
+{{- $brewOwners := dict -}}
+{{- range $role, $brews := $brewRoles -}}
+  {{- if not (has $role $darwinRoles) }}{{ fail (printf "packages.darwin.brews.roles contains unsupported darwin role %q" $role) }}{{ end -}}
+  {{- if not (kindIs "slice" $brews) }}{{ fail (printf "packages.darwin.brews.roles.%s must be a list" $role) }}{{ end -}}
+  {{- $seenBrews := dict -}}
+  {{- range $index, $brew := $brews -}}
+    {{- if or (not (kindIs "string" $brew)) (empty ($brew | trim)) }}{{ fail (printf "packages.darwin.brews.roles.%s[%d] must be a non-empty string" $role $index) }}{{ end -}}
+    {{- if hasKey $seenBrews $brew }}{{ fail (printf "packages.darwin.brews.roles.%s contains duplicate brew %q" $role $brew) }}{{ end -}}
+    {{- if hasKey $brewOwners $brew }}{{ fail (printf "darwin brew %q belongs to both roles %q and %q" $brew (get $brewOwners $brew) $role) }}{{ end -}}
+    {{- $_ := set $seenBrews $brew true -}}
+    {{- $_ := set $brewOwners $brew $role -}}
+  {{- end -}}
+{{- end -}}
+
+{{- $caskOwners := dict -}}
+{{- range $role, $casks := $caskRoles -}}
+  {{- if not (has $role $darwinRoles) }}{{ fail (printf "packages.darwin.casks.roles contains unsupported darwin role %q" $role) }}{{ end -}}
+  {{- if not (kindIs "slice" $casks) }}{{ fail (printf "packages.darwin.casks.roles.%s must be a list" $role) }}{{ end -}}
+  {{- $seenCasks := dict -}}
+  {{- range $index, $cask := $casks -}}
+    {{- if or (not (kindIs "string" $cask)) (empty ($cask | trim)) }}{{ fail (printf "packages.darwin.casks.roles.%s[%d] must be a non-empty string" $role $index) }}{{ end -}}
+    {{- if hasKey $seenCasks $cask }}{{ fail (printf "packages.darwin.casks.roles.%s contains duplicate cask %q" $role $cask) }}{{ end -}}
+    {{- if hasKey $caskOwners $cask }}{{ fail (printf "darwin cask %q belongs to both roles %q and %q" $cask (get $caskOwners $cask) $role) }}{{ end -}}
+    {{- $_ := set $seenCasks $cask true -}}
+    {{- $_ := set $caskOwners $cask $role -}}
+  {{- end -}}
+{{- end -}}
+
+{{- $selectedCustom := list -}}
+{{- $selectedTaps := list -}}
+{{- $selectedTrustedFormulae := list -}}
+{{- $selectedBrews := list -}}
+{{- $selectedCasks := list -}}
+{{- range $role := $root.machineRoles -}}
+  {{- $selectedCustom = concat $selectedCustom (get $customRoles $role | default list) -}}
+  {{- range $tap := (get $tapRoles $role | default list) -}}
+    {{- $denied := false -}}
+    {{- range $prefix := $deniedPrefixes }}{{ if hasPrefix $prefix $tap }}{{ $denied = true }}{{ end }}{{ end -}}
+    {{- if not $denied }}{{ $selectedTaps = append $selectedTaps $tap }}{{ end -}}
+  {{- end -}}
+  {{- range $formula := (get $trustedFormulaRoles $role | default list) -}}
+    {{- $denied := false -}}
+    {{- range $prefix := $deniedPrefixes }}{{ if hasPrefix $prefix $formula }}{{ $denied = true }}{{ end }}{{ end -}}
+    {{- if not $denied }}{{ $selectedTrustedFormulae = append $selectedTrustedFormulae $formula }}{{ end -}}
+  {{- end -}}
+  {{- range $brew := (get $brewRoles $role | default list) -}}
+    {{- $denied := false -}}
+    {{- range $prefix := $deniedPrefixes }}{{ if hasPrefix $prefix $brew }}{{ $denied = true }}{{ end }}{{ end -}}
+    {{- if not $denied }}{{ $selectedBrews = append $selectedBrews $brew }}{{ end -}}
+  {{- end -}}
+  {{- range $cask := (get $caskRoles $role | default list) -}}
+    {{- $denied := false -}}
+    {{- range $prefix := $deniedPrefixes }}{{ if hasPrefix $prefix $cask }}{{ $denied = true }}{{ end }}{{ end -}}
+    {{- if not $denied }}{{ $selectedCasks = append $selectedCasks $cask }}{{ end -}}
+  {{- end -}}
+{{- end -}}
 #!/bin/bash
 set -euo pipefail
 
@@ -18,9 +136,9 @@ export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 # `brew bundle install --force-cleanup` prunes the allowlist and would leave
 # interactive brew commands untrusted.
 grant_tap_trust() {
-{{ range .packages.darwin.trusted_formulae -}}
-  brew trust --formula {{ . | quote }} >/dev/null
-{{ end -}}
+{{- range $formula := $selectedTrustedFormulae }}
+  brew trust --formula {{ $formula | quote }} >/dev/null
+{{- end }}
   :
 }
 
@@ -30,38 +148,19 @@ grant_tap_trust
 # installed that is not declared there.
 echo "==> Syncing Homebrew packages via brew bundle (strict)"
 brew bundle install --file=/dev/stdin --force-cleanup <<EOF
-{{ $blocked_prefixes := get . "blocked_prefixes" | default list -}}
-{{ range .packages.darwin.taps -}}
-tap {{ . | quote }}
-{{ end -}}
-{{ range .packages.darwin.brews -}}
-  {{- $pkg := . -}}
-  {{- $blocked := false -}}
-  {{- range $blocked_prefixes }}
-    {{- if hasPrefix . $pkg }}
-      {{- $blocked = true -}}
-    {{- end }}
-  {{- end }}
-  {{- if not $blocked }}
-brew {{ $pkg | quote }}
-  {{- end }}
-{{- end -}}
-{{ range .packages.darwin.casks -}}
-  {{- $pkg := . -}}
-  {{- $blocked := false -}}
-  {{- range $blocked_prefixes }}
-    {{- if hasPrefix . $pkg }}
-      {{- $blocked = true -}}
-    {{- end }}
-  {{- end }}
-  {{- if not $blocked }}
-cask {{ $pkg | quote }}
-  {{- end }}
+{{- range $tap := $selectedTaps }}
+tap {{ $tap | quote }}
+{{- end }}
+{{- range $brew := $selectedBrews }}
+brew {{ $brew | quote }}
+{{- end }}
+{{- range $cask := $selectedCasks }}
+cask {{ $cask | quote }}
 {{- end }}
 EOF
 
 grant_tap_trust
 
-{{ template "install-custom-packages.sh.tmpl" (dict "custom" .packages.darwin.custom "blocked_prefixes" $blocked_prefixes) }}
+{{ template "install-custom-packages.sh.tmpl" (dict "custom" $selectedCustom "denied_prefixes" $deniedPrefixes) }}
 
 {{- end }}
