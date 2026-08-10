@@ -8,24 +8,13 @@
 {{-   if not (kindIs "slice" $legacyDeniedPrefixes) }}{{ fail "custom installers: denied prefixes must be a list" }}{{ end -}}
 {{-   $deniedPrefixes = concat $newDeniedPrefixes $legacyDeniedPrefixes | uniq -}}
 {{- end -}}
-{{- if not (kindIs "slice" $installers) }}{{ fail "custom installers: declaration must be a list" }}{{ end -}}
 {{- if not (kindIs "slice" $deniedPrefixes) }}{{ fail "custom installers: denied prefixes must be a list" }}{{ end -}}
-{{- range $index, $installer := $installers }}
-{{- if not (kindIs "map" $installer) }}{{ fail (printf "custom installer %d: entry must be a map" $index) }}{{ end -}}
+{{ template "validate-custom-installers.tmpl" $installers }}
+{{- range $installer := $installers }}
 {{- $name := get $installer "name" -}}
 {{- $executable := get $installer "executable" -}}
 {{- $setup := get $installer "setup" -}}
 {{- $install := get $installer "install" -}}
-{{- if not (kindIs "string" $name) }}{{ fail (printf "custom installer %d: name must be a string" $index) }}{{ end -}}
-{{- if not (kindIs "string" $executable) }}{{ fail (printf "custom installer %d: executable must be a string" $index) }}{{ end -}}
-{{- if hasKey $installer "setup" -}}
-  {{- if not (kindIs "string" $setup) }}{{ fail (printf "custom installer %d: setup must be a string" $index) }}{{ end -}}
-{{- end -}}
-{{- if not (kindIs "string" $install) }}{{ fail (printf "custom installer %d: install must be a string" $index) }}{{ end -}}
-{{- if empty ($name | trim) }}{{ fail (printf "custom installer %d: name must not be empty" $index) }}{{ end -}}
-{{- if empty ($executable | trim) }}{{ fail (printf "custom installer %d: executable must not be empty" $index) }}{{ end -}}
-{{- if not (regexMatch "^[A-Za-z0-9_][A-Za-z0-9_.+:-]*$" $executable) }}{{ fail (printf "custom installer %d: executable must be a command name" $index) }}{{ end -}}
-{{- if empty ($install | trim) }}{{ fail (printf "custom installer %d: install must not be empty" $index) }}{{ end -}}
 {{- $quotedName := $name | replace "'" "'\"'\"'" -}}
 {{- $denied := false -}}
 {{- range $prefix := $deniedPrefixes -}}

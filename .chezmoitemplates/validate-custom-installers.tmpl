@@ -1,0 +1,27 @@
+{{- $installers := . -}}
+{{- $context := "custom installer" -}}
+{{- if kindIs "map" . -}}
+  {{- $installers = get . "installers" -}}
+  {{- if hasKey . "context" -}}
+    {{- $context = get . "context" -}}
+    {{- if not (kindIs "string" $context) -}}{{ fail "custom installer validation context must be a string" }}{{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- if not (kindIs "slice" $installers) -}}{{ fail (printf "%ss: declaration must be a list" $context) }}{{- end -}}
+{{- range $index, $installer := $installers -}}
+  {{- if not (kindIs "map" $installer) -}}{{ fail (printf "%s %d: entry must be a map" $context $index) }}{{- end -}}
+  {{- $name := get $installer "name" -}}
+  {{- $executable := get $installer "executable" -}}
+  {{- $setup := get $installer "setup" -}}
+  {{- $install := get $installer "install" -}}
+  {{- if not (kindIs "string" $name) -}}{{ fail (printf "%s %d: name must be a string" $context $index) }}{{- end -}}
+  {{- if not (kindIs "string" $executable) -}}{{ fail (printf "%s %d: executable must be a string" $context $index) }}{{- end -}}
+  {{- if hasKey $installer "setup" -}}
+    {{- if not (kindIs "string" $setup) -}}{{ fail (printf "%s %d: setup must be a string" $context $index) }}{{- end -}}
+  {{- end -}}
+  {{- if not (kindIs "string" $install) -}}{{ fail (printf "%s %d: install must be a string" $context $index) }}{{- end -}}
+  {{- if empty ($name | trim) -}}{{ fail (printf "%s %d: name must not be empty" $context $index) }}{{- end -}}
+  {{- if empty ($executable | trim) -}}{{ fail (printf "%s %d: executable must not be empty" $context $index) }}{{- end -}}
+  {{- if not (regexMatch "^[A-Za-z0-9_][A-Za-z0-9_.+:-]*$" $executable) -}}{{ fail (printf "%s %d: executable must be a command name" $context $index) }}{{- end -}}
+  {{- if empty ($install | trim) -}}{{ fail (printf "%s %d: install must not be empty" $context $index) }}{{- end -}}
+{{- end -}}

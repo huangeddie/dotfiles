@@ -8,9 +8,33 @@
 {{- if not (kindIs "slice" $requiredRoles) -}}
   {{- fail "machineRolePolicy.required must be a list" -}}
 {{- end -}}
+{{- if ne (len $requiredRoles) 1 -}}
+  {{- fail "machineRolePolicy.required must exactly equal [\"base\"]" -}}
+{{- end -}}
+{{- if ne (index $requiredRoles 0) "base" -}}
+  {{- fail "machineRolePolicy.required must exactly equal [\"base\"]" -}}
+{{- end -}}
 {{- if not (kindIs "map" $platforms) -}}
   {{- fail "machineRolePolicy.platforms must be a map" -}}
 {{- end -}}
+{{- if or (ne (len $platforms) 2) (not (hasKey $platforms "linux")) (not (hasKey $platforms "darwin")) -}}
+  {{- fail "machineRolePolicy.platforms must contain exactly linux and darwin" -}}
+{{- end -}}
+{{- $linuxRoles := get $platforms "linux" -}}
+{{- if or (not (kindIs "slice" $linuxRoles)) (ne (len $linuxRoles) 2) -}}
+  {{- fail "machineRolePolicy.platforms.linux must exactly equal [\"base\", \"gaming\"]" -}}
+{{- end -}}
+{{- if or (ne (index $linuxRoles 0) "base") (ne (index $linuxRoles 1) "gaming") -}}
+  {{- fail "machineRolePolicy.platforms.linux must exactly equal [\"base\", \"gaming\"]" -}}
+{{- end -}}
+{{- $darwinRoles := get $platforms "darwin" -}}
+{{- if or (not (kindIs "slice" $darwinRoles)) (ne (len $darwinRoles) 1) -}}
+  {{- fail "machineRolePolicy.platforms.darwin must exactly equal [\"base\"]" -}}
+{{- end -}}
+{{- if ne (index $darwinRoles 0) "base" -}}
+  {{- fail "machineRolePolicy.platforms.darwin must exactly equal [\"base\"]" -}}
+{{- end -}}
+
 {{- $machineRoles := get $root "machineRoles" -}}
 {{- if not (kindIs "slice" $machineRoles) -}}
   {{- fail "machineRoles must be a non-empty list of roles" -}}
@@ -21,16 +45,6 @@
 {{- $platformRoles := get $platforms $root.chezmoi.os -}}
 {{- if not (kindIs "slice" $platformRoles) -}}
   {{- fail (printf "package roles do not support operating system %q" $root.chezmoi.os) -}}
-{{- end -}}
-{{- $seenPlatformRoles := dict -}}
-{{- range $index, $role := $platformRoles -}}
-  {{- if or (not (kindIs "string" $role)) (empty ($role | trim)) -}}
-    {{- fail (printf "machineRolePolicy.platforms.%s[%d] must be a non-empty string" $root.chezmoi.os $index) -}}
-  {{- end -}}
-  {{- if hasKey $seenPlatformRoles $role -}}
-    {{- fail (printf "machineRolePolicy.platforms.%s contains duplicate role %q" $root.chezmoi.os $role) -}}
-  {{- end -}}
-  {{- $_ := set $seenPlatformRoles $role true -}}
 {{- end -}}
 {{- $seenRoles := dict -}}
 {{- range $index, $role := $machineRoles -}}
@@ -45,21 +59,8 @@
     {{- fail (printf "machine role %q is not supported on %s; valid roles: %s" $role $root.chezmoi.os ($platformRoles | join ", ")) -}}
   {{- end -}}
 {{- end -}}
-{{- $seenRequiredRoles := dict -}}
-{{- range $index, $requiredRole := $requiredRoles -}}
-  {{- if or (not (kindIs "string" $requiredRole)) (empty ($requiredRole | trim)) -}}
-    {{- fail (printf "machineRolePolicy.required[%d] must be a non-empty string" $index) -}}
-  {{- end -}}
-  {{- if hasKey $seenRequiredRoles $requiredRole -}}
-    {{- fail (printf "machineRolePolicy.required contains duplicate role %q" $requiredRole) -}}
-  {{- end -}}
-  {{- $_ := set $seenRequiredRoles $requiredRole true -}}
-  {{- if not (has $requiredRole $platformRoles) -}}
-    {{- fail (printf "required machine role %q is not supported on %s" $requiredRole $root.chezmoi.os) -}}
-  {{- end -}}
-  {{- if not (has $requiredRole $machineRoles) -}}
-    {{- fail (printf "machineRoles must include required role %q" $requiredRole) -}}
-  {{- end -}}
+{{- if not (has "base" $machineRoles) -}}
+  {{- fail "machineRoles must include required role \"base\"" -}}
 {{- end -}}
 
 {{- $packagePolicy := dict -}}

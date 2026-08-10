@@ -2,6 +2,7 @@
 {{ template "validate-machine-package-data.tmpl" . }}
 {{- $root := . -}}
 {{- $aptRoles := $root.packages.linux.apt.roles -}}
+{{- $customRoles := $root.packages.linux.custom.roles -}}
 {{- $packagePolicy := get $root "packagePolicy" | default dict -}}
 {{- $newDenied := get $packagePolicy "deniedPrefixes" | default list -}}
 {{- $legacyDenied := get $root "blocked_prefixes" | default list -}}
@@ -29,6 +30,22 @@
   {{- if hasKey $seenAptRemove $package }}{{ fail (printf "packages.linux.apt.remove contains duplicate package %q" $package) }}{{ end -}}
   {{- if hasKey $aptPackageOwners $package }}{{ fail (printf "apt package %q cannot be both role-managed and a removal tombstone" $package) }}{{ end -}}
   {{- $_ := set $seenAptRemove $package true -}}
+{{- end -}}
+{{- if not (kindIs "map" $customRoles) }}{{ fail "packages.linux.custom.roles must be a map" }}{{ end -}}
+{{- $customInstallerOwners := dict -}}
+{{- range $role, $installers := $customRoles -}}
+  {{- if not (has $role $linuxRoles) }}{{ fail (printf "packages.linux.custom.roles contains unsupported linux role %q" $role) }}{{ end -}}
+  {{- if not (kindIs "slice" $installers) }}{{ fail (printf "packages.linux.custom.roles.%s must be a list" $role) }}{{ end -}}
+  {{- $context := printf "packages.linux.custom.roles.%s" $role -}}
+  {{- template "validate-custom-installers.tmpl" (dict "installers" $installers "context" $context) -}}
+  {{- $seenInstallers := dict -}}
+  {{- range $installer := $installers -}}
+    {{- $name := get $installer "name" -}}
+    {{- if hasKey $seenInstallers $name }}{{ fail (printf "packages.linux.custom.roles.%s contains duplicate installer %q" $role $name) }}{{ end -}}
+    {{- if hasKey $customInstallerOwners $name }}{{ fail (printf "linux custom installer %q belongs to both roles %q and %q" $name (get $customInstallerOwners $name) $role) }}{{ end -}}
+    {{- $_ := set $seenInstallers $name true -}}
+    {{- $_ := set $customInstallerOwners $name $role -}}
+  {{- end -}}
 {{- end -}}
 #!/bin/bash
 set -euo pipefail
@@ -252,7 +269,7 @@ fi
 
 {{- $selectedCustom := list -}}
 {{- range $role := $root.machineRoles -}}
-  {{- $roleCustom := get $root.packages.linux.custom.roles $role | default list -}}
+  {{- $roleCustom := get $customRoles $role | default list -}}
   {{- $selectedCustom = concat $selectedCustom $roleCustom -}}
 {{- end -}}
 {{ template "install-custom-packages.sh.tmpl" (dict "custom" $selectedCustom "denied_prefixes" $deniedPrefixes) }}
