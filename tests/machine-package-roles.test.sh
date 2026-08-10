@@ -26,6 +26,19 @@ assert_validation_failure() {
   grep -Fq "$diagnostic" "$test_root/$case_name.err"
 }
 
+assert_direct_init_failure() {
+  local case_name=$1
+  local override=$2
+  local diagnostic=$3
+  if chezmoi --source "$source_dir" --override-data "$override" \
+    execute-template --init -f "$source_dir/.chezmoi.toml.tmpl" \
+    >"$test_root/$case_name.out" 2>"$test_root/$case_name.err"; then
+    echo "direct init accepted invalid machine package data: $case_name" >&2
+    exit 1
+  fi
+  grep -Fq "$diagnostic" "$test_root/$case_name.err"
+}
+
 render_validator linux-base \
   '{"chezmoi":{"os":"linux"},"machineRoles":["base"]}' >/dev/null
 render_validator linux-gaming \
@@ -63,12 +76,18 @@ assert_validation_failure darwin-gaming \
 assert_validation_failure scalar-policy \
   '{"machineRoles":["base"],"packagePolicy":"deny"}' \
   'packagePolicy must be a map'
+assert_validation_failure empty-scalar-policy \
+  '{"machineRoles":["base"],"packagePolicy":""}' \
+  'packagePolicy must be a map'
 assert_validation_failure empty-new-prefix \
   '{"machineRoles":["base"],"packagePolicy":{"deniedPrefixes":[""]}}' \
   'packagePolicy.deniedPrefixes[0] must be a non-empty string'
 assert_validation_failure non-string-new-prefix \
   '{"machineRoles":["base"],"packagePolicy":{"deniedPrefixes":[42]}}' \
   'packagePolicy.deniedPrefixes[0] must be a non-empty string'
+assert_validation_failure empty-scalar-new-prefixes \
+  '{"machineRoles":["base"],"packagePolicy":{"deniedPrefixes":""}}' \
+  'packagePolicy.deniedPrefixes must be a list'
 assert_validation_failure duplicate-new-prefix \
   '{"machineRoles":["base"],"packagePolicy":{"deniedPrefixes":["steam","steam"]}}' \
   'packagePolicy.deniedPrefixes contains duplicate prefix "steam"'
@@ -78,6 +97,12 @@ assert_validation_failure scalar-legacy-policy \
 assert_validation_failure empty-legacy-prefix \
   '{"machineRoles":["base"],"blocked_prefixes":[""]}' \
   'blocked_prefixes[0] must be a non-empty string'
+assert_validation_failure empty-scalar-legacy-prefixes \
+  '{"machineRoles":["base"],"blocked_prefixes":""}' \
+  'blocked_prefixes must be a list'
+assert_validation_failure duplicate-legacy-prefix \
+  '{"machineRoles":["base"],"blocked_prefixes":["steam","steam"]}' \
+  'blocked_prefixes contains duplicate prefix "steam"'
 assert_validation_failure non-string-legacy-prefix \
   '{"machineRoles":["base"],"blocked_prefixes":[42]}' \
   'blocked_prefixes[0] must be a non-empty string'
@@ -103,6 +128,16 @@ chezmoi --source "$source_dir" \
   --override-data '{"chezmoi":{"os":"linux"},"machineRoles":["base","gaming"],"packagePolicy":{"deniedPrefixes":["steam","codex"]},"blocked_prefixes":["steam","tailscale"]}' \
   execute-template --init \
   -f "$source_dir/.chezmoi.toml.tmpl" >"$test_root/existing-data.toml"
+
+assert_direct_init_failure direct-init-scalar-roles \
+  '{"chezmoi":{"os":"linux"},"machineRoles":"base"}' \
+  'machineRoles must be a non-empty list of roles'
+assert_direct_init_failure direct-init-empty-roles \
+  '{"chezmoi":{"os":"linux"},"machineRoles":[]}' \
+  'machineRoles must be a non-empty list of roles'
+assert_direct_init_failure direct-init-unsupported-roles \
+  '{"chezmoi":{"os":"linux"},"machineRoles":["base","work"]}' \
+  'machine role "work" is not supported on linux'
 
 python3 - "$test_root" <<'PY'
 import sys
