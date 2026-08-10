@@ -179,6 +179,14 @@ assert_render_failure \
   '{"chezmoi":{"os":"darwin"},"machineRoles":["base"],"packages":{"darwin":{"custom":{"roles":{"base":[{"name":"synthetic-installer","install":"true"}]}}}}}' \
   'custom installer 0: executable must not be empty'
 assert_render_failure \
+  custom-empty-name \
+  '{"chezmoi":{"os":"darwin"},"machineRoles":["base"],"packages":{"darwin":{"custom":{"roles":{"base":[{"name":"","executable":"synthetic-installer","install":"true"}]}}}}}' \
+  'packages.darwin.custom.roles.base[0].name must be a non-empty string'
+assert_render_failure \
+  custom-duplicate-within-role \
+  '{"chezmoi":{"os":"darwin"},"machineRoles":["base"],"packages":{"darwin":{"custom":{"roles":{"base":[{"name":"shared","executable":"shared-one","install":"true"},{"name":"shared","executable":"shared-two","install":"true"}]}}}}}' \
+  'packages.darwin.custom.roles.base contains duplicate installer "shared"'
+assert_render_failure \
   custom-duplicate-ownership \
   '{"chezmoi":{"os":"darwin"},"machineRoles":["base"],"machineRolePolicy":{"platforms":{"darwin":["base","work"]}},"packages":{"darwin":{"custom":{"roles":{"base":[{"name":"shared","executable":"shared-base","install":"true"}],"work":[{"name":"shared","executable":"shared-work","install":"true"}]}}}}}' \
   'darwin custom installer "shared" belongs to both roles "base" and "work"'
