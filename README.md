@@ -40,7 +40,7 @@ agnostic configs.
 
 ### Machine roles
 
-Every machine must select `base`. Linux machines may also select `gaming`.
+Every machine must select `base`. Linux machines may also select `gaming`. Selecting `gaming` on macOS/Darwin fails validation.
 
 | Machine | `machineRoles` |
 |---|---|
