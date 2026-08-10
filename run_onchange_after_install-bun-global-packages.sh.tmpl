@@ -19,6 +19,7 @@
   {{- $seenRolePackages := dict -}}
   {{- range $index, $package := $rolePackages -}}
     {{- if or (not (kindIs "string" $package)) (empty ($package | trim)) }}{{ fail (printf "packages.bun.global.roles.%s[%d] must be a non-empty string" $role $index) }}{{ end -}}
+    {{- if ne $package ($package | trim) }}{{ fail (printf "packages.bun.global.roles.%s[%d] must not have leading or trailing whitespace" $role $index) }}{{ end -}}
     {{- if hasKey $seenRolePackages $package }}{{ fail (printf "packages.bun.global.roles.%s contains duplicate package %q" $role $package) }}{{ end -}}
     {{- if hasKey $bunPackageOwners $package }}{{ fail (printf "bun global package %q belongs to both roles %q and %q" $package (get $bunPackageOwners $package) $role) }}{{ end -}}
     {{- $_ := set $seenRolePackages $package true -}}
