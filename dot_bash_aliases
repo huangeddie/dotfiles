@@ -6,6 +6,7 @@ alias sm='ssh main'
 
 # Version control
 alias g='git'
+alias gc='git add -u && git commit -m "chore: update $(git diff --cached --name-only | head -n1)"'
 alias gcp='git add -u && git commit -m "chore: update $(git diff --cached --name-only | head -n1)" && git push'
 alias gp='git push'
 alias gl='git pull'
