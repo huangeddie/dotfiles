@@ -4,13 +4,15 @@ set -euo pipefail
 source_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 test_root=$(mktemp -d)
 trap 'rm -rf "$test_root"' EXIT
+empty_config="$test_root/empty-config.toml"
+: >"$empty_config"
 
 render_validator() {
   local case_name=$1
   local override=$2
   local wrapper="$test_root/$case_name.tmpl"
   printf '%s\n' '{{ template "validate-machine-package-data.tmpl" . }}' >"$wrapper"
-  chezmoi --source "$source_dir" --override-data "$override" \
+  chezmoi --config "$empty_config" --source "$source_dir" --override-data "$override" \
     execute-template -f "$wrapper"
 }
 
@@ -30,7 +32,7 @@ assert_direct_init_failure() {
   local case_name=$1
   local override=$2
   local diagnostic=$3
-  if chezmoi --source "$source_dir" --override-data "$override" \
+  if chezmoi --config "$empty_config" --source "$source_dir" --override-data "$override" \
     execute-template --init -f "$source_dir/.chezmoi.toml.tmpl" \
     >"$test_root/$case_name.out" 2>"$test_root/$case_name.err"; then
     echo "direct init accepted invalid machine package data: $case_name" >&2
@@ -131,24 +133,24 @@ assert_validation_failure non-string-legacy-prefix \
   '{"machineRoles":["base"],"blocked_prefixes":[42]}' \
   'blocked_prefixes[0] must be a non-empty string'
 
-chezmoi --source "$source_dir" \
+chezmoi --config "$empty_config" --source "$source_dir" \
   --override-data '{"chezmoi":{"os":"linux"}}' \
   execute-template --init \
   --promptBool 'Install gaming packages=true' \
   -f "$source_dir/.chezmoi.toml.tmpl" >"$test_root/linux-gaming.toml"
 
-chezmoi --source "$source_dir" \
+chezmoi --config "$empty_config" --source "$source_dir" \
   --override-data '{"chezmoi":{"os":"linux"}}' \
   execute-template --init \
   --promptBool 'Install gaming packages=false' \
   -f "$source_dir/.chezmoi.toml.tmpl" >"$test_root/linux-base.toml"
 
-chezmoi --source "$source_dir" \
+chezmoi --config "$empty_config" --source "$source_dir" \
   --override-data '{"chezmoi":{"os":"darwin"}}' \
   execute-template --init \
   -f "$source_dir/.chezmoi.toml.tmpl" >"$test_root/darwin-base.toml"
 
-chezmoi --source "$source_dir" \
+chezmoi --config "$empty_config" --source "$source_dir" \
   --override-data '{"chezmoi":{"os":"linux"},"machineRoles":["base","gaming"],"packagePolicy":{"deniedPrefixes":["steam","codex"]},"blocked_prefixes":["steam","tailscale"]}' \
   execute-template --init \
   -f "$source_dir/.chezmoi.toml.tmpl" >"$test_root/existing-data.toml"

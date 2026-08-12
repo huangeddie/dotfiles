@@ -4,11 +4,13 @@ set -euo pipefail
 source_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 test_root=$(mktemp -d)
 trap 'rm -rf "$test_root"' EXIT
+empty_config="$test_root/empty-config.toml"
+: >"$empty_config"
 
 base_linux='{"machineRoles":["base"]}'
 
 schema_json="$test_root/schema.json"
-chezmoi --source "$source_dir" data --format json >"$schema_json"
+chezmoi --config "$empty_config" --source "$source_dir" data --format json >"$schema_json"
 python3 - "$schema_json" <<'PY'
 import json
 import sys
@@ -25,7 +27,7 @@ assert "bun" in packages["darwin"]["brews"]["roles"]["base"]
 PY
 
 linux_script="$test_root/linux-install-packages.sh"
-chezmoi --source "$source_dir" --override-data "$base_linux" \
+chezmoi --config "$empty_config" --source "$source_dir" --override-data "$base_linux" \
   execute-template \
   -f "$source_dir/run_onchange_before_linux-install-packages.sh.tmpl" \
   >"$linux_script"
@@ -35,7 +37,7 @@ grep -Fqx 'export PATH="$BUN_INSTALL/bin:$PATH"' "$linux_script"
 render_bun() {
   local name=$1
   local override=$2
-  chezmoi --source "$source_dir" --override-data "$override" \
+  chezmoi --config "$empty_config" --source "$source_dir" --override-data "$override" \
     execute-template \
     -f "$source_dir/run_onchange_after_install-bun-global-packages.sh.tmpl" \
     >"$test_root/$name.sh"
@@ -47,7 +49,7 @@ assert_render_failure() {
   local override=$2
   local expected_error=$3
 
-  if chezmoi --source "$source_dir" --override-data "$override" \
+  if chezmoi --config "$empty_config" --source "$source_dir" --override-data "$override" \
     execute-template \
     -f "$source_dir/run_onchange_after_install-bun-global-packages.sh.tmpl" \
     >"$test_root/$name.out" 2>"$test_root/$name.err"; then

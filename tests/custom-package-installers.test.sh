@@ -4,9 +4,11 @@ set -euo pipefail
 source_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 test_root=$(mktemp -d)
 trap 'rm -rf "$test_root"' EXIT
+empty_config="$test_root/empty-config.toml"
+: >"$empty_config"
 
 schema_json="$test_root/schema.json"
-chezmoi --source "$source_dir" data --format json >"$schema_json"
+chezmoi --config "$empty_config" --source "$source_dir" data --format json >"$schema_json"
 python3 - "$schema_json" <<'PY'
 import json
 import sys
@@ -51,7 +53,7 @@ PY
 render_linux() {
   local name=$1
   local override=$2
-  chezmoi --source "$source_dir" --override-data "$override" \
+  chezmoi --config "$empty_config" --source "$source_dir" --override-data "$override" \
     execute-template \
     -f "$source_dir/run_onchange_before_linux-install-packages.sh.tmpl" \
     >"$test_root/$name.sh"
@@ -110,7 +112,7 @@ set -euo pipefail
 TMPL
 
 synthetic_script="$test_root/synthetic.sh"
-chezmoi --source "$source_dir" execute-template \
+chezmoi --config "$empty_config" --source "$source_dir" execute-template \
   -f "$synthetic_template" >"$synthetic_script"
 bash -n "$synthetic_script"
 
@@ -144,7 +146,7 @@ set -euo pipefail
 ) }}
 TMPL
 metadata_script="$test_root/metadata.sh"
-chezmoi --source "$source_dir" execute-template \
+chezmoi --config "$empty_config" --source "$source_dir" execute-template \
   -f "$metadata_template" >"$metadata_script"
 bash -n "$metadata_script"
 metadata_marker="$test_root/metadata-expanded"
@@ -162,7 +164,7 @@ assert_invalid() {
   local template_file="$test_root/$case_name.tmpl"
 
   printf '%s\n' "$template" >"$template_file"
-  if chezmoi --source "$source_dir" execute-template \
+  if chezmoi --config "$empty_config" --source "$source_dir" execute-template \
     -f "$template_file" \
     >"$test_root/$case_name.out" \
     2>"$test_root/$case_name.err"; then
@@ -230,7 +232,7 @@ set -euo pipefail
 ) }}
 TMPL
 blocked_test_script="$test_root/blocked.sh"
-chezmoi --source "$source_dir" execute-template \
+chezmoi --config "$empty_config" --source "$source_dir" execute-template \
   -f "$blocked_test_template" >"$blocked_test_script"
 bash -n "$blocked_test_script"
 
@@ -259,7 +261,7 @@ set -euo pipefail
 ) }}
 TMPL
 legacy_map_script="$test_root/legacy-map.sh"
-chezmoi --source "$source_dir" execute-template \
+chezmoi --config "$empty_config" --source "$source_dir" execute-template \
   -f "$legacy_map_template" >"$legacy_map_script"
 bash -n "$legacy_map_script"
 if grep -Fq 'echo new-denied' "$legacy_map_script" ||

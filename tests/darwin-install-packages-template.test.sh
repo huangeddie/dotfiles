@@ -4,11 +4,13 @@ set -euo pipefail
 source_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 test_dir=$(mktemp -d)
 trap 'rm -rf "$test_dir"' EXIT
+empty_config="$test_dir/empty-config.toml"
+: >"$empty_config"
 
 base_darwin='{"chezmoi":{"os":"darwin"},"machineRoles":["base"]}'
 
 schema_json="$test_dir/schema.json"
-chezmoi --source "$source_dir" data --format json >"$schema_json"
+chezmoi --config "$empty_config" --source "$source_dir" data --format json >"$schema_json"
 python3 - "$schema_json" <<'PY'
 import json
 import sys
@@ -31,7 +33,7 @@ PY
 render_darwin() {
   local name=$1
   local override=$2
-  chezmoi --source "$source_dir" --override-data "$override" \
+  chezmoi --config "$empty_config" --source "$source_dir" --override-data "$override" \
     execute-template \
     -f "$source_dir/run_onchange_before_darwin-install-packages.sh.tmpl" \
     >"$test_dir/$name.sh"
@@ -43,7 +45,7 @@ assert_render_failure() {
   local override=$2
   local expected_error=$3
 
-  if chezmoi --source "$source_dir" --override-data "$override" \
+  if chezmoi --config "$empty_config" --source "$source_dir" --override-data "$override" \
     execute-template \
     -f "$source_dir/run_onchange_before_darwin-install-packages.sh.tmpl" \
     >"$test_dir/$name.out" 2>"$test_dir/$name.err"; then
