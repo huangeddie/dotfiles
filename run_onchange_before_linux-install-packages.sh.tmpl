@@ -71,14 +71,8 @@ apt_remove_packages=(
   {{ $package | quote }}
 {{- end }}
 {{- range $role, $rolePackages := $aptRoles }}
-  {{- range $package := $rolePackages }}
-    {{- $denied := false -}}
-    {{- range $prefix := $deniedPrefixes }}
-      {{- if hasPrefix $prefix $package }}
-        {{- $denied = true -}}
-      {{- end }}
-    {{- end }}
-    {{- if or (not (has $role $root.machineRoles)) $denied }}
+  {{- if not (has $role $root.machineRoles) }}
+    {{- range $package := $rolePackages }}
   {{ $package | quote }}
     {{- end }}
   {{- end }}

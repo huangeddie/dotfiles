@@ -66,9 +66,12 @@ deniedPrefixes = ["unauthorized-prefix"]
 ```
 
 Packages whose names start with a denied prefix are never installed. Managed
-apt, Homebrew, and Bun packages that later become denied are removed. Custom
-script installers are skipped, but their existing installations cannot be
-automatically removed because they have no uninstall instruction.
+Homebrew and Bun packages that later become denied are removed by their
+authoritative bundle/global cleanup. Managed apt packages matching a denied
+prefix are excluded from installation and left untouched on the host rather
+than purged. Custom script installers are skipped, but their existing
+installations cannot be automatically removed because they have no uninstall
+instruction.
 
 `blocked_prefixes` remains accepted for older configuration during migration.
 Its entries are combined with `packagePolicy.deniedPrefixes`, so either field
