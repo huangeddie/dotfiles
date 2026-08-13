@@ -5,4 +5,5 @@ description:
 disable-model-invocation: true
 ---
 
-Merge the branch / worktree back to main or master locally and clean up.
+Merge the branch / worktree back to the canonical branch, e.g. main or master,
+locally and clean up.
