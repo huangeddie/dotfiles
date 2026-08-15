@@ -16,7 +16,7 @@ next_workspace = "ctrl+alt+j"
 
 [theme]
 name = "catppuccin"
-auto_switch = false
+auto_switch = true
 
 [ui]
 agent_panel_sort = "spaces"
