@@ -8,7 +8,7 @@ Host minipc
     User eddie
     RequestTTY yes
     SetEnv TERM=xterm-256color
-Host mac-minipc
+Host macmini
     HostName 100.104.154.28
     User eddie
     RequestTTY yes
