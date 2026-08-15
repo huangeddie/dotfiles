@@ -31,7 +31,7 @@ alias la='ls -a'
 # Chezmoi
 alias cz='chezmoi'
 alias czd='cd $(chezmoi source-path)'
-alias cza='chezmoi apply'
+alias cza='chezmoi apply --force'
 
 # bun completions
 [ -s "~/.bun/_bun" ] && source "~/.bun/_bun"
