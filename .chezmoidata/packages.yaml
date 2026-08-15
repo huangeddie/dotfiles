@@ -37,41 +37,43 @@ packages:
       roles:
         base:
           [
-            # Linked against by the mise-managed Ruby toolchain. Homebrew cannot
-            # see that dependency, so without an explicit entry cleanup treats
-            # these as orphans and removes them, breaking `ruby` at runtime.
-            "gmp",
-            "libyaml",
-            "openssl@3",
+            # Search
             "bat",
-            "bun",
-            "chezmoi",
-            "cloudflared",
             "fd",
-            "ffmpeg",
             "fzf",
-            "gh",
-            "node",
-            "uv",
-            "vips",
+            "zoxide",
+            # Text editors
+            "neovim",
+            "universal-ctags",
+            # Version-control
+            "modem-dev/tap/hunk",
             "git-delta",
-            "herdr",
+            "gh",
+            "chezmoi",
             "jj",
             "jjui",
             "lazygit",
-            "mise",
-            "modem-dev/tap/hunk",
-            "neovim",
-            # Unversioned formulae (python, zig) intentionally track the latest
-            # stable release rather than pinning a version.
-            "python",
+            # Languages
             "rust-analyzer",
             "stylua",
             "swiftformat",
-            "television",
-            "universal-ctags",
             "zig",
-            "zoxide",
+            "python",
+            # Package managers
+            "node",
+            "bun",
+            "uv",
+            "mise",
+            # Libraries
+            "gmp",
+            "libyaml",
+            "openssl@3",
+            "cloudflared",
+            "ffmpeg",
+            "vips",
+            # Terminal
+            "herdr",
+            "television",
             "btop",
           ]
     casks:
