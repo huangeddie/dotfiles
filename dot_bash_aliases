@@ -2,7 +2,8 @@
 alias n='nvim'
 
 # SSH
-alias sm='ssh main'
+alias sd='ssh desktop'
+alias sm='ssh mac'
 
 # Version control
 alias g='git'

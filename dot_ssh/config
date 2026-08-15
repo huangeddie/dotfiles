@@ -1,4 +1,4 @@
-Host main
+Host desktop
     HostName 100.119.103.30
     User eddie
     RequestTTY yes
