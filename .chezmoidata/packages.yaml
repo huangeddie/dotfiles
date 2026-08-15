@@ -120,23 +120,30 @@ packages:
       roles:
         base:
           [
-            "neovim",
+            # Search
+            "bat",
             "ripgrep",
-            "golang-go",
             "fd-find",
             "fzf",
+            # Text Editors
+            "neovim",
+            # Version control
             "git",
             "lazygit",
             "gh",
             "git-delta",
+            # Languages
+            "golang-go",
+            # Libraries
             "curl",
             "openssh-server",
             "ffmpeg",
+            # Package managers
             "nodejs",
             "npm",
+            # Terminal
             "btop",
             "nvtop",
-            "bat",
             "ghostty",
           ]
         gaming:
