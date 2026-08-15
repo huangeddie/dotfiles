@@ -51,6 +51,7 @@ packages:
             "ffmpeg",
             "fzf",
             "gh",
+            "node",
             "git-delta",
             "herdr",
             "jj",
