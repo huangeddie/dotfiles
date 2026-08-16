@@ -1,0 +1,65 @@
+#!/bin/bash
+# Checks whether the vendored superpowers skills (pulled via .chezmoiexternal.toml)
+# match the latest commit on the upstream branch, without relying on chezmoi's
+# archive cache to expose a commit hash. Manual/QA-style: not run in CI.
+set -euo pipefail
+
+external_key=".agents/packages/superpowers/skills"
+
+source_dir=$(chezmoi source-path)
+external_toml="$source_dir/.chezmoiexternal.toml"
+home_dir=$(chezmoi data | jq -r '.chezmoi.homeDir')
+target_dir="$home_dir/$external_key"
+
+url=$(awk -v key="[\"$external_key\"]" '
+  $0 == key { in_block = 1; next }
+  in_block && /^\[/ { exit }
+  in_block && /^[ \t]*url[ \t]*=/ { gsub(/.*url[ \t]*=[ \t]*"|"[ \t]*$/, ""); print; exit }
+' "$external_toml")
+
+if [[ -z "$url" ]]; then
+  echo "Could not find url for [\"$external_key\"] in $external_toml" >&2
+  exit 1
+fi
+
+if [[ ! "$url" =~ ^https://github\.com/([^/]+)/([^/]+)/archive/refs/heads/([^/]+)\.tar\.gz$ ]]; then
+  echo "Unrecognized archive url format: $url" >&2
+  exit 1
+fi
+owner="${BASH_REMATCH[1]}"
+repo="${BASH_REMATCH[2]}"
+branch="${BASH_REMATCH[3]}"
+
+latest_sha=$(git ls-remote "https://github.com/$owner/$repo.git" "refs/heads/$branch" | awk '{print $1}')
+if [[ -z "$latest_sha" ]]; then
+  echo "Could not resolve latest commit for $owner/$repo@$branch" >&2
+  exit 1
+fi
+
+tmp_dir=$(mktemp -d)
+trap 'rm -rf "$tmp_dir"' EXIT
+
+curl -fsSL "$url" -o "$tmp_dir/archive.tar.gz"
+tar xzf "$tmp_dir/archive.tar.gz" -C "$tmp_dir"
+extracted_skills=$(find "$tmp_dir" -mindepth 2 -maxdepth 2 -type d -name skills | head -1)
+
+if [[ -z "$extracted_skills" ]]; then
+  echo "Downloaded archive has no top-level skills/ directory" >&2
+  exit 1
+fi
+
+if [[ ! -d "$target_dir" ]]; then
+  echo "✗ $target_dir does not exist locally — run: chezmoi apply" >&2
+  exit 1
+fi
+
+if diff -rq "$extracted_skills" "$target_dir" >/dev/null; then
+  echo "✓ superpowers skills are up to date with $owner/$repo@$branch (${latest_sha:0:7})"
+else
+  echo "✗ superpowers skills are stale against $owner/$repo@$branch (${latest_sha:0:7})"
+  echo
+  diff -rq "$extracted_skills" "$target_dir" || true
+  echo
+  echo "Fix: chezmoi apply --refresh-externals"
+  exit 1
+fi
