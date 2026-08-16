@@ -38,6 +38,7 @@ packages:
         base:
           [
             # Search
+            "ripgrep",
             "bat",
             "fd",
             "fzf",
