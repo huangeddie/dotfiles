@@ -81,6 +81,7 @@ packages:
         base:
           [
             "codex",
+            "claude-code",
             "font-jetbrains-mono-nerd-font",
             "gcloud-cli",
             "ghostty",
