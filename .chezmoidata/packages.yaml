@@ -19,7 +19,15 @@ packages:
   darwin:
     custom:
       roles:
-        base: []
+        base: 
+          - name: claude-code
+            executable: claude
+            install: |-
+              curl -fsSL https://claude.ai/install.sh | bash
+          - name: codex
+            executable: codex
+            install: |-
+              curl -fsSL https://chatgpt.com/codex/install.sh | sh
     taps:
       roles:
         base: ["modem-dev/tap"]
@@ -81,8 +89,6 @@ packages:
       roles:
         base:
           [
-            "codex",
-            "claude-code",
             "font-jetbrains-mono-nerd-font",
             "gcloud-cli",
             "ghostty",
