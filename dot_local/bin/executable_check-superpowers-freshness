@@ -6,19 +6,27 @@ set -euo pipefail
 
 external_key=".agents/packages/superpowers/skills"
 
-source_dir=$(chezmoi source-path)
-external_toml="$source_dir/.chezmoiexternal.toml"
-home_dir=$(chezmoi data | jq -r '.chezmoi.homeDir')
+source_dir="${CHEZMOI_SOURCE_DIR:-$(chezmoi source-path)}"
+home_dir="${CHEZMOI_HOME_DIR:-$(chezmoi data | jq -r '.chezmoi.homeDir')}"
 target_dir="$home_dir/$external_key"
 
-url=$(awk -v key="[\"$external_key\"]" '
-  $0 == key { in_block = 1; next }
-  in_block && /^\[/ { exit }
-  in_block && /^[ \t]*url[ \t]*=/ { gsub(/.*url[ \t]*=[ \t]*"|"[ \t]*$/, ""); print; exit }
-' "$external_toml")
+url=""
+external_toml=""
+while IFS= read -r -d '' candidate; do
+  extracted_url=$(awk -v key="[\"$external_key\"]" '
+    $0 == key { in_block = 1; next }
+    in_block && /^\[/ { exit }
+    in_block && /^[ \t]*url[ \t]*=/ { gsub(/.*url[ \t]*=[ \t]*"|"[ \t]*$/, ""); print; exit }
+  ' "$candidate")
+  if [[ -n "$extracted_url" ]]; then
+    url="$extracted_url"
+    external_toml="$candidate"
+    break
+  fi
+done < <(find "$source_dir" -name ".git" -prune -o -name ".chezmoiexternal.toml" -type f -print0)
 
 if [[ -z "$url" ]]; then
-  echo "Could not find url for [\"$external_key\"] in $external_toml" >&2
+  echo "Could not find url for [\"$external_key\"] in any .chezmoiexternal.toml under $source_dir" >&2
   exit 1
 fi
 
@@ -30,21 +38,28 @@ owner="${BASH_REMATCH[1]}"
 repo="${BASH_REMATCH[2]}"
 branch="${BASH_REMATCH[3]}"
 
-latest_sha=$(git ls-remote "https://github.com/$owner/$repo.git" "refs/heads/$branch" | awk '{print $1}')
+tmp_dir=$(mktemp -d)
+trap 'rm -rf "$tmp_dir"' EXIT
+
+git clone --quiet --depth 1 --branch "$branch" --single-branch "https://github.com/$owner/$repo.git" "$tmp_dir/repo" || {
+  echo "Could not clone $owner/$repo@$branch from https://github.com/$owner/$repo.git" >&2
+  exit 1
+}
+
+latest_sha=$(git -C "$tmp_dir/repo" rev-parse HEAD)
 if [[ -z "$latest_sha" ]]; then
   echo "Could not resolve latest commit for $owner/$repo@$branch" >&2
   exit 1
 fi
 
-tmp_dir=$(mktemp -d)
-trap 'rm -rf "$tmp_dir"' EXIT
-
-curl -fsSL "$url" -o "$tmp_dir/archive.tar.gz"
-tar xzf "$tmp_dir/archive.tar.gz" -C "$tmp_dir"
-extracted_skills=$(find "$tmp_dir" -mindepth 2 -maxdepth 2 -type d -name skills | head -1)
+if [[ -d "$tmp_dir/repo/skills" ]]; then
+  extracted_skills="$tmp_dir/repo/skills"
+else
+  extracted_skills=$(find "$tmp_dir/repo" -mindepth 1 -maxdepth 2 -type d -name skills | head -1)
+fi
 
 if [[ -z "$extracted_skills" ]]; then
-  echo "Downloaded archive has no top-level skills/ directory" >&2
+  echo "Cloned repository has no skills/ directory" >&2
   exit 1
 fi
 
