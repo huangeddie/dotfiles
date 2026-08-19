@@ -180,3 +180,4 @@ above.
 - L = "latter"
 - SDD = "subagent-driven development"
 - IE = "inline execution"
+- IIRC = "if i recall correctly"
