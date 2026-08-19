@@ -18,6 +18,7 @@ alias jd='jj diff'
 
 # Diff tools
 alias h='hunk'
+alias hs='hunk show'
 
 # Agent harnesses
 alias cl='claude'
