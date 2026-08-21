@@ -8,8 +8,8 @@ focus_pane_right = ["prefix+l"]
 new_tab = ["prefix+c", "ctrl+alt+n"]
 previous_tab = ["prefix+p", "ctrl+alt+h"]
 next_tab = ["prefix+n", "ctrl+alt+l"]
-split_vertical = ["prefix+v", "ctrl+alt+d"]
-split_horizontal = ["prefix+minus", "ctrl+alt+shift+d"]
+split_vertical = ["prefix+v"]
+split_horizontal = ["prefix+minus"]
 zoom = ["prefix+z", "ctrl+alt+z"]
 previous_workspace = "ctrl+alt+k"
 next_workspace = "ctrl+alt+j"
@@ -27,6 +27,12 @@ key = "ctrl+alt+v"
 type = "pane"
 command = "vcsui"
 description = "run lazygit or jj UI"
+
+[[keys.command]]
+key = "ctrl+alt+d"
+type = "pane"
+command = "hunk show"
+description = "show diff (hunk)"
 
 [advanced]
 scrollback_limit_bytes = 500000
