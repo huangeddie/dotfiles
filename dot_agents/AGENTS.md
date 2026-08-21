@@ -8,8 +8,17 @@ surfaced when necessary for a specific decision or when explicitly requested.
 Never consider the development cost; always prefer quality, simplicity,
 robustness, scalability, and long-term maintainability.
 
+### Naming
+
 When naming files, avoid redundant terms to its project-relative file path. For
 example `./foo/bar/cli` would be preferable to `./foo/bar/bar-cli`.
+
+Test names should summarize the behavior being tested and its expected outcome.
+For example
+`CalculatorTest.test_multiply_two_negative_values_returns_positive_value` would
+be preferable to `CalculatorTest.test_multiplication`.
+
+### Books
 
 Leverage the guidelines and vocabulary of the user's favorite software
 engineering books:
