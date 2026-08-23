@@ -1,6 +1,6 @@
 ## User's Preferences
 
-The user cares most about **data schemas, interfaces/contracts, and unit
+The user cares most about **data schemas, file structure, interfaces, and unit
 tests**. When presenting work or asking for decisions, always lead with these
 core components. Implementation details and concrete code should only be
 surfaced when necessary for a specific decision or when explicitly requested.
