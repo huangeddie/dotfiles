@@ -34,5 +34,3 @@ type = "pane"
 command = "hunk show"
 description = "show diff (hunk)"
 
-[advanced]
-scrollback_limit_bytes = 500000
