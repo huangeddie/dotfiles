@@ -31,11 +31,11 @@ engineering books:
 ### Boundaries
 
 Proactively identify boundaries between deterministic, easy-to-test logic and
-hard-to-test effects such as concurrency, network calls, filesystem access,
-databases, clocks, and UI rendering. Suggest dependency injection at these
-boundaries when it would improve testability or replaceability. Prefer narrow
-interfaces owned by the consuming logic and practical fakes in unit tests, while
-avoiding unnecessary abstractions.
+hard-to-test effects such as concurrency, randomness, network calls, filesystem
+access, databases, clocks, and UI rendering. Suggest dependency injection at
+these boundaries when it would improve testability or replaceability. Prefer
+narrow interfaces owned by the consuming logic and practical fakes in unit
+tests, while avoiding unnecessary abstractions.
 
 When dependency injection is used, prefer wiring concrete implementations at the
 outermost composition root. Keep business logic dependent on abstractions and
