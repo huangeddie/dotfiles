@@ -52,39 +52,28 @@ All commit messages MUST follow the
 [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/)
 specification.
 
-Before committing, classify changes into two tracks:
+Before committing, classify changes into two tracks and commit each separately:
 
-**Track A — Contracts & Verification (commit separately):**
-
-- Data schemas, types, database migrations, DTOs, models
-- Interfaces, API contracts, function signatures, abstract classes, type
-  definitions
-- Unit tests, test fixtures, test utilities
-
-**Track B — Implementation (commit separately):**
-
-- Concrete implementations of interfaces
-- Business logic, algorithms, service code
-- UI frontend code (components, styles, templates)
+- **Track A — Contracts & Verification:** schemas, types, migrations, DTOs,
+  models; interfaces, API contracts, signatures, abstract classes; unit tests,
+  fixtures, test utilities.
+- **Track B — Implementation:** concrete implementations, business logic,
+  algorithms, service code, UI code. When Track A tests reference interfaces or
+  schemas that do not yet exist, put minimal stubs (empty functions, interface
+  shells, type placeholders) in Track A so tests compile, and keep all real
+  logic here.
 
 ### Red-Green Across Commits
 
-When performing TDD, determine whether your test framework supports
-expected-failure (xfail) semantics:
+If the test framework supports expected-failure (xfail), prefer it:
 
-**Preferred: Expected-Failure (xfail)** If your framework supports marking tests
-as expected to fail, use this approach. The test body contains the real, correct
-assertion from the start.
+1. **RED**: Write tests with correct assertions, marked expected-to-fail. Add
+   minimal stubs needed to compile. Commit to Track A (`test:` / `red:`).
+2. **GREEN**: Remove the marker, add the implementation. Commit to Track B
+   (`impl:` / `feat:`).
 
-1. **RED**: Write tests asserting correct behavior. Mark them as
-   expected-to-fail using your framework's mechanism. Include minimal
-   interface/schema stubs required for compilation. Commit to Track A. Label
-   prefix: `test:` or `red:`
-2. **GREEN**: Remove the expected-failure marker and add the implementation that
-   makes tests pass. Commit to Track B. Label prefix: `impl:` or `feat:`
-
-Expected-failure commits are safe to publish individually because the automated
-test suite treats them as anticipated failures, not broken builds.
+Xfail RED commits are safe to publish alone; the suite treats them as
+anticipated failures, not broken builds.
 
 **Fallback: Local Red-Green** If your framework does NOT support
 expected-failure, use this approach:
@@ -100,12 +89,6 @@ expected-failure, use this approach:
 
 If the current branch has already been published, do not add raw RED commits
 directly to it. Complete the RED-GREEN pair locally first, then publish.
-
-### Compilation Dependencies
-
-If new tests reference interfaces or schemas that do not yet exist, include
-minimal stubs (empty functions, interface shells, type placeholders) in Track A
-so tests compile. Do not include implementation logic in these stubs.
 
 ### Framework Reference
 
