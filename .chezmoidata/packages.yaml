@@ -30,13 +30,13 @@ packages:
               curl -fsSL https://chatgpt.com/codex/install.sh | sh
     taps:
       roles:
-        base: ["modem-dev/tap"]
-    # Homebrew refuses to load formulae from third-party taps unless they are
-    # trusted. Scoped per-formula rather than per-tap, so formulae added to a
-    # tap later are not implicitly authorized.
-    trusted_formulae:
-      roles:
-        base: ["modem-dev/tap/hunk"]
+        base: ["modem-dev/tap", "anomalyco/tap"]
+    # # Homebrew refuses to load formulae from third-party taps unless they are
+    # # trusted. Scoped per-formula rather than per-tap, so formulae added to a
+    # # tap later are not implicitly authorized.
+    # trusted_formulae:
+    #   roles:
+    #     base: ["modem-dev/tap/hunk"]
     # On darwin this list is AUTHORITATIVE: `chezmoi apply` runs `brew bundle`
     # with `install --force-cleanup`, so any Homebrew package NOT listed here is
     # uninstalled. Adding a package here installs it; removing it uninstalls it.
