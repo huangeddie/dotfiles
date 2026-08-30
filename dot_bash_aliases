@@ -4,6 +4,7 @@ alias n='nvim'
 # SSH
 alias sd='ssh desktop'
 alias sm='ssh mac herdr'
+alias mm='mosh mac -- herdr'
 
 # Version control
 alias g='git'
