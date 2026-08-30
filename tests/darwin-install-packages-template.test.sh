@@ -19,11 +19,13 @@ with open(sys.argv[1], encoding="utf-8") as stream:
     packages = json.load(stream)["packages"]
 
 darwin = packages["darwin"]
-assert darwin["taps"]["roles"]["base"] == ["modem-dev/tap"]
-assert darwin["trusted_formulae"]["roles"]["base"] == ["modem-dev/tap/hunk"]
+assert "taps" not in darwin
+assert darwin["trusted_formulae"]["roles"]["base"] == [
+    "modem-dev/tap/hunk",
+    "anomalyco/tap/opencode",
+]
 assert "git-delta" in darwin["brews"]["roles"]["base"]
 assert darwin["casks"]["roles"]["base"] == [
-    "codex",
     "font-jetbrains-mono-nerd-font",
     "gcloud-cli",
     "ghostty",
@@ -78,6 +80,10 @@ assert_string_category_validation() {
 }
 
 render_darwin base "$base_darwin"
+assert_render_failure \
+  null-taps \
+  '{"chezmoi":{"os":"darwin"},"machineRoles":["base"],"packages":{"darwin":{"taps":null}}}' \
+  'packages.darwin.taps must be a map'
 
 fake_bin="$test_dir/bin"
 mkdir -p "$fake_bin"
@@ -100,11 +106,13 @@ BREW_CALLS="$brew_calls" \
 BREWFILE_INPUT="$brewfile_input" \
   bash "$test_dir/base.sh"
 
-trust_call_count=$(grep -Fxc 'trust --formula modem-dev/tap/hunk' "$brew_calls" || true)
-if [[ $trust_call_count -ne 2 ]]; then
-  echo "rendered installer did not restore declared tap trust around bundle cleanup" >&2
-  exit 1
-fi
+for formula in modem-dev/tap/hunk anomalyco/tap/opencode; do
+  trust_call_count=$(grep -Fxc "trust --formula $formula" "$brew_calls" || true)
+  if [[ $trust_call_count -ne 2 ]]; then
+    echo "rendered installer did not restore trust for $formula around bundle cleanup" >&2
+    exit 1
+  fi
+done
 
 if ! grep -Fqx 'bundle install --file=/dev/stdin --force-cleanup' "$brew_calls"; then
   echo "rendered installer did not use strict brew bundle cleanup" >&2
@@ -118,35 +126,40 @@ with open(sys.argv[1], encoding="utf-8") as stream:
     declarations = [line.rstrip("\n") for line in stream]
 
 assert declarations == [
-    'tap "modem-dev/tap"',
-    'brew "gmp"',
-    'brew "libyaml"',
-    'brew "openssl@3"',
+    'brew "ripgrep"',
     'brew "bat"',
-    'brew "bun"',
-    'brew "chezmoi"',
-    'brew "cloudflared"',
     'brew "fd"',
-    'brew "ffmpeg"',
     'brew "fzf"',
-    'brew "gh"',
+    'brew "zoxide"',
+    'brew "neovim"',
+    'brew "universal-ctags"',
+    'brew "modem-dev/tap/hunk"',
     'brew "git-delta"',
-    'brew "herdr"',
+    'brew "gh"',
+    'brew "chezmoi"',
     'brew "jj"',
     'brew "jjui"',
     'brew "lazygit"',
-    'brew "mise"',
-    'brew "modem-dev/tap/hunk"',
-    'brew "neovim"',
-    'brew "python"',
     'brew "rust-analyzer"',
     'brew "stylua"',
     'brew "swiftformat"',
-    'brew "television"',
-    'brew "universal-ctags"',
     'brew "zig"',
-    'brew "zoxide"',
-    'cask "codex"',
+    'brew "python"',
+    'brew "node"',
+    'brew "bun"',
+    'brew "uv"',
+    'brew "mise"',
+    'brew "gmp"',
+    'brew "libyaml"',
+    'brew "openssl@3"',
+    'brew "cloudflared"',
+    'brew "ffmpeg"',
+    'brew "vips"',
+    'brew "mosh"',
+    'brew "herdr"',
+    'brew "television"',
+    'brew "btop"',
+    'brew "anomalyco/tap/opencode"',
     'cask "font-jetbrains-mono-nerd-font"',
     'cask "gcloud-cli"',
     'cask "ghostty"',

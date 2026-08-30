@@ -7,7 +7,12 @@
 {{- $legacyDenied := get $root "blocked_prefixes" | default list -}}
 {{- $deniedPrefixes := concat $newDenied $legacyDenied | uniq -}}
 {{- $customRoles := $root.packages.darwin.custom.roles -}}
-{{- $tapRoles := $root.packages.darwin.taps.roles -}}
+{{- $tapRoles := dict -}}
+{{- if hasKey $root.packages.darwin "taps" -}}
+  {{- $tapConfig := get $root.packages.darwin "taps" -}}
+  {{- if not (kindIs "map" $tapConfig) }}{{ fail "packages.darwin.taps must be a map" }}{{ end -}}
+  {{- $tapRoles = get $tapConfig "roles" -}}
+{{- end -}}
 {{- $trustedFormulaRoles := $root.packages.darwin.trusted_formulae.roles -}}
 {{- $brewRoles := $root.packages.darwin.brews.roles -}}
 {{- $caskRoles := $root.packages.darwin.casks.roles -}}
