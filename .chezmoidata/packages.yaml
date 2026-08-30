@@ -85,6 +85,8 @@ packages:
             "herdr",
             "television",
             "btop",
+            # Agent Harnesses
+            "anomalyco/tap/opencode",
           ]
     casks:
       roles:
