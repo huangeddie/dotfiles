@@ -1,6 +1,3 @@
-Host desktop mac
-    RemoteCommand exec "$SHELL" -lic "herdr; exec $SHELL -l"
-
 Host desktop
     HostName 100.119.103.30
     User eddie
