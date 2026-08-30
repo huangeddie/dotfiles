@@ -1,4 +1,4 @@
-## User's Preferences
+# User's Preferences
 
 The user cares most about **data schemas, file structure, interfaces, and unit
 tests**. When presenting work or asking for decisions, always lead with these
@@ -46,7 +46,13 @@ free from construction details.
 Prefer to design schema in Third Normal Form (3NF). Only consider deviating from
 data normalization for significant performance optimizations.
 
-## Committing & TDD Protocol
+### Scoping work
+
+When collaborating with the user, scope the simplest most incremental work
+required. Rely on the user to explicitly expand the scope. Incremental changes
+are the most effective way of concentrating our attention and focus.
+
+## Test Driven Development
 
 All commit messages MUST follow the
 [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/)
@@ -90,20 +96,11 @@ expected-failure, use this approach:
 If the current branch has already been published, do not add raw RED commits
 directly to it. Complete the RED-GREEN pair locally first, then publish.
 
-### Framework Reference
-
-- **pytest**: `@pytest.mark.xfail` — use expected-failure
-- **Python unittest**: `@unittest.expectedFailure` — use expected-failure
-- **Go testing** — no expected-failure; use local red-green (or `t.Skip()` as a
-  secondary fallback)
-- **Rust** — `#[should_panic]` for panic tests only; general expected-failure
-  not supported; use local red-green
-
 If the framework has no expected-failure, skip, or todo mechanism, temporarily
 comment out test blocks in Track A and uncomment them in Track B as a last
 resort.
 
-### Exceptions to Red-Green TDD
+#### Exceptions
 
 The following code changes SHOULD NOT use red-green TDD.
 
@@ -113,7 +110,7 @@ The following code changes SHOULD NOT use red-green TDD.
 - Bug fixes with trivial test adjustments; trivial
 - Config changes; too shallow to have meaningful tests
 
-## Testing Preferences
+## Testing
 
 All unit tests should have the following properties
 
@@ -128,7 +125,7 @@ All unit tests should have the following properties
 
 Any tests discovered to violate these properties MUST be flagged to the user.
 
-### QA
+### Quality Assurance (QA)
 
 QA tests complement unit tests by covering the hard-to-test entities. Recall
 that unit tests covers our own domain logic, with hard-to-test entities
@@ -163,13 +160,13 @@ above.
 
 ## Terminology
 
-- SG(TM) = "sounds good (to me)"
-- LG(TM) = "looks good (to me)"
-- WDYM = "what do you mean"
 - Y = "yes"
 - N = "no"
 - F = "former"
 - L = "latter"
+- SG(TM) = "sounds good (to me)"
+- LG(TM) = "looks good (to me)"
+- WDYM = "what do you mean"
 - SDD = "subagent-driven development"
 - IE = "inline execution"
 - IIRC = "if i recall correctly"
