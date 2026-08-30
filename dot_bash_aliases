@@ -3,8 +3,8 @@ alias n='nvim'
 
 # SSH
 alias sd='ssh desktop'
-alias sm='ssh mac herdr'
-alias mm='mosh mac -- herdr'
+alias sm="ssh mac 'herdr; exec \"\$SHELL\" -l'"
+alias mm="mosh mac -- sh -c 'herdr; exec \"\$SHELL\" -l'"
 
 # Version control
 alias g='git'
