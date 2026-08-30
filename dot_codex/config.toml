@@ -1,3 +1,5 @@
-default_permissions = "danger-full-access"
 approval_policy = "never"
 sandbox_mode = "danger-full-access"
+
+[permissions]
+default_permissions = "danger-full-access"
