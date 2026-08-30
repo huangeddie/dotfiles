@@ -13,6 +13,7 @@
     },
     {
       "source": "~/.agents/packages/devops"
-    }
+    },
+    "npm:pi-subagents"
   ]
 }
