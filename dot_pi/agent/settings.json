@@ -15,5 +15,9 @@
       "source": "~/.agents/packages/devops"
     },
     "npm:pi-subagents"
-  ]
+  ],
+  "subagents": {
+    "defaultModel": "gpt-5.6-terra",
+    "defaultProvider": "openai-codex"
+  }
 }
