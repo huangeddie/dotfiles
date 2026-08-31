@@ -135,9 +135,16 @@ QA tests are often scripts that test our integration of domain logic with the
 production hard-to-test entities such as network calls or UI code.
 
 QA tests MUST NOT be included in pre-commit, pre-push, or CI/CD pipelines. They
-should only be invoked manually and it is up to our discretion to determine when
-we should run our QA tests. Generally speaking, maintain and run QA tests
+should only by our discretion . Generally speaking, maintain and run QA tests
 related to any code changes, also in red-green fashion.
+
+QA tests can further be classified between **agent-driven** and
+**human-driven**. Agent-driven means the agent can invoke and evaluate the
+results of the QA without human guidance. This likely requires that the QA can
+be controlled by CLI and the output is either text and/or images. Human-driven
+QA are the even-harder-to-test domains such as interacting with a GUI and/or
+evaluating video / audio data. Aim to make as much of the QA agent-driven as
+possible.
 
 ## Debugging
 
