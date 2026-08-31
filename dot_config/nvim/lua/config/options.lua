@@ -4,6 +4,7 @@
 
 vim.opt.wildignore:append("*.orig")
 vim.opt.relativenumber = false
+vim.opt.clipboard = "unnamedplus"
 
 if vim.env.SSH_TTY or vim.env.SSH_CLIENT or vim.env.SSH_CONNECTION or vim.env.TMUX or vim.env.HERDR_ENV then
   -- Reading the clipboard via OSC 52 requires the terminal to answer a
