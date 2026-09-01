@@ -24,13 +24,17 @@ prompt_new_tab_name = false
 
 [[keys.command]]
 key = "ctrl+alt+v"
-type = "pane"
+type = "popup"
 command = "vcsui"
 description = "run lazygit or jj UI"
+width = "100%"
+height = "100%"
 
 [[keys.command]]
 key = "ctrl+alt+d"
-type = "pane"
+type = "popup"
 command = "hunk show"
 description = "show diff (hunk)"
+width = "100%"
+height = "100%"
 
