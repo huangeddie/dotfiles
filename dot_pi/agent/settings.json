@@ -3,7 +3,7 @@
   "theme": "light/dark",
   "defaultProvider": "openai-codex",
   "defaultModel": "gpt-5.6-sol",
-  "defaultThinkingLevel": "high",
+  "defaultThinkingLevel": "xhigh",
   "packages": [
     {
       "source": "~/.agents/packages/superpowers"
