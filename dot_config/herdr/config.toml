@@ -1,6 +1,7 @@
 onboarding = false
 [keys]
 prefix = "ctrl+space"
+new_workspace = "ctrl+alt+shift+n"
 focus_pane_left = ["prefix+h"]
 focus_pane_down = ["prefix+j"]
 focus_pane_up = ["prefix+k"]
