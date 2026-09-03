@@ -14,7 +14,8 @@
     {
       "source": "~/.agents/packages/devops"
     },
-    "npm:pi-subagents"
+    "npm:pi-subagents",
+    "npm:pi-web-access"
   ],
   "subagents": {
     "defaultModel": "gpt-5.6-terra",
