@@ -13,6 +13,8 @@ const socketEndpoint =
   process.platform === "win32" && socketPath ? `\\\\.\\pipe\\${socketPath}` : socketPath;
 const paneId = process.env.HERDR_PANE_ID;
 const source = "herdr:pi";
+// Bounds reconciliation when a fast async workflow completes before its tool result arrives.
+const RECENT_ASYNC_COMPLETION_LIMIT = 128;
 
 function enabled() {
   return HERDR_ENV === "1" && !!socketPath && !!paneId;
@@ -180,6 +182,9 @@ export default function (pi) {
   let agentActive = false;
   let busyCount = 0;
   let busyMessage: string | undefined;
+  // pi-subagents workflow launches currently omit the herdr:busy start event.
+  const fallbackAsyncWorkflowRuns = new Set<string>();
+  const recentAsyncCompletions = new Set<string>();
   let blockedCount = 0;
   let blockedMessage: string | undefined;
   let lastState: AgentState | undefined;
@@ -190,7 +195,7 @@ export default function (pi) {
     if (blockedCount > 0) {
       return { state: "blocked" as const, message: blockedMessage };
     }
-    if (agentActive || busyCount > 0) {
+    if (agentActive || busyCount > 0 || fallbackAsyncWorkflowRuns.size > 0) {
       return {
         state: "working" as const,
         message: agentActive ? undefined : busyMessage,
@@ -242,6 +247,47 @@ export default function (pi) {
 
     blockedCount += 1;
     blockedMessage = data.label;
+    publishState();
+  });
+
+  pi.events.on("subagent:async-complete", (data) => {
+    if (!rootSession) {
+      return;
+    }
+    const runId = data?.runId ?? data?.id;
+    if (typeof runId !== "string") {
+      return;
+    }
+    if (fallbackAsyncWorkflowRuns.delete(runId)) {
+      publishState();
+      return;
+    }
+
+    recentAsyncCompletions.add(runId);
+    if (recentAsyncCompletions.size > RECENT_ASYNC_COMPLETION_LIMIT) {
+      recentAsyncCompletions.delete(recentAsyncCompletions.values().next().value);
+    }
+  });
+
+  pi.on("tool_result", (event) => {
+    if (
+      !rootSession ||
+      event?.toolName !== "subagent" ||
+      event?.isError === true ||
+      event?.details?.mode !== "workflow"
+    ) {
+      return;
+    }
+
+    const runId = event.details.asyncId;
+    if (typeof runId !== "string" || runId.length === 0) {
+      return;
+    }
+    if (recentAsyncCompletions.delete(runId)) {
+      return;
+    }
+
+    fallbackAsyncWorkflowRuns.add(runId);
     publishState();
   });
 
