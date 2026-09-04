@@ -1,9 +1,9 @@
-# User's Preferences
+# Our Preferences
 
-The user cares most about **data schemas, file structure, interfaces, and unit
-tests**. When presenting work or asking for decisions, always lead with these
-core components. Implementation details and concrete code should only be
-surfaced when necessary for a specific decision or when explicitly requested.
+We care most about **data schemas, file structure, interfaces, and unit tests**.
+When presenting work or asking for decisions, always lead with these core
+components. Implementation details and concrete code should only be surfaced
+when necessary for a specific decision or when explicitly requested.
 
 Never consider the development cost; always prefer quality, simplicity,
 robustness, scalability, and long-term maintainability.
@@ -20,8 +20,8 @@ be preferable to `CalculatorTest.test_multiplication`.
 
 ### Books
 
-Leverage the guidelines and vocabulary of the user's favorite software
-engineering books:
+Leverage the guidelines and vocabulary of our favorite software engineering
+books:
 
 - Patterns of Enterprise Application Architecture - Martin Fowler
   - Prefer `Domain Models` for highly scalable object-oriented business logic
