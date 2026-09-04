@@ -1,0 +1,18 @@
+# approval_policy = "never"
+# sandbox_mode = "danger-full-access"
+
+default_permissions = ":danger-full-access"
+
+[tui]
+vim_mode_default = true
+
+[projects."/Users/eddie/Documents/GitHub/Tokens"]
+trust_level = "trusted"
+
+[projects."/Users/eddie/Documents/GitHub/Lernr"]
+trust_level = "trusted"
+
+[hooks.state]
+
+[hooks.state."/Users/eddie/.codex/hooks.json:session_start:0:0"]
+trusted_hash = "sha256:ed7562b28c8956655466fe4881cf53c0a1e23c5cca95388723f5a3b00e1055cf"
