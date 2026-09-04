@@ -178,6 +178,8 @@ export default function (pi) {
   }
 
   let agentActive = false;
+  let busyCount = 0;
+  let busyMessage: string | undefined;
   let blockedCount = 0;
   let blockedMessage: string | undefined;
   let lastState: AgentState | undefined;
@@ -188,8 +190,11 @@ export default function (pi) {
     if (blockedCount > 0) {
       return { state: "blocked" as const, message: blockedMessage };
     }
-    if (agentActive) {
-      return { state: "working" as const, message: undefined };
+    if (agentActive || busyCount > 0) {
+      return {
+        state: "working" as const,
+        message: agentActive ? undefined : busyMessage,
+      };
     }
     return { state: "idle" as const, message: undefined };
   }
@@ -203,6 +208,24 @@ export default function (pi) {
     lastMessage = next.message;
     queueState(next.state, next.message);
   }
+
+  pi.events.on("herdr:busy", (data) => {
+    if (!rootSession) {
+      return;
+    }
+    if (!data?.active) {
+      busyCount = Math.max(0, busyCount - 1);
+      if (busyCount === 0) {
+        busyMessage = undefined;
+      }
+      publishState();
+      return;
+    }
+
+    busyCount += 1;
+    busyMessage = data.label;
+    publishState();
+  });
 
   pi.events.on("herdr:blocked", (data) => {
     if (!rootSession) {

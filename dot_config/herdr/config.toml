@@ -28,7 +28,7 @@ status_indicators = "symbols"
 [[keys.command]]
 key = "ctrl+alt+v"
 type = "popup"
-command = "vcsui"
+command = "\"$HOME/.local/bin/vcsui\""
 description = "run lazygit or jj UI"
 width = "100%"
 height = "100%"
