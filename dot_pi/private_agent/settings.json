@@ -3,7 +3,7 @@
   "theme": "light/dark",
   "defaultProvider": "openai-codex",
   "defaultModel": "gpt-6-astra",
-  "defaultThinkingLevel": "high",
+  "defaultThinkingLevel": "medium",
   "packages": [
     {
       "source": "~/.agents/packages/superpowers"
