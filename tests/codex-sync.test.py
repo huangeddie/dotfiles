@@ -3,10 +3,10 @@ import runpy
 import unittest
 from pathlib import Path
 
-script = runpy.run_path(str(Path(__file__).parents[1] / 'dot_local/bin/executable_refresh-codex'))
+script = runpy.run_path(str(Path(__file__).parents[1] / 'dot_local/bin/executable_sync-codex'))
 
 
-class RefreshTest(unittest.TestCase):
+class SyncTest(unittest.TestCase):
     def test_historical_changes_without_pending_changes_return_no_targets(self):
         self.assertEqual(script['pending_targets']('M  .agents/AGENTS.md\n'), [])
 
@@ -30,7 +30,7 @@ class RefreshTest(unittest.TestCase):
 
     def test_refresh_applies_only_targets_then_reinstalls_then_restarts(self):
         calls = []
-        script['refresh'](calls.append, ['/home/a/.agents', '/home/a/.codex/AGENTS.md'],
+        script['sync'](calls.append, ['/home/a/.agents', '/home/a/.codex/AGENTS.md'],
                           [{'pluginId': 'coding@local-agents', 'enabled': True}])
         self.assertEqual(calls, [
             ['chezmoi', 'apply', '--force', '--exclude', 'scripts', '--refresh-externals=always', '/home/a/.agents', '/home/a/.codex/AGENTS.md'],
@@ -40,13 +40,13 @@ class RefreshTest(unittest.TestCase):
 
     def test_no_restart_omits_daemon_command(self):
         calls = []
-        script['refresh'](calls.append, ['target'], [], restart=False)
+        script['sync'](calls.append, ['target'], [], restart=False)
         self.assertEqual(len(calls), 1)
 
     def test_disabled_plugin_aborts_before_mutation(self):
         calls = []
         with self.assertRaisesRegex(ValueError, 'disabled'):
-            script['refresh'](calls.append, ['target'], [{'enabled': False}])
+            script['sync'](calls.append, ['target'], [{'enabled': False}])
         self.assertEqual(calls, [])
 
     def test_apply_failure_prevents_plugin_removal_and_restart(self):
@@ -55,26 +55,24 @@ class RefreshTest(unittest.TestCase):
             calls.append(command)
             raise RuntimeError('apply failed')
         with self.assertRaisesRegex(RuntimeError, 'apply failed'):
-            script['refresh'](fail, ['target'], [])
+            script['sync'](fail, ['target'], [])
         self.assertEqual(len(calls), 1)
 
 
 
-    @unittest.expectedFailure
     def test_missing_packages_include_every_uninstalled_local_selector(self):
         installed = [{'pluginId': 'coding@local-agents'}]
         self.assertEqual(script['missing_plugins'](
             ['superpowers@local-agents', 'coding@local-agents', 'assistant@local-agents'],
             installed), ['assistant@local-agents', 'superpowers@local-agents'])
 
-    @unittest.expectedFailure
     def test_sync_discovers_after_apply_and_installs_missing_packages_before_verification(self):
         calls = []
         def discover():
             self.assertEqual(calls[0][0:2], ['chezmoi', 'apply'])
             return ['assistant@local-agents', 'coding@local-agents', 'devops@local-agents',
                     'superpowers@local-agents']
-        script['refresh'](calls.append, ['target'],
+        script['sync'](calls.append, ['target'],
                           [{'pluginId': 'coding@local-agents', 'enabled': True}],
                           discover=discover, verify=lambda: calls.append(['verify']))
         self.assertEqual(calls[1:], [
@@ -85,7 +83,6 @@ class RefreshTest(unittest.TestCase):
             ['codex', 'plugin', 'add', 'superpowers@local-agents'],
             ['verify'], ['codex', 'app-server', 'daemon', 'restart']])
 
-    @unittest.expectedFailure
     def test_install_failure_reports_recovery_and_prevents_verification_and_restart(self):
         calls = []
         def run(command):
@@ -93,7 +90,7 @@ class RefreshTest(unittest.TestCase):
             if command[:3] == ['codex', 'plugin', 'add']:
                 raise RuntimeError('install failed')
         with self.assertRaisesRegex(RuntimeError, 'Recover with: codex plugin add assistant@local-agents'):
-            script['refresh'](run, ['target'], [],
+            script['sync'](run, ['target'], [],
                               discover=lambda: ['assistant@local-agents'],
                               verify=lambda: calls.append(['verify']))
         self.assertEqual(calls[1:], [['codex', 'plugin', 'add', 'assistant@local-agents']])
@@ -103,7 +100,7 @@ class RefreshTest(unittest.TestCase):
         def verify():
             raise RuntimeError('verification failed')
         with self.assertRaisesRegex(RuntimeError, 'verification failed'):
-            script['refresh'](calls.append, ['target'], [], verify=verify)
+            script['sync'](calls.append, ['target'], [], verify=verify)
         self.assertEqual(len(calls), 1)
 
 

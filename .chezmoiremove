@@ -3,3 +3,4 @@
 .tmux.conf
 .tmux
 .config/television/cable/sesh.toml
+.local/bin/refresh-codex

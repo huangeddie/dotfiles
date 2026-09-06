@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check or refresh chezmoi-managed Codex inputs. See docs/codex-refresh.md."""
+"""Check or sync chezmoi-managed Codex inputs and install all local packages. See docs/codex-sync.md."""
 import argparse
 import hashlib
 import json
@@ -24,13 +24,23 @@ def differences(source, cached):
                   if source.get(key) != cached.get(key))
 
 
-def refresh(run, targets, plugins, restart=True, verify=lambda: None):
+def missing_plugins(required, installed):
+    return sorted(set(required) - {plugin['pluginId'] for plugin in installed})
+
+
+def package_plugins(home):
+    return sorted(f'{manifest.parent.parent.name}@local-agents'
+                  for manifest in (home / '.agents/packages').glob('*/.codex-plugin/plugin.json'))
+
+
+def sync(run, targets, plugins, restart=True, verify=lambda: None, discover=lambda: []):
     # The CLI has no enable/disable command. Reinstallation would enable a
     # deliberately disabled plugin, so fail before modifying anything.
     if any(not plugin['enabled'] for plugin in plugins):
-        raise ValueError('An installed local plugin is disabled; refresh would enable it.')
+        raise ValueError('An installed local plugin is disabled; sync would enable it.')
     run(['chezmoi', 'apply', '--force', '--exclude', 'scripts', '--refresh-externals=always',
          *targets])
+    missing = missing_plugins(discover(), plugins)
     for plugin in plugins:
         selector = plugin['pluginId']
         run(['codex', 'plugin', 'remove', selector])
@@ -38,6 +48,11 @@ def refresh(run, targets, plugins, restart=True, verify=lambda: None):
             run(['codex', 'plugin', 'add', selector])
         except Exception as error:
             raise RuntimeError(f'Reinstall failed. Recover with: codex plugin add {selector}') from error
+    for selector in missing:
+        try:
+            run(['codex', 'plugin', 'add', selector])
+        except Exception as error:
+            raise RuntimeError(f'Install failed. Recover with: codex plugin add {selector}') from error
     verify()
     if restart:
         run(['codex', 'app-server', 'daemon', 'restart'])
@@ -68,6 +83,8 @@ def inspect(targets, codex_home, home):
                   *targets])
     stale = [f'Unapplied: {path}' for path in pending_targets(status)]
     plugins = local_plugins(json.loads(run(['codex', 'plugin', 'list', '--json']))['installed'])
+    stale.extend(f'Missing local plugin: {selector}'
+                 for selector in missing_plugins(package_plugins(home), plugins))
     for plugin in plugins:
         name, version = plugin['name'], plugin['version']
         if any(Path(part).name != part or part in ('.', '..', '') for part in (name, version)):
@@ -101,8 +118,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument('--check', action='store_true', help='Report disk staleness; exit 1 if stale')
-    mode.add_argument('--refresh', action='store_true', help='Force refresh (default)')
-    parser.add_argument('--no-restart', action='store_true', help='Refresh files and plugins only')
+    mode.add_argument('--sync', '--refresh', action='store_true', help='Force sync (default)')
+    parser.add_argument('--no-restart', action='store_true', help='Sync files and plugins only')
     args = parser.parse_args()
     home = Path(run(['chezmoi', 'execute-template', '{{ .chezmoi.destDir }}']).strip()).resolve()
     codex_home = Path(os.environ.get('CODEX_HOME', str(Path.home() / '.codex'))).expanduser().resolve()
@@ -113,8 +130,8 @@ def main():
     for message in stale:
         print(message, flush=True)
     if not stale:
-        print('Managed files and installed local plugin caches match on disk.', flush=True)
-    print(f'Installed local-agents plugins: {len(plugins)}; uninstalled plugins are not installed.', flush=True)
+        print('All local packages are installed; managed files and plugin caches match on disk.', flush=True)
+    print(f'Installed local-agents plugins: {len(plugins)}; sync installs all local packages.', flush=True)
     print(memory_status(codex_home), flush=True)
     print('Existing conversation instructions cannot be checked or replaced by this script.', flush=True)
     if args.check:
@@ -124,7 +141,7 @@ def main():
         remaining, installed = inspect(targets, codex_home, home)
         missing = {p['pluginId'] for p in plugins} - {p['pluginId'] for p in installed}
         if remaining or missing:
-            raise RuntimeError('Refresh verification failed: ' + '; '.join(remaining + sorted(missing)))
+            raise RuntimeError('Sync verification failed: ' + '; '.join(remaining + sorted(missing)))
 
     def execute(command):
         print('Running: ' + ' '.join(command), flush=True)
@@ -132,8 +149,9 @@ def main():
         if output.strip():
             print(output.strip(), flush=True)
 
-    refresh(execute, targets, plugins, restart=not args.no_restart, verify=verify)
-    print('Disk refresh verified. Start a NEW Codex conversation to load current instructions.')
+    sync(execute, targets, plugins, restart=not args.no_restart, verify=verify,
+         discover=lambda: package_plugins(home))
+    print('Disk sync verified. Start a NEW Codex conversation to load current instructions.')
     if args.no_restart:
         print('Daemon restart skipped; restart Codex before starting that conversation.')
     return 0

@@ -6,12 +6,17 @@ import subprocess
 import tempfile
 
 repo = Path(__file__).resolve().parents[2]
-script = runpy.run_path(str(repo / 'dot_local/bin/executable_refresh-codex'))
-with tempfile.TemporaryDirectory(prefix='codex-refresh-qa-') as temporary:
+script = runpy.run_path(str(repo / 'dot_local/bin/executable_sync-codex'))
+with tempfile.TemporaryDirectory(prefix='codex-sync-qa-') as temporary:
     root = Path(temporary)
     source, destination = root / 'source', root / 'destination'
     (source / 'dot_agents').mkdir(parents=True)
     (source / 'dot_codex').mkdir()
+    manifest = source / 'dot_agents/exact_packages/example/dot_codex-plugin/plugin.json'
+    manifest.parent.mkdir(parents=True)
+    manifest.write_text('{"name": "example", "skills": "./skills/"}')
+    (source / 'dot_agents/exact_packages/non-codex').mkdir()
+    (source / 'dot_agents/exact_packages/non-codex/README.md').write_text('No Codex manifest')
     (destination / '.agents').mkdir(parents=True)
     (destination / '.codex').mkdir()
     (source / 'dot_agents/AGENTS.md').write_text('current instructions\n')
@@ -31,14 +36,16 @@ with tempfile.TemporaryDirectory(prefix='codex-refresh-qa-') as temporary:
     targets = [str(destination / '.agents'), str(destination / '.codex/AGENTS.md')]
     status_command = ['chezmoi', 'status', '--exclude', 'scripts', '--refresh-externals=never', *targets]
     assert script['pending_targets'](run(status_command)), 'RED: stale fixture must be detected'
-    script['refresh'](run, targets, [], restart=False)
+    script['sync'](run, targets, [], restart=False)
     assert not script['pending_targets'](run(status_command)), 'GREEN: pending changes remain'
+    assert script['package_plugins'](destination) == ['example@local-agents']
+    assert script['missing_plugins'](script['package_plugins'](destination), []) == ['example@local-agents']
     assert (destination / '.codex/AGENTS.md').is_symlink()
     assert (destination / '.codex/AGENTS.md').read_text() == 'current instructions\n'
-    script['refresh'](run, targets, [], restart=False)
+    script['sync'](run, targets, [], restart=False)
     assert not script['pending_targets'](run(status_command)), 'Repeat refresh must be idempotent'
     cached = root / 'cached'
     cached.mkdir()
     (cached / 'AGENTS.md').write_text('old cache\n')
-    assert script['differences'](script['snapshot'](destination / '.agents'), script['snapshot'](cached)) == ['AGENTS.md']
-print('PASS: stale detection, forced apply, symlink repair, script exclusion, idempotence, cache comparison')
+    assert 'AGENTS.md' in script['differences'](script['snapshot'](destination / '.agents'), script['snapshot'](cached))
+print('PASS: stale detection, forced apply, symlink repair, script exclusion, idempotence, manifest discovery, missing installation detection, cache comparison')
