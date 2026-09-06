@@ -1,18 +1,147 @@
 #!/usr/bin/env python3
 """Check or refresh chezmoi-managed Codex inputs. See docs/codex-refresh.md."""
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import sqlite3
+import subprocess
+import sys
 
 
 def pending_targets(status):
-    raise NotImplementedError
+    return [line[3:] for line in status.splitlines() if len(line) > 3 and line[1] != ' ']
 
 
 def local_plugins(installed):
-    raise NotImplementedError
+    return [plugin for plugin in installed
+            if plugin['marketplaceName'] == 'local-agents' and plugin['installed']]
 
 
 def differences(source, cached):
-    raise NotImplementedError
+    return sorted(key for key in source.keys() | cached.keys()
+                  if source.get(key) != cached.get(key))
 
 
-def refresh(run, targets, plugins, restart=True):
-    raise NotImplementedError
+def refresh(run, targets, plugins, restart=True, verify=lambda: None):
+    # The CLI has no enable/disable command. Reinstallation would enable a
+    # deliberately disabled plugin, so fail before modifying anything.
+    if any(not plugin['enabled'] for plugin in plugins):
+        raise ValueError('An installed local plugin is disabled; refresh would enable it.')
+    run(['chezmoi', 'apply', '--force', '--exclude', 'scripts', '--refresh-externals=always',
+         *targets])
+    for plugin in plugins:
+        selector = plugin['pluginId']
+        run(['codex', 'plugin', 'remove', selector])
+        try:
+            run(['codex', 'plugin', 'add', selector])
+        except Exception as error:
+            raise RuntimeError(f'Reinstall failed. Recover with: codex plugin add {selector}') from error
+    verify()
+    if restart:
+        run(['codex', 'app-server', 'daemon', 'restart'])
+
+
+def run(command):
+    return subprocess.run(command, check=True, text=True, stdout=subprocess.PIPE).stdout
+
+
+def snapshot(root):
+    if not root.is_dir():
+        return {}
+    result = {}
+    for path in sorted(root.rglob('*')):
+        relative = path.relative_to(root)
+        if '.git' in relative.parts:
+            continue
+        if path.is_symlink():
+            result[str(relative)] = ('link', os.readlink(path))
+        elif path.is_file():
+            result[str(relative)] = ('file', hashlib.sha256(path.read_bytes()).hexdigest(),
+                                     bool(path.stat().st_mode & 0o111))
+    return result
+
+
+def inspect(targets, codex_home, home):
+    status = run(['chezmoi', 'status', '--exclude', 'scripts', '--refresh-externals=never',
+                  *targets])
+    stale = [f'Unapplied: {path}' for path in pending_targets(status)]
+    plugins = local_plugins(json.loads(run(['codex', 'plugin', 'list', '--json']))['installed'])
+    for plugin in plugins:
+        name, version = plugin['name'], plugin['version']
+        if any(Path(part).name != part or part in ('.', '..', '') for part in (name, version)):
+            raise ValueError('Invalid plugin name or version in Codex output')
+        source = home / '.agents/packages' / name
+        cached = codex_home / 'plugins/cache/local-agents' / name / version
+        if not source.is_dir():
+            stale.append(f'Missing local plugin source: {source}')
+        elif not cached.is_dir():
+            stale.append(f'Missing plugin cache: {cached}')
+        else:
+            changed = differences(snapshot(source), snapshot(cached))
+            if changed:
+                stale.append(f'Stale plugin {name}: {len(changed)} changed/missing/extra files')
+    return stale, plugins
+
+
+def memory_status(codex_home):
+    database = codex_home / 'memories_1.sqlite'
+    if not database.exists():
+        return 'Memory: no local memories_1.sqlite database found; freshness unverified.'
+    try:
+        with sqlite3.connect(database.as_uri() + '?mode=ro', uri=True) as connection:
+            count = connection.execute('SELECT count(*) FROM stage1_outputs').fetchone()[0]
+        return f'Memory: {count} stored extraction rows; semantic freshness unverified.'
+    except sqlite3.Error:
+        return 'Memory: database could not be inspected; freshness unverified.'
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument('--check', action='store_true', help='Report disk staleness; exit 1 if stale')
+    mode.add_argument('--refresh', action='store_true', help='Force refresh (default)')
+    parser.add_argument('--no-restart', action='store_true', help='Refresh files and plugins only')
+    args = parser.parse_args()
+    home = Path(run(['chezmoi', 'execute-template', '{{ .chezmoi.destDir }}']).strip()).resolve()
+    codex_home = Path(os.environ.get('CODEX_HOME', str(Path.home() / '.codex'))).expanduser().resolve()
+    if codex_home != (home / '.codex').resolve():
+        raise ValueError('CODEX_HOME does not match the chezmoi destination .codex directory')
+    targets = [str(home / '.agents'), str(home / '.codex/AGENTS.md')]
+    stale, plugins = inspect(targets, codex_home, home)
+    for message in stale:
+        print(message, flush=True)
+    if not stale:
+        print('Managed files and installed local plugin caches match on disk.', flush=True)
+    print(f'Installed local-agents plugins: {len(plugins)}; uninstalled plugins are not installed.', flush=True)
+    print(memory_status(codex_home), flush=True)
+    print('Existing conversation instructions cannot be checked or replaced by this script.', flush=True)
+    if args.check:
+        return int(bool(stale))
+
+    def verify():
+        remaining, installed = inspect(targets, codex_home, home)
+        missing = {p['pluginId'] for p in plugins} - {p['pluginId'] for p in installed}
+        if remaining or missing:
+            raise RuntimeError('Refresh verification failed: ' + '; '.join(remaining + sorted(missing)))
+
+    def execute(command):
+        print('Running: ' + ' '.join(command), flush=True)
+        output = run(command)
+        if output.strip():
+            print(output.strip(), flush=True)
+
+    refresh(execute, targets, plugins, restart=not args.no_restart, verify=verify)
+    print('Disk refresh verified. Start a NEW Codex conversation to load current instructions.')
+    if args.no_restart:
+        print('Daemon restart skipped; restart Codex before starting that conversation.')
+    return 0
+
+
+if __name__ == '__main__':
+    try:
+        sys.exit(main())
+    except (OSError, ValueError, KeyError, RuntimeError, subprocess.CalledProcessError) as error:
+        print(f'Error: {error}', file=sys.stderr)
+        sys.exit(2)
