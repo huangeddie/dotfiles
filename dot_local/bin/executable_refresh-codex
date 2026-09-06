@@ -1,0 +1,18 @@
+#!/usr/bin/env python3
+"""Check or refresh chezmoi-managed Codex inputs. See docs/codex-refresh.md."""
+
+
+def pending_targets(status):
+    raise NotImplementedError
+
+
+def local_plugins(installed):
+    raise NotImplementedError
+
+
+def differences(source, cached):
+    raise NotImplementedError
+
+
+def refresh(run, targets, plugins, restart=True):
+    raise NotImplementedError
