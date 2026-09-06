@@ -59,5 +59,53 @@ class RefreshTest(unittest.TestCase):
         self.assertEqual(len(calls), 1)
 
 
+
+    @unittest.expectedFailure
+    def test_missing_packages_include_every_uninstalled_local_selector(self):
+        installed = [{'pluginId': 'coding@local-agents'}]
+        self.assertEqual(script['missing_plugins'](
+            ['superpowers@local-agents', 'coding@local-agents', 'assistant@local-agents'],
+            installed), ['assistant@local-agents', 'superpowers@local-agents'])
+
+    @unittest.expectedFailure
+    def test_sync_discovers_after_apply_and_installs_missing_packages_before_verification(self):
+        calls = []
+        def discover():
+            self.assertEqual(calls[0][0:2], ['chezmoi', 'apply'])
+            return ['assistant@local-agents', 'coding@local-agents', 'devops@local-agents',
+                    'superpowers@local-agents']
+        script['refresh'](calls.append, ['target'],
+                          [{'pluginId': 'coding@local-agents', 'enabled': True}],
+                          discover=discover, verify=lambda: calls.append(['verify']))
+        self.assertEqual(calls[1:], [
+            ['codex', 'plugin', 'remove', 'coding@local-agents'],
+            ['codex', 'plugin', 'add', 'coding@local-agents'],
+            ['codex', 'plugin', 'add', 'assistant@local-agents'],
+            ['codex', 'plugin', 'add', 'devops@local-agents'],
+            ['codex', 'plugin', 'add', 'superpowers@local-agents'],
+            ['verify'], ['codex', 'app-server', 'daemon', 'restart']])
+
+    @unittest.expectedFailure
+    def test_install_failure_reports_recovery_and_prevents_verification_and_restart(self):
+        calls = []
+        def run(command):
+            calls.append(command)
+            if command[:3] == ['codex', 'plugin', 'add']:
+                raise RuntimeError('install failed')
+        with self.assertRaisesRegex(RuntimeError, 'Recover with: codex plugin add assistant@local-agents'):
+            script['refresh'](run, ['target'], [],
+                              discover=lambda: ['assistant@local-agents'],
+                              verify=lambda: calls.append(['verify']))
+        self.assertEqual(calls[1:], [['codex', 'plugin', 'add', 'assistant@local-agents']])
+
+    def test_verification_failure_prevents_restart(self):
+        calls = []
+        def verify():
+            raise RuntimeError('verification failed')
+        with self.assertRaisesRegex(RuntimeError, 'verification failed'):
+            script['refresh'](calls.append, ['target'], [], verify=verify)
+        self.assertEqual(len(calls), 1)
+
+
 if __name__ == '__main__':
     unittest.main()
