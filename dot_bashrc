@@ -36,4 +36,15 @@ elif [ -n "$ZSH_VERSION" ] && [ -f ~/.zsh_aliases ]; then
   . ~/.zsh_aliases
 fi
 
+# zoxide
 eval "$(zoxide init bash)"
+
+# bun completions
+[ -s "~/.bun/_bun" ] && source "~/.bun/_bun"
+
+# bun
+export BUN_INSTALL="$HOME/.bun"
+export PATH="$BUN_INSTALL/bin:$PATH"
+
+# cargo
+export PATH="$HOME/.cargo/bin"

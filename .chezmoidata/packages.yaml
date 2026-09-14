@@ -10,16 +10,15 @@ packages:
   bun:
     global:
       roles:
-        base:
-          [
-            "prettier",
-            "@earendil-works/pi-coding-agent",
-            "hunkdiff",
-          ]
+        base: ["prettier", "@earendil-works/pi-coding-agent", "hunkdiff"]
   darwin:
     custom:
       roles:
-        base: 
+        base:
+          - name: cargo
+            executable: cargo
+            install: |-
+              curl https://sh.rustup.rs -sSf | sh
           - name: claude-code
             executable: claude
             install: |-
@@ -40,8 +39,7 @@ packages:
     # Dependencies of listed packages are retained automatically.
     brews:
       roles:
-        base:
-          [
+        base: [
             # Search
             "ripgrep",
             "bat",
@@ -87,12 +85,7 @@ packages:
           ]
     casks:
       roles:
-        base:
-          [
-            "font-jetbrains-mono-nerd-font",
-            "gcloud-cli",
-            "ghostty",
-          ]
+        base: ["font-jetbrains-mono-nerd-font", "gcloud-cli", "ghostty"]
   linux:
     custom:
       roles:
@@ -120,14 +113,17 @@ packages:
               export PATH="$BUN_INSTALL/bin:$PATH"
             install: |-
               curl -fsSL https://bun.com/install | bash
+          - name: cargo
+            executable: cargo
+            install: |-
+              curl https://sh.rustup.rs -sSf | sh
     # On linux, apt roles declare desired packages and apt.remove contains
     # durable removal tombstones. Move a retired package from a role to remove;
     # packages absent from both lists are left untouched. Apt-calculated orphan
     # dependencies are purged automatically.
     apt:
       roles:
-        base:
-          [
+        base: [
             # Search
             "bat",
             "ripgrep",
@@ -154,9 +150,5 @@ packages:
             "nvtop",
             "ghostty",
           ]
-        gaming:
-          [
-            "steam-installer",
-            "steam-devices",
-          ]
+        gaming: ["steam-installer", "steam-devices"]
       remove: []
