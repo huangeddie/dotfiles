@@ -108,9 +108,6 @@ packages:
               curl -fsSL https://tailscale.com/install.sh | sh
           - name: bun
             executable: bun
-            setup: |-
-              export BUN_INSTALL="${BUN_INSTALL:-$HOME/.bun}"
-              export PATH="$BUN_INSTALL/bin:$PATH"
             install: |-
               curl -fsSL https://bun.com/install | bash
           - name: cargo
