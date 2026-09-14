@@ -19,3 +19,12 @@ trust_level = "trusted"
 
 [hooks.state."/Users/eddie/.codex/hooks.json:session_start:0:0"]
 trusted_hash = "sha256:ed7562b28c8956655466fe4881cf53c0a1e23c5cca95388723f5a3b00e1055cf"
+
+[plugins."coding@local-agents"]
+enabled = true
+
+[plugins."devops@local-agents"]
+enabled = true
+
+[plugins."superpowers@local-agents"]
+enabled = true
