@@ -4,3 +4,4 @@
 .tmux
 .config/television/cable/sesh.toml
 .local/bin/refresh-codex
+.agents/packages/devops/skills/chezmoi
