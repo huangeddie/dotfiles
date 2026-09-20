@@ -172,6 +172,7 @@ above.
 - N = "no"
 - F = "former"
 - L = "latter"
+- A = "approved"
 - SG(TM) = "sounds good (to me)"
 - LG(TM) = "looks good (to me)"
 - WDYM = "what do you mean"
