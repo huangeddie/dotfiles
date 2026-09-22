@@ -15,6 +15,7 @@ split_horizontal = ["prefix+minus"]
 zoom = ["prefix+z", "ctrl+alt+z"]
 previous_workspace = "ctrl+alt+k"
 next_workspace = "ctrl+alt+j"
+toggle_sidebar = "ctrl+alt+b"
 
 [theme]
 name = "catppuccin"
@@ -44,4 +45,3 @@ height = "100%"
 
 [experimental]
 kitty_graphics = true
-
