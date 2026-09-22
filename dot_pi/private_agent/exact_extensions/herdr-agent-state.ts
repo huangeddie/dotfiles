@@ -2,10 +2,11 @@
 // managed by herdr; reinstalling or updating the integration overwrites this file.
 // add custom hooks/plugins beside this file instead of editing it.
 // HERDR_INTEGRATION_ID=pi
-// HERDR_INTEGRATION_VERSION=8
+// HERDR_INTEGRATION_VERSION=9
 // @ts-nocheck
 
 import net from "node:net";
+import path from "node:path";
 
 const HERDR_ENV = process.env.HERDR_ENV;
 const socketPath = process.env.HERDR_SOCKET_PATH;
@@ -13,8 +14,6 @@ const socketEndpoint =
   process.platform === "win32" && socketPath ? `\\\\.\\pipe\\${socketPath}` : socketPath;
 const paneId = process.env.HERDR_PANE_ID;
 const source = "herdr:pi";
-// Bounds reconciliation when a fast async workflow completes before its tool result arrives.
-const RECENT_ASYNC_COMPLETION_LIMIT = 128;
 
 function enabled() {
   return HERDR_ENV === "1" && !!socketPath && !!paneId;
@@ -76,7 +75,10 @@ function updateSessionRef(ctx: any): void {
   try {
     const file = ctx?.sessionManager?.getSessionFile?.();
     currentAgentSessionPath =
-      typeof file === "string" && file.startsWith("/") ? file : undefined;
+      typeof file === "string" &&
+      (path.posix.isAbsolute(file) || path.win32.isAbsolute(file))
+        ? file
+        : undefined;
   } catch {
     currentAgentSessionPath = undefined;
   }
@@ -180,11 +182,6 @@ export default function (pi) {
   }
 
   let agentActive = false;
-  let busyCount = 0;
-  let busyMessage: string | undefined;
-  // pi-subagents workflow launches currently omit the herdr:busy start event.
-  const fallbackAsyncWorkflowRuns = new Set<string>();
-  const recentAsyncCompletions = new Set<string>();
   let blockedCount = 0;
   let blockedMessage: string | undefined;
   let lastState: AgentState | undefined;
@@ -195,11 +192,8 @@ export default function (pi) {
     if (blockedCount > 0) {
       return { state: "blocked" as const, message: blockedMessage };
     }
-    if (agentActive || busyCount > 0 || fallbackAsyncWorkflowRuns.size > 0) {
-      return {
-        state: "working" as const,
-        message: agentActive ? undefined : busyMessage,
-      };
+    if (agentActive) {
+      return { state: "working" as const, message: undefined };
     }
     return { state: "idle" as const, message: undefined };
   }
@@ -213,24 +207,6 @@ export default function (pi) {
     lastMessage = next.message;
     queueState(next.state, next.message);
   }
-
-  pi.events.on("herdr:busy", (data) => {
-    if (!rootSession) {
-      return;
-    }
-    if (!data?.active) {
-      busyCount = Math.max(0, busyCount - 1);
-      if (busyCount === 0) {
-        busyMessage = undefined;
-      }
-      publishState();
-      return;
-    }
-
-    busyCount += 1;
-    busyMessage = data.label;
-    publishState();
-  });
 
   pi.events.on("herdr:blocked", (data) => {
     if (!rootSession) {
@@ -247,47 +223,6 @@ export default function (pi) {
 
     blockedCount += 1;
     blockedMessage = data.label;
-    publishState();
-  });
-
-  pi.events.on("subagent:async-complete", (data) => {
-    if (!rootSession) {
-      return;
-    }
-    const runId = data?.runId ?? data?.id;
-    if (typeof runId !== "string") {
-      return;
-    }
-    if (fallbackAsyncWorkflowRuns.delete(runId)) {
-      publishState();
-      return;
-    }
-
-    recentAsyncCompletions.add(runId);
-    if (recentAsyncCompletions.size > RECENT_ASYNC_COMPLETION_LIMIT) {
-      recentAsyncCompletions.delete(recentAsyncCompletions.values().next().value);
-    }
-  });
-
-  pi.on("tool_result", (event) => {
-    if (
-      !rootSession ||
-      event?.toolName !== "subagent" ||
-      event?.isError === true ||
-      event?.details?.mode !== "workflow"
-    ) {
-      return;
-    }
-
-    const runId = event.details.asyncId;
-    if (typeof runId !== "string" || runId.length === 0) {
-      return;
-    }
-    if (recentAsyncCompletions.delete(runId)) {
-      return;
-    }
-
-    fallbackAsyncWorkflowRuns.add(runId);
     publishState();
   });
 
