@@ -18,7 +18,7 @@
     "npm:pi-web-access"
   ],
   "subagents": {
-    "defaultModel": "gpt-5.6-terra",
+    "defaultModel": "gpt-6-sol",
     "defaultProvider": "openai-codex"
   }
 }
