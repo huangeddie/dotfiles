@@ -159,7 +159,7 @@ possible.
 Prefer icons over text, but never emojis. Minimize text descriptions and hints.
 It's preferable to start with a lacking of text information than to spam it on
 the UI. Prefer baking new UI into the background instead of creating nested
-views / divs unless otherwise specified.
+views / divs / bordered buttons unless otherwise specified.
 
 ## Flagging
 
