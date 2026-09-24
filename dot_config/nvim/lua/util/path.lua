@@ -6,6 +6,7 @@ local M = {}
 ---@field link? boolean          -- Format as web/CodeSearch URL
 ---@field link_prefix? string    -- URL prefix (e.g. 'http://google3/')
 ---@field head_prefix? string    -- Head depot prefix (e.g. '/google/src/head/depot/google3/')
+---@field absolute? boolean     -- Copy absolute path instead of relative
 ---@field all_buffers? boolean   -- Copy all listed open buffer paths
 ---@field root_resolver? fun(full_path: string): string? -- Custom root extractor
 

@@ -6,6 +6,7 @@ personal_dir=$(cd "$script_dir/.." && pwd)
 
 nvim -l - <<LUA
 package.path = "$personal_dir/dot_config/nvim/lua/?.lua;$personal_dir/dot_config/nvim/lua/?/init.lua;" .. package.path
+vim.opt.rtp:prepend("$personal_dir/dot_config/nvim")
 
 local path_util = require("util.path")
 
@@ -149,6 +150,49 @@ assert_eq(
   ),
   "/google/src/head/depot/google3/devtools/editor/plugin.lua:5-12",
   "Head absolute path"
+)
+
+-- Test 17: Plain absolute path
+assert_eq(
+  path_util.format_path("/home/user/project/lua/config/keymaps.lua", "/home/user/project", { absolute = true }),
+  "/home/user/project/lua/config/keymaps.lua",
+  "plain absolute path"
+)
+
+-- Test 18: Absolute path with single line
+assert_eq(
+  path_util.format_path(
+    "/home/user/project/lua/config/keymaps.lua",
+    "/home/user/project",
+    { absolute = true },
+    { start_line = 10, end_line = 10 }
+  ),
+  "/home/user/project/lua/config/keymaps.lua:10",
+  "absolute path with single line"
+)
+
+-- Test 19: Absolute path with line range
+assert_eq(
+  path_util.format_path(
+    "/home/user/project/lua/config/keymaps.lua",
+    "/home/user/project",
+    { absolute = true },
+    { start_line = 10, end_line = 25 }
+  ),
+  "/home/user/project/lua/config/keymaps.lua:10-25",
+  "absolute path with line range"
+)
+
+-- Test 20: Inverted line range on absolute path
+assert_eq(
+  path_util.format_path(
+    "/home/user/project/lua/config/keymaps.lua",
+    "/home/user/project",
+    { absolute = true },
+    { start_line = 25, end_line = 10 }
+  ),
+  "/home/user/project/lua/config/keymaps.lua:10-25",
+  "inverted line range on absolute path"
 )
 
 print("All path formatting tests passed successfully!")
