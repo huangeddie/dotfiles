@@ -9,6 +9,10 @@ vim.keymap.set({ "n", "x" }, "<leader>yp", function()
   path_util.copy_path()
 end, { desc = "Copy relative path" })
 
+vim.keymap.set({ "n", "x" }, "<leader>yP", function()
+  path_util.copy_path({ absolute = true })
+end, { desc = "Copy absolute path" })
+
 vim.keymap.set({ "n", "x" }, "<leader>ya", function()
   path_util.copy_path({ annotated = true })
 end, { desc = "Copy annotated path (@)" })

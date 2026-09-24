@@ -56,13 +56,20 @@ end
 ---@return string?
 function M.format_path(full_path, project_root, opts, range)
   opts = opts or {}
-  local rel = M.get_relative_path(full_path, project_root, opts.root_resolver)
+  local rel = opts.absolute and full_path or M.get_relative_path(full_path, project_root, opts.root_resolver)
 
   if opts.dir_only then
-    if rel == "." or not rel:find("/") then
-      rel = "."
+    if opts.absolute then
+      if rel:find("/") then
+        local dir = rel:match("^(.*)/[^/]*$")
+        rel = (dir == "" and "/" or dir) or rel
+      end
     else
-      rel = rel:match("^(.*)/[^/]*$") or "."
+      if rel == "." or not rel:find("/") then
+        rel = "."
+      else
+        rel = rel:match("^(.*)/[^/]*$") or "."
+      end
     end
   end
 
