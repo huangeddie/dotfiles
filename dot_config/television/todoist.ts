@@ -17,11 +17,23 @@ export interface Section {
 export type Run = (args: string[]) => Promise<string>;
 
 export function localDate(date: Date): string {
-  return "";
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
+// ANSI mode cannot use Television's display template, so retain a dimmed ID at the end.
 export function displayRows(rows: string[], tab: Tab, today: string): string[] {
-  return rows;
+  return rows.map(row => {
+    const [id, label] = row.split("\t");
+    let display = label;
+    if (tab === "scheduled") {
+      const end = label.indexOf(" ");
+      const due = label.slice(0, end);
+      const day = due.slice(0, 10);
+      const color = day < today ? "\x1b[31m" : day === today ? "\x1b[33m" : "";
+      if (color) display = `${color}${due}\x1b[39m${label.slice(end)}`;
+    }
+    return `${display}\t\x1b[2m${id}\x1b[22m`;
+  });
 }
 
 // Keep every task on one TSV line, including multiline task/section names.
@@ -65,13 +77,24 @@ export async function loadRows(config: Record<string, unknown>, tab: Tab, run: R
     if (!data || !Array.isArray(data.results)) throw new Error(`Missing ${entity} results from td`);
     return data.results;
   }
-  const tasks = await list<Task>("task", project);
-  // td section list requires a project. Only visit projects that need section labels.
-  const projects = project ? [project] : [...new Set(tasks
+  if (project) {
+    const [tasks, sections] = await Promise.all([
+      list<Task>("task", project), list<Section>("section", project),
+    ]);
+    return taskRows(tasks, sections, tab);
+  }
+  const tasks = await list<Task>("task");
+  // td section list requires a project. Only visit projects represented in this tab.
+  const projects = [...new Set(tasks
+    .filter(task => Boolean(task.due?.date) === (tab === "scheduled"))
     .filter(task => task.sectionId && task.projectId)
     .map(task => `id:${task.projectId}`))];
   const sections: Section[] = [];
-  for (const ref of projects) sections.push(...await list<Section>("section", ref));
+  // Bound concurrency so an account with many projects cannot flood the API.
+  for (let i = 0; i < projects.length; i += 4) {
+    const batch = await Promise.all(projects.slice(i, i + 4).map(ref => list<Section>("section", ref)));
+    sections.push(...batch.flat());
+  }
   return taskRows(tasks, sections, tab);
 }
 
@@ -91,7 +114,7 @@ if (import.meta.main) {
       return stdout;
     };
     const rows = await loadRows(config, tab, run);
-    if (rows.length) console.log(rows.join("\n"));
+    if (rows.length) console.log(displayRows(rows, tab, localDate(new Date())).join("\n"));
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;

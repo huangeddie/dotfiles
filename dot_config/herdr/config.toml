@@ -43,5 +43,13 @@ description = "show diff (hunk)"
 width = "100%"
 height = "100%"
 
+[[keys.command]]
+key = "ctrl+alt+t"
+type = "popup"
+command = "\"$SHELL\" -lic 'exec tv todoist'"
+description = "open Todoist"
+width = "100%"
+height = "100%"
+
 [experimental]
 kitty_graphics = true

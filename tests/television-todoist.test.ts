@@ -123,7 +123,7 @@ test("malformed CLI output fails instead of appearing as an empty task list", as
   await expect(loadRows({}, "backlog", async () => '{}')).rejects.toThrow("results");
 });
 
-test.failing("scheduled colors only overdue dates red and today's dates yellow", () => {
+test("scheduled colors only overdue dates red and today's dates yellow", () => {
   expect(displayRows([
     "old\t2026-06-13 [Work] Overdue",
     "now\t2026-06-14T09:00:00 [Work] Today",
@@ -135,17 +135,17 @@ test.failing("scheduled colors only overdue dates red and today's dates yellow",
   ]);
 });
 
-test.failing("today's all-day date is yellow rather than overdue", () => {
+test("today's all-day date is yellow rather than overdue", () => {
   expect(displayRows(["day\t2026-06-14 All day"], "scheduled", "2026-06-14"))
     .toEqual(["\x1b[33m2026-06-14\x1b[39m All day\t\x1b[2mday\x1b[22m"]);
 });
 
-test.failing("backlog dates in task names remain uncolored while IDs are dimmed", () => {
+test("backlog dates in task names remain uncolored while IDs are dimmed", () => {
   expect(displayRows(["plain\t2020-01-01 is part of the title"], "backlog", "2026-06-14"))
     .toEqual(["2020-01-01 is part of the title\t\x1b[2mplain\x1b[22m"]);
 });
 
-test.failing("changing the supplied date changes due-date color without changing task order", () => {
+test("changing the supplied date changes due-date color without changing task order", () => {
   const rows = ["one\t2026-06-14 Task"];
   expect(displayRows(rows, "scheduled", "2026-06-13"))
     .toEqual(["2026-06-14 Task\t\x1b[2mone\x1b[22m"]);
@@ -153,12 +153,12 @@ test.failing("changing the supplied date changes due-date color without changing
     .toEqual(["\x1b[31m2026-06-14\x1b[39m Task\t\x1b[2mone\x1b[22m"]);
 });
 
-test.failing("local date uses padded local calendar fields at both ends of the day", () => {
+test("local date uses padded local calendar fields at both ends of the day", () => {
   expect(localDate(new Date(2026, 0, 2, 0, 0))).toBe("2026-01-02");
   expect(localDate(new Date(2026, 0, 2, 23, 59))).toBe("2026-01-02");
 });
 
-test.failing("configured project starts task and section requests without waiting for either", async () => {
+test("configured project starts task and section requests without waiting for either", async () => {
   const gate = Promise.withResolvers<void>();
   const started: string[] = [];
   const run: Run = async args => {
@@ -178,7 +178,7 @@ test.failing("configured project starts task and section requests without waitin
   ]);
 });
 
-test.failing("unscoped tabs skip other-tab and unsectioned projects and deduplicate section lookups", async () => {
+test("unscoped tabs skip other-tab and unsectioned projects and deduplicate section lookups", async () => {
   const input: Task[] = [
     { id: "one", content: "One", due: { date: "2026-01-01" }, projectId: "p", sectionId: "s" },
     { id: "two", content: "Two", due: { date: "2026-01-02" }, projectId: "p", sectionId: "s" },
@@ -200,7 +200,7 @@ test.failing("unscoped tabs skip other-tab and unsectioned projects and deduplic
   }
 });
 
-test.failing("unscoped section requests run concurrently with no more than four in flight", async () => {
+test("unscoped section requests run concurrently with no more than four in flight", async () => {
   const gates = Array.from({ length: 6 }, () => Promise.withResolvers<void>());
   const signals = Array.from({ length: 6 }, () => Promise.withResolvers<void>());
   const started: number[] = [];

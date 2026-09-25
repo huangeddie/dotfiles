@@ -34,22 +34,24 @@ bun - <<'JS'
 const path = `${process.env.XDG_CONFIG_HOME || `${process.env.HOME}/.config`}/television`;
 const channel = Bun.TOML.parse(await Bun.file(`${path}/cable/todoist.toml`).text());
 for (const source of channel.source.command) {
+  const started = performance.now();
   const child = Bun.spawn(['sh', '-c', source.run], { stdout: 'pipe', stderr: 'pipe' });
   const [out, err, code] = await Promise.all([
     new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited,
   ]);
   if (code) throw new Error(`${source.name}: ${err}`);
-  const rows = out.trimEnd() ? out.trimEnd().split('\n') : [];
+  const plain = Bun.stripANSI(out);
+  const rows = plain.trimEnd() ? plain.trimEnd().split('\n') : [];
   for (const row of rows) {
-    if (!/^[a-zA-Z0-9_-]+\t[^\t\r\n]*$/.test(row)) throw new Error('Invalid task row');
+    if (!/^[^\t\r\n]*\t[a-zA-Z0-9_-]+$/.test(row)) throw new Error('Invalid task row');
   }
   if (source.name === 'Scheduled') {
-    const dates = rows.map(row => row.split('\t')[1].split(' ')[0]);
+    const dates = rows.map(row => row.split('\t')[0].split(' ')[0]);
     if (dates.some((date, index) => index > 0 && date < dates[index - 1])) {
       throw new Error('Scheduled is not in due-date order');
     }
   }
-  console.log(`${source.name}: ${rows.length} valid rows`);
+  console.log(`${source.name}: ${rows.length} valid rows in ${((performance.now() - started) / 1000).toFixed(3)}s`);
 }
 JS
 tv list-channels | grep '^todoist$'
@@ -58,6 +60,10 @@ tv list-channels | grep '^todoist$'
 Repeat with different projects configured for each tab, then with one tab's
 project empty. Each tab should use only its own scope. The unscoped mode resolves
 section names per project because `td section list` requires a project argument.
+Only projects with sectioned tasks in the selected tab are queried, in batches
+of at most four concurrent requests. Scoped tabs fetch tasks and sections in
+parallel. No data is cached; rerunning a source always fetches fresh data.
+Compare timings manually, not with automated wall-clock thresholds.
 
 ## Human-driven checks
 
@@ -67,7 +73,11 @@ Run `tv todoist`:
   all-day tasks precede timed tasks on the same day. Overdue tasks remain visible.
 - Ctrl+S switches to Backlog, containing only tasks without due dates. A deadline
   alone does not make a task scheduled.
-- Both tabs prefix sectioned task names with `[Section]`.
+- Both tabs prefix sectioned task names with `[Section]` and show dimmed task IDs
+  at the end (Television ANSI mode cannot also hide IDs with a display template).
+- Scheduled due dates are red when overdue, yellow today, and default-colored in
+  the future. Classification uses the local calendar date when the source loads;
+  reload or reopen after midnight. Only the date, not the task label, is colored.
 - Task previews work; Enter opens the selected task in Todoist's web app.
 - Each tab contains only tasks from its own configured project; an empty project
   setting shows all projects without inheriting the other tab's setting.

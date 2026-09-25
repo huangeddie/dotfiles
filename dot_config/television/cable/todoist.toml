@@ -11,16 +11,16 @@ command = [
 ]
 # Keep the helper's chronological order rather than ranking by fuzzy score/history.
 no_sort = true
-display = "{split:\t:1}"
-output = "{split:\t:0}"
+ansi = true
+output = "{strip_ansi|split:\t:1}"
 
 [preview]
-command = "td --no-spinner task view 'id:{split:\t:0}' --raw"
+command = "td --no-spinner task view 'id:{strip_ansi|split:\t:1}' --raw"
 
 [keybindings]
 enter = "actions:open"
 
 [actions.open]
 description = "Open task in Todoist"
-command = "td --no-spinner task browse 'id:{split:\t:0}'"
+command = "td --no-spinner task browse 'id:{strip_ansi|split:\t:1}'"
 mode = "execute"
