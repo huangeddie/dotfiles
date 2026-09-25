@@ -10,7 +10,12 @@ packages:
   bun:
     global:
       roles:
-        base: ["prettier", "@earendil-works/pi-coding-agent", "hunkdiff"]
+        base: [
+          "prettier",
+          "@earendil-works/pi-coding-agent",
+          "hunkdiff",
+          "@doist/todoist-cli"
+        ]
   darwin:
     custom:
       roles:
@@ -32,7 +37,10 @@ packages:
     # tap later are not implicitly authorized.
     trusted_formulae:
       roles:
-        base: ["modem-dev/tap/hunk", "anomalyco/tap/opencode"]
+        base: [
+          "modem-dev/tap/hunk",
+          "anomalyco/tap/opencode"
+        ]
     # On darwin this list is AUTHORITATIVE: `chezmoi apply` runs `brew bundle`
     # with `install --force-cleanup`, so any Homebrew package NOT listed here is
     # uninstalled. Adding a package here installs it; removing it uninstalls it.
