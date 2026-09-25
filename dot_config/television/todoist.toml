@@ -1,0 +1,6 @@
+# Each tab accepts a td project name or "id:PROJECT_ID". Empty means all projects.
+[scheduled]
+project = ""
+
+[backlog]
+project = "Lernr"

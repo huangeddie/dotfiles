@@ -1,0 +1,26 @@
+[metadata]
+name = "todoist"
+description = "Search active Todoist tasks and open them in the browser"
+requirements = ["td", "bun"]
+
+[source]
+# Ctrl+S switches tabs. Project scope is configured in ../todoist.toml.
+command = [
+  { name = "Scheduled", run = 'bun "${XDG_CONFIG_HOME:-$HOME/.config}/television/todoist.ts" scheduled' },
+  { name = "Backlog", run = 'bun "${XDG_CONFIG_HOME:-$HOME/.config}/television/todoist.ts" backlog' },
+]
+# Keep the helper's chronological order rather than ranking by fuzzy score/history.
+no_sort = true
+display = "{split:\t:1}"
+output = "{split:\t:0}"
+
+[preview]
+command = "td --no-spinner task view 'id:{split:\t:0}' --raw"
+
+[keybindings]
+enter = "actions:open"
+
+[actions.open]
+description = "Open task in Todoist"
+command = "td --no-spinner task browse 'id:{split:\t:0}'"
+mode = "execute"
