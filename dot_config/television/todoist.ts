@@ -16,6 +16,14 @@ export interface Section {
 
 export type Run = (args: string[]) => Promise<string>;
 
+export function localDate(date: Date): string {
+  return "";
+}
+
+export function displayRows(rows: string[], tab: Tab, today: string): string[] {
+  return rows;
+}
+
 // Keep every task on one TSV line, including multiline task/section names.
 function singleLine(value: string): string {
   return value.replace(/[\x00-\x1f\x7f-\x9f\u2028\u2029]/g, " ");
