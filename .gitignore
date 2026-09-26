@@ -4,3 +4,4 @@ dot_agents/exact_packages/*/commands/*.toml
 dot_agents/exact_packages/*/exact_commands/*.toml
 .antigravitycli
 tests/node_modules/
+dot_config/todoist/node_modules/

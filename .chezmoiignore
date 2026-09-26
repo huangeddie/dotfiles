@@ -4,6 +4,7 @@ AGENTS.md
 LICENSE
 docs/
 tests/
+.config/todoist/node_modules/
 tsconfig.json
 .agents/
 {{ if ne .chezmoi.os "darwin" }}
