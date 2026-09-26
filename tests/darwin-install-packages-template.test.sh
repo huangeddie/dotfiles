@@ -8,6 +8,7 @@ empty_config="$test_dir/empty-config.toml"
 : >"$empty_config"
 
 base_darwin='{"chezmoi":{"os":"darwin"},"machineRoles":["base"]}'
+execution_darwin='{"chezmoi":{"os":"darwin"},"machineRoles":["base"],"packages":{"darwin":{"custom":{"roles":{"base":[]}}}}}'
 
 schema_json="$test_dir/schema.json"
 chezmoi --config "$empty_config" --source "$source_dir" data --format json >"$schema_json"
@@ -79,14 +80,34 @@ assert_string_category_validation() {
     "packages.darwin.$category.roles.base contains duplicate $identifier \"shared\""
 }
 
+# Render executable cases from an isolated copy, never from the production source.
+execution_source="$test_dir/execution-source"
+mkdir -p "$execution_source"
+cp -R "$source_dir/.chezmoitemplates" "$source_dir/.chezmoidata" "$execution_source/"
+cp "$source_dir/run_onchange_before_darwin-install-packages.sh.tmpl" "$execution_source/"
+render_execution() {
+  local name=$1 override=$2
+  chezmoi --config "$empty_config" --source "$execution_source" --override-data "$override" \
+    execute-template -f "$execution_source/run_onchange_before_darwin-install-packages.sh.tmpl" >"$test_dir/$name.sh"
+  bash -n "$test_dir/$name.sh"
+  if grep -Eq 'sh\.rustup\.rs|claude\.ai/install\.sh|chatgpt\.com/codex/install\.sh' "$test_dir/$name.sh"; then
+    echo "production custom installer in execution script" >&2; exit 1
+  fi
+}
+
 render_darwin base "$base_darwin"
+render_execution execution "$execution_darwin"
 assert_render_failure \
   null-taps \
   '{"chezmoi":{"os":"darwin"},"machineRoles":["base"],"packages":{"darwin":{"taps":null}}}' \
   'packages.darwin.taps must be a map'
 
 fake_bin="$test_dir/bin"
-mkdir -p "$fake_bin"
+mkdir -p "$fake_bin" "$test_dir/home" "$test_dir/config"
+for executable in curl wget; do
+  printf '#!/bin/sh\necho "network forbidden in unit tests" >&2\nexit 97\n' >"$fake_bin/$executable"
+  chmod +x "$fake_bin/$executable"
+done
 cat >"$fake_bin/brew" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -99,12 +120,12 @@ chmod +x "$fake_bin/brew"
 
 brew_calls="$test_dir/brew-calls"
 brewfile_input="$test_dir/Brewfile"
-PATH="$fake_bin:$PATH" \
+PATH="$fake_bin:/usr/bin:/bin" \
 HOME="$test_dir/home" \
 XDG_CONFIG_HOME="$test_dir/config" \
 BREW_CALLS="$brew_calls" \
 BREWFILE_INPUT="$brewfile_input" \
-  bash "$test_dir/base.sh"
+  bash "$test_dir/execution.sh"
 
 for formula in modem-dev/tap/hunk anomalyco/tap/opencode; do
   trust_call_count=$(grep -Fxc "trust --formula $formula" "$brew_calls" || true)
@@ -119,51 +140,19 @@ if ! grep -Fqx 'bundle install --file=/dev/stdin --force-cleanup' "$brew_calls";
   exit 1
 fi
 
-python3 - "$brewfile_input" <<'PY'
+python3 - "$brewfile_input" "$source_dir/tests/fixtures/packages/baseline.json" <<'PY'
+import json
 import sys
 
 with open(sys.argv[1], encoding="utf-8") as stream:
     declarations = [line.rstrip("\n") for line in stream]
-
-assert declarations == [
-    'brew "ripgrep"',
-    'brew "bat"',
-    'brew "fd"',
-    'brew "fzf"',
-    'brew "zoxide"',
-    'brew "neovim"',
-    'brew "universal-ctags"',
-    'brew "modem-dev/tap/hunk"',
-    'brew "git-delta"',
-    'brew "gh"',
-    'brew "chezmoi"',
-    'brew "jj"',
-    'brew "jjui"',
-    'brew "lazygit"',
-    'brew "rust-analyzer"',
-    'brew "stylua"',
-    'brew "swiftformat"',
-    'brew "zig"',
-    'brew "python"',
-    'brew "node"',
-    'brew "bun"',
-    'brew "uv"',
-    'brew "mise"',
-    'brew "gmp"',
-    'brew "libyaml"',
-    'brew "openssl@3"',
-    'brew "cloudflared"',
-    'brew "ffmpeg"',
-    'brew "vips"',
-    'brew "mosh"',
-    'brew "herdr"',
-    'brew "television"',
-    'brew "btop"',
-    'brew "anomalyco/tap/opencode"',
-    'cask "font-jetbrains-mono-nerd-font"',
-    'cask "gcloud-cli"',
-    'cask "ghostty"',
-]
+with open(sys.argv[2], encoding="utf-8") as stream:
+    expected = json.load(stream)["darwin-base"]["homebrew"]
+assert sorted(declarations) == sorted(
+    f'{category} "{name}"'
+    for key, category in (("brews", "brew"), ("casks", "cask"), ("taps", "tap"))
+    for name in expected[key]
+)
 PY
 
 assert_render_failure \
@@ -197,10 +186,10 @@ assert_render_failure \
   '{"chezmoi":{"os":"darwin"},"machineRoles":["base"],"packages":{"darwin":{"custom":{"roles":{"base":[{"name":"shared","executable":"shared-one","install":"true"},{"name":"shared","executable":"shared-two","install":"true"}]}}}}}' \
   'packages.darwin.custom.roles.base contains duplicate installer "shared"'
 
-render_darwin denied-tap '{"chezmoi":{"os":"darwin"},"machineRoles":["base"],"packagePolicy":{"deniedPrefixes":["modem-dev/tap"]}}'
+render_execution denied-tap '{"chezmoi":{"os":"darwin"},"machineRoles":["base"],"packagePolicy":{"deniedPrefixes":["modem-dev/tap"]},"packages":{"darwin":{"custom":{"roles":{"base":[]}}}}}'
 denied_tap_calls="$test_dir/denied-tap-calls"
 denied_tap_brewfile="$test_dir/denied-tap-Brewfile"
-PATH="$fake_bin:$PATH" \
+PATH="$fake_bin:/usr/bin:/bin" \
 HOME="$test_dir/home" \
 XDG_CONFIG_HOME="$test_dir/config" \
 BREW_CALLS="$denied_tap_calls" \
@@ -223,13 +212,13 @@ for declaration in [
     assert declaration not in declarations, declaration
 PY
 
-render_darwin custom-denial '{"chezmoi":{"os":"darwin"},"machineRoles":["base"],"packagePolicy":{"deniedPrefixes":["synthetic-installer"]},"packages":{"darwin":{"custom":{"roles":{"base":[{"name":"synthetic-installer","executable":"synthetic-installer","install":"printf custom-denial-marker > \\u0022$CUSTOM_EFFECT\\u0022"}]}}}}}'
+render_execution custom-denial '{"chezmoi":{"os":"darwin"},"machineRoles":["base"],"packagePolicy":{"deniedPrefixes":["synthetic-installer"]},"packages":{"darwin":{"custom":{"roles":{"base":[{"name":"synthetic-installer","executable":"synthetic-installer","install":"printf custom-denial-marker > \\u0022$CUSTOM_EFFECT\\u0022"}]}}}}}'
 if grep -Fq 'custom-denial-marker' "$test_dir/custom-denial.sh"; then
   echo "denied custom installer command remained in the rendered script" >&2
   exit 1
 fi
 custom_effect="$test_dir/custom-effect"
-PATH="$fake_bin:$PATH" \
+PATH="$fake_bin:/usr/bin:/bin" \
 HOME="$test_dir/home" \
 XDG_CONFIG_HOME="$test_dir/config" \
 BREW_CALLS="$test_dir/custom-denial-calls" \

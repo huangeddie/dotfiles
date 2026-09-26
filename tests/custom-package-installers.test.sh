@@ -40,13 +40,20 @@ expected_linux_custom = [
     {
         "name": "bun",
         "executable": "bun",
-        "setup": 'export BUN_INSTALL="${BUN_INSTALL:-$HOME/.bun}"\n'
-        'export PATH="$BUN_INSTALL/bin:$PATH"',
         "install": "curl -fsSL https://bun.com/install | bash",
+    },
+    {
+        "name": "cargo",
+        "executable": "cargo",
+        "install": "curl https://sh.rustup.rs -sSf | sh",
     },
 ]
 
-assert packages["darwin"]["custom"]["roles"]["base"] == []
+assert packages["darwin"]["custom"]["roles"]["base"] == [
+    {"name": "cargo", "executable": "cargo", "install": "curl https://sh.rustup.rs -sSf | sh"},
+    {"name": "claude-code", "executable": "claude", "install": "curl -fsSL https://claude.ai/install.sh | bash"},
+    {"name": "codex", "executable": "codex", "install": "curl -fsSL https://chatgpt.com/codex/install.sh | sh"},
+]
 assert packages["linux"]["custom"]["roles"]["base"] == expected_linux_custom
 PY
 
@@ -60,7 +67,7 @@ render_linux() {
   bash -n "$test_root/$name.sh"
 }
 
-render_linux base '{"machineRoles":["base"]}'
+render_linux base '{"chezmoi":{"os":"linux"},"machineRoles":["base"]}'
 python3 - "$test_root/base.sh" <<'PY'
 import sys
 
@@ -73,6 +80,7 @@ install_commands = [
     "curl -fsSL https://herdr.dev/install.sh | sh",
     "curl -fsSL https://tailscale.com/install.sh | sh",
     "curl -fsSL https://bun.com/install | bash",
+    "curl https://sh.rustup.rs -sSf | sh",
 ]
 positions = [script.index(command) for command in install_commands]
 if positions != sorted(positions):
@@ -80,20 +88,15 @@ if positions != sorted(positions):
 if any(script.count(command) != 1 for command in install_commands):
     raise AssertionError("a custom installer command was not rendered exactly once")
 
-bun_install_position = positions[-1]
-bun_check_position = script.rfind("if ! command -v", 0, bun_install_position)
-bun_setup_position = script.index('export PATH="$BUN_INSTALL/bin:$PATH"')
-if bun_check_position < 0 or bun_setup_position >= bun_check_position:
-    raise AssertionError("Bun setup did not render before executable discovery")
 PY
 
-render_linux new-denial '{"machineRoles":["base"],"packagePolicy":{"deniedPrefixes":["tailscale"]}}'
+render_linux new-denial '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"packagePolicy":{"deniedPrefixes":["tailscale"]}}'
 if grep -Fq 'curl -fsSL https://tailscale.com/install.sh | sh' "$test_root/new-denial.sh"; then
   echo "new package-policy denial rendered a matching custom installer" >&2
   exit 1
 fi
 
-render_linux legacy-denial '{"machineRoles":["base"],"blocked_prefixes":["tailscale"]}'
+render_linux legacy-denial '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"blocked_prefixes":["tailscale"]}'
 if grep -Fq 'curl -fsSL https://tailscale.com/install.sh | sh' "$test_root/legacy-denial.sh"; then
   echo "legacy package-policy denial rendered a matching custom installer" >&2
   exit 1
@@ -117,7 +120,11 @@ chezmoi --config "$empty_config" --source "$source_dir" execute-template \
 bash -n "$synthetic_script"
 
 synthetic_bin="$test_root/synthetic-bin"
-mkdir -p "$synthetic_bin"
+mkdir -p "$synthetic_bin" "$test_root/home" "$test_root/config" "$test_root/guards"
+for executable in curl wget; do
+  printf '#!/bin/sh\necho "network forbidden in unit tests" >&2\nexit 97\n' >"$test_root/guards/$executable"
+  chmod +x "$test_root/guards/$executable"
+done
 cat >"$synthetic_bin/prepared-tool" <<'SH'
 #!/usr/bin/env sh
 exit 0
@@ -128,7 +135,8 @@ install_log="$test_root/install.log"
 : >"$install_log"
 if SYNTHETIC_BIN="$synthetic_bin" \
   INSTALL_LOG="$install_log" \
-  PATH="/usr/bin:/bin" \
+  HOME="$test_root/home" XDG_CONFIG_HOME="$test_root/config" \
+  PATH="$test_root/guards:/usr/bin:/bin" \
   bash "$synthetic_script"; then
   echo "failed installer did not stop the generated script" >&2
   exit 1
@@ -150,7 +158,8 @@ chezmoi --config "$empty_config" --source "$source_dir" execute-template \
   -f "$metadata_template" >"$metadata_script"
 bash -n "$metadata_script"
 metadata_marker="$test_root/metadata-expanded"
-METADATA_MARKER="$metadata_marker" PATH="/usr/bin:/bin" \
+METADATA_MARKER="$metadata_marker" HOME="$test_root/home" XDG_CONFIG_HOME="$test_root/config" \
+  PATH="$test_root/guards:/usr/bin:/bin" \
   bash "$metadata_script" >/dev/null
 if [[ -e "$metadata_marker" ]]; then
   echo "custom installer metadata was evaluated as shell" >&2

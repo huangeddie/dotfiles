@@ -1,0 +1,222 @@
+{
+  "darwin-base": {
+    "apt": {
+      "install": [],
+      "remove": []
+    },
+    "homebrew": {
+      "brews": [
+        "anomalyco/tap/opencode",
+        "bat",
+        "btop",
+        "bun",
+        "chezmoi",
+        "cloudflared",
+        "fd",
+        "ffmpeg",
+        "fzf",
+        "gh",
+        "git-delta",
+        "gmp",
+        "herdr",
+        "jj",
+        "jjui",
+        "lazygit",
+        "libyaml",
+        "mise",
+        "modem-dev/tap/hunk",
+        "mosh",
+        "neovim",
+        "node",
+        "openssl@3",
+        "python",
+        "ripgrep",
+        "rust-analyzer",
+        "stylua",
+        "swiftformat",
+        "television",
+        "universal-ctags",
+        "uv",
+        "vips",
+        "zig",
+        "zoxide"
+      ],
+      "casks": [
+        "font-jetbrains-mono-nerd-font",
+        "gcloud-cli",
+        "ghostty"
+      ],
+      "taps": [],
+      "trustedFormulae": [
+        "anomalyco/tap/opencode",
+        "modem-dev/tap/hunk"
+      ]
+    },
+    "bun": [
+      "@doist/todoist-cli",
+      "@earendil-works/pi-coding-agent",
+      "hunkdiff",
+      "prettier"
+    ],
+    "custom": [
+      {
+        "executable": "cargo",
+        "install": "curl https://sh.rustup.rs -sSf | sh",
+        "name": "cargo"
+      },
+      {
+        "executable": "claude",
+        "install": "curl -fsSL https://claude.ai/install.sh | bash",
+        "name": "claude-code"
+      },
+      {
+        "executable": "codex",
+        "install": "curl -fsSL https://chatgpt.com/codex/install.sh | sh",
+        "name": "codex"
+      }
+    ]
+  },
+  "linux-base": {
+    "apt": {
+      "install": [
+        "bat",
+        "btop",
+        "curl",
+        "fd-find",
+        "ffmpeg",
+        "fzf",
+        "gh",
+        "ghostty",
+        "git",
+        "git-delta",
+        "golang-go",
+        "lazygit",
+        "neovim",
+        "nodejs",
+        "npm",
+        "nvtop",
+        "openssh-server",
+        "ripgrep"
+      ],
+      "remove": [
+        "steam-devices",
+        "steam-installer"
+      ]
+    },
+    "homebrew": {
+      "brews": [],
+      "casks": [],
+      "taps": [],
+      "trustedFormulae": []
+    },
+    "bun": [
+      "@doist/todoist-cli",
+      "@earendil-works/pi-coding-agent",
+      "hunkdiff",
+      "prettier"
+    ],
+    "custom": [
+      {
+        "executable": "tv",
+        "install": "curl -fsSL https://alexpasmantier.github.io/television/install.sh | bash",
+        "name": "television"
+      },
+      {
+        "executable": "zoxide",
+        "install": "curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh",
+        "name": "zoxide"
+      },
+      {
+        "executable": "herdr",
+        "install": "curl -fsSL https://herdr.dev/install.sh | sh",
+        "name": "herdr"
+      },
+      {
+        "executable": "tailscale",
+        "install": "curl -fsSL https://tailscale.com/install.sh | sh",
+        "name": "tailscale"
+      },
+      {
+        "executable": "bun",
+        "install": "curl -fsSL https://bun.com/install | bash",
+        "name": "bun"
+      },
+      {
+        "executable": "cargo",
+        "install": "curl https://sh.rustup.rs -sSf | sh",
+        "name": "cargo"
+      }
+    ]
+  },
+  "linux-gaming": {
+    "apt": {
+      "install": [
+        "bat",
+        "btop",
+        "curl",
+        "fd-find",
+        "ffmpeg",
+        "fzf",
+        "gh",
+        "ghostty",
+        "git",
+        "git-delta",
+        "golang-go",
+        "lazygit",
+        "neovim",
+        "nodejs",
+        "npm",
+        "nvtop",
+        "openssh-server",
+        "ripgrep",
+        "steam-devices",
+        "steam-installer"
+      ],
+      "remove": []
+    },
+    "homebrew": {
+      "brews": [],
+      "casks": [],
+      "taps": [],
+      "trustedFormulae": []
+    },
+    "bun": [
+      "@doist/todoist-cli",
+      "@earendil-works/pi-coding-agent",
+      "hunkdiff",
+      "prettier"
+    ],
+    "custom": [
+      {
+        "executable": "tv",
+        "install": "curl -fsSL https://alexpasmantier.github.io/television/install.sh | bash",
+        "name": "television"
+      },
+      {
+        "executable": "zoxide",
+        "install": "curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh",
+        "name": "zoxide"
+      },
+      {
+        "executable": "herdr",
+        "install": "curl -fsSL https://herdr.dev/install.sh | sh",
+        "name": "herdr"
+      },
+      {
+        "executable": "tailscale",
+        "install": "curl -fsSL https://tailscale.com/install.sh | sh",
+        "name": "tailscale"
+      },
+      {
+        "executable": "bun",
+        "install": "curl -fsSL https://bun.com/install | bash",
+        "name": "bun"
+      },
+      {
+        "executable": "cargo",
+        "install": "curl https://sh.rustup.rs -sSf | sh",
+        "name": "cargo"
+      }
+    ]
+  }
+}

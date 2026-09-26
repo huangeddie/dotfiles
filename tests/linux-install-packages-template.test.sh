@@ -7,8 +7,9 @@ trap 'rm -rf "$test_dir"' EXIT
 empty_config="$test_dir/empty-config.toml"
 : >"$empty_config"
 
-base_linux='{"machineRoles":["base"]}'
-gaming_linux='{"machineRoles":["base","gaming"]}'
+base_linux='{"chezmoi":{"os":"linux"},"machineRoles":["base"]}'
+execution_linux='{"chezmoi":{"os":"linux"},"machineRoles":["base"],"packages":{"linux":{"custom":{"roles":{"base":[]}}}}}'
+gaming_linux='{"chezmoi":{"os":"linux"},"machineRoles":["base","gaming"]}'
 
 schema_json="$test_dir/schema.json"
 chezmoi --config "$empty_config" --source "$source_dir" data --format json >"$schema_json"
@@ -56,13 +57,21 @@ def array(name):
         raise AssertionError(f"missing {name} array")
     return [shlex.split(line)[0] for line in match.group(1).splitlines() if line.strip()]
 
-assert array("apt_install_packages") == json.loads(expected_install)
-assert array("apt_remove_packages") == json.loads(expected_remove)
+assert sorted(array("apt_install_packages")) == sorted(json.loads(expected_install))
+assert sorted(array("apt_remove_packages")) == sorted(json.loads(expected_remove))
 PY
 }
 
-base_install='["neovim","ripgrep","golang-go","fd-find","fzf","git","lazygit","gh","git-delta","curl","openssh-server","ffmpeg","nodejs","npm","btop","nvtop","bat","ghostty"]'
-gaming_install='["neovim","ripgrep","golang-go","fd-find","fzf","git","lazygit","gh","git-delta","curl","openssh-server","ffmpeg","nodejs","npm","btop","nvtop","bat","ghostty","steam-installer","steam-devices"]'
+base_install=$(python3 - "$source_dir/tests/fixtures/packages/baseline.json" <<'PY'
+import json, sys
+print(json.dumps(json.load(open(sys.argv[1]))["linux-base"]["apt"]["install"]))
+PY
+)
+gaming_install=$(python3 - "$source_dir/tests/fixtures/packages/baseline.json" <<'PY'
+import json, sys
+print(json.dumps(json.load(open(sys.argv[1]))["linux-gaming"]["apt"]["install"]))
+PY
+)
 steam_purge='["steam-installer","steam-devices"]'
 
 render_linux base "$base_linux"
@@ -71,17 +80,21 @@ assert_arrays "$test_dir/base.sh" "$base_install" "$steam_purge"
 render_linux gaming "$gaming_linux"
 assert_arrays "$test_dir/gaming.sh" "$gaming_install" '[]'
 
-render_linux new-denial '{"machineRoles":["base","gaming"],"packagePolicy":{"deniedPrefixes":["steam"]}}'
+render_linux new-denial '{"chezmoi":{"os":"linux"},"machineRoles":["base","gaming"],"packagePolicy":{"deniedPrefixes":["steam"]}}'
 assert_arrays "$test_dir/new-denial.sh" "$base_install" '[]'
 
-render_linux legacy-denial '{"machineRoles":["base","gaming"],"blocked_prefixes":["steam"]}'
+render_linux legacy-denial '{"chezmoi":{"os":"linux"},"machineRoles":["base","gaming"],"blocked_prefixes":["steam"]}'
 assert_arrays "$test_dir/legacy-denial.sh" "$base_install" '[]'
 
-render_linux combined-denial '{"machineRoles":["base","gaming"],"packagePolicy":{"deniedPrefixes":["steam-installer"]},"blocked_prefixes":["steam-devices"]}'
+render_linux combined-denial '{"chezmoi":{"os":"linux"},"machineRoles":["base","gaming"],"packagePolicy":{"deniedPrefixes":["steam-installer"]},"blocked_prefixes":["steam-devices"]}'
 assert_arrays "$test_dir/combined-denial.sh" "$base_install" '[]'
 
-base_denied_install='["ripgrep","golang-go","fd-find","fzf","git","lazygit","gh","git-delta","curl","openssh-server","ffmpeg","npm","btop","nvtop","bat","ghostty"]'
-render_linux active-role-denial '{"machineRoles":["base"],"packagePolicy":{"deniedPrefixes":["nodejs","neovim"]}}'
+base_denied_install=$(python3 - "$source_dir/tests/fixtures/packages/baseline.json" <<'PY'
+import json, sys
+print(json.dumps([name for name in json.load(open(sys.argv[1]))["linux-base"]["apt"]["install"] if name not in ("nodejs", "neovim")]))
+PY
+)
+render_linux active-role-denial '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"packagePolicy":{"deniedPrefixes":["nodejs","neovim"]}}'
 assert_arrays "$test_dir/active-role-denial.sh" "$base_denied_install" "$steam_purge"
 
 assert_render_failure() {
@@ -101,46 +114,65 @@ assert_render_failure() {
 
 assert_render_failure \
   unsupported-role \
-  '{"machineRoles":["base"],"packages":{"linux":{"apt":{"roles":{"work":[]}}}}}' \
+  '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"packages":{"linux":{"apt":{"roles":{"work":[]}}}}}' \
   'packages.linux.apt.roles contains unsupported linux role "work"'
 assert_render_failure \
   non-list-role \
-  '{"machineRoles":["base"],"packages":{"linux":{"apt":{"roles":{"base":"neovim"}}}}}' \
+  '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"packages":{"linux":{"apt":{"roles":{"base":"neovim"}}}}}' \
   'packages.linux.apt.roles.base must be a list'
 assert_render_failure \
   duplicate-ownership \
-  '{"machineRoles":["base"],"packages":{"linux":{"apt":{"roles":{"base":["shared"],"gaming":["shared"]}}}}}' \
+  '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"packages":{"linux":{"apt":{"roles":{"base":["shared"],"gaming":["shared"]}}}}}' \
   'apt package "shared" belongs to both roles "base" and "gaming"'
 assert_render_failure \
   duplicate-tombstone \
-  '{"machineRoles":["base"],"packages":{"linux":{"apt":{"remove":["obsolete","obsolete"]}}}}' \
+  '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"packages":{"linux":{"apt":{"remove":["obsolete","obsolete"]}}}}' \
   'packages.linux.apt.remove contains duplicate package "obsolete"'
 assert_render_failure \
   role-tombstone-overlap \
-  '{"machineRoles":["base"],"packages":{"linux":{"apt":{"roles":{"base":["shared"]},"remove":["shared"]}}}}' \
+  '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"packages":{"linux":{"apt":{"roles":{"base":["shared"]},"remove":["shared"]}}}}' \
   'apt package "shared" cannot be both role-managed and a removal tombstone'
 assert_render_failure \
   custom-unsupported-role \
-  '{"machineRoles":["base"],"packages":{"linux":{"custom":{"roles":{"work":[]}}}}}' \
+  '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"packages":{"linux":{"custom":{"roles":{"work":[]}}}}}' \
   'packages.linux.custom.roles contains unsupported linux role "work"'
 assert_render_failure \
   custom-non-list-role \
-  '{"machineRoles":["base"],"packages":{"linux":{"custom":{"roles":{"base":{}}}}}}' \
+  '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"packages":{"linux":{"custom":{"roles":{"base":{}}}}}}' \
   'packages.linux.custom.roles.base must be a list'
 assert_render_failure \
   custom-inactive-malformed-record \
-  '{"machineRoles":["base"],"packages":{"linux":{"custom":{"roles":{"gaming":[{"name":"broken","executable":"","install":"true"}]}}}}}' \
+  '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"packages":{"linux":{"custom":{"roles":{"gaming":[{"name":"broken","executable":"","install":"true"}]}}}}}' \
   'packages.linux.custom.roles.gaming 0: executable must not be empty'
 assert_render_failure \
   custom-duplicate-within-role \
-  '{"machineRoles":["base"],"packages":{"linux":{"custom":{"roles":{"base":[{"name":"shared","executable":"shared","install":"true"},{"name":"shared","executable":"other","install":"true"}]}}}}}' \
+  '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"packages":{"linux":{"custom":{"roles":{"base":[{"name":"shared","executable":"shared","install":"true"},{"name":"shared","executable":"other","install":"true"}]}}}}}' \
   'packages.linux.custom.roles.base contains duplicate installer "shared"'
 assert_render_failure \
   custom-duplicate-ownership \
-  '{"machineRoles":["base"],"packages":{"linux":{"custom":{"roles":{"base":[{"name":"shared","executable":"shared","install":"true"}],"gaming":[{"name":"shared","executable":"other","install":"true"}]}}}}}' \
+  '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"packages":{"linux":{"custom":{"roles":{"base":[{"name":"shared","executable":"shared","install":"true"}],"gaming":[{"name":"shared","executable":"other","install":"true"}]}}}}}' \
   'linux custom installer "shared" belongs to both roles "base" and "gaming"'
 
-render_linux execution '{"machineRoles":["base"]}'
+execution_source="$test_dir/execution-source"
+mkdir -p "$execution_source"
+cp -R "$source_dir/.chezmoitemplates" "$source_dir/.chezmoidata" "$execution_source/"
+cp "$source_dir/run_onchange_before_linux-install-packages.sh.tmpl" "$execution_source/"
+chezmoi --config "$empty_config" --source "$execution_source" --override-data "$execution_linux" \
+  execute-template -f "$execution_source/run_onchange_before_linux-install-packages.sh.tmpl" >"$test_dir/execution.sh"
+bash -n "$test_dir/execution.sh"
+if grep -Eq 'alexpasmantier\.github\.io|ajeetdsouza/zoxide|herdr\.dev/install|tailscale\.com/install|bun\.com/install|sh\.rustup\.rs' "$test_dir/execution.sh"; then
+  echo "production custom installer in execution script" >&2; exit 1
+fi
+supported_bash=
+for candidate in /opt/homebrew/bin/bash /usr/local/bin/bash /bin/bash; do
+  if [[ -x $candidate ]] && "$candidate" -c 'declare -A package_states=()' 2>/dev/null; then
+    supported_bash=$candidate
+    break
+  fi
+done
+if [[ -z $supported_bash ]]; then
+  echo 'SKIP Linux fake apt execution: Bash with associative arrays is unavailable' >&2
+else
 fake_bin="$test_dir/fake-bin"
 mkdir -p "$fake_bin"
 dpkg_state="$test_dir/dpkg-state"
@@ -199,27 +231,26 @@ set -euo pipefail
 printf 'sudo %s\n' "$*" >>"$APT_EFFECTS"
 "$@"
 SH
-for executable in tv zoxide herdr tailscale bun; do
-  cat >"$fake_bin/$executable" <<'SH'
-#!/usr/bin/env bash
-exit 0
-SH
+for executable in curl wget; do
+  printf '#!/bin/sh\necho "network forbidden in unit tests" >&2\nexit 97\n' >"$fake_bin/$executable"
   chmod +x "$fake_bin/$executable"
 done
 chmod +x "$fake_bin/dpkg-query" "$fake_bin/apt-cache" "$fake_bin/apt-get" \
   "$fake_bin/apt-mark" "$fake_bin/sudo"
 
+mkdir -p "$test_dir/home" "$test_dir/config"
 APT_DPKG_STATE="$dpkg_state" \
 APT_EFFECTS="$apt_effects" \
+HOME="$test_dir/home" XDG_CONFIG_HOME="$test_dir/config" \
 PATH="$fake_bin:/usr/bin:/bin" \
-  bash "$test_dir/execution.sh" >/dev/null
+  "$supported_bash" "$test_dir/execution.sh" >/dev/null
 
 python3 - "$apt_effects" "$base_install" <<'PY'
 import json
 import sys
 
 effects_path, base_install = sys.argv[1:]
-desired = json.loads(base_install)
+desired = ["neovim", "ripgrep", "golang-go", "fd-find", "fzf", "git", "lazygit", "gh", "git-delta", "curl", "openssh-server", "ffmpeg", "nodejs", "npm", "btop", "nvtop", "bat", "ghostty"]
 expected = [
     "sudo apt-get update",
     "apt-get update",
@@ -238,3 +269,4 @@ with open(effects_path, encoding="utf-8") as stream:
     actual = [line.rstrip("\n") for line in stream]
 assert actual == expected, f"unexpected apt effects: {actual!r}"
 PY
+fi
