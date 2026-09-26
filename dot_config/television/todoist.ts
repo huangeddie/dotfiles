@@ -22,6 +22,8 @@ export function localDate(date: Date): string {
 
 // ANSI mode cannot use Television's display template, so retain a dimmed ID at the end.
 export function displayRows(rows: string[], tab: Tab, today: string): string[] {
+  // Television 0.15 requires a selected row even for an action without a template.
+  if (!rows.length) return ["No active tasks\t"];
   return rows.map(row => {
     const [id, label] = row.split("\t");
     let display = label;
@@ -98,6 +100,15 @@ export async function loadRows(config: Record<string, unknown>, tab: Tab, run: R
   return taskRows(tasks, sections, tab);
 }
 
+export const runTd: Run = async args => {
+  const child = Bun.spawn(["td", ...args], { stdout: "pipe", stderr: "pipe" });
+  const [stdout, stderr, code] = await Promise.all([
+    new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited,
+  ]);
+  if (code !== 0) throw new Error(stderr.trim() || `td exited with status ${code}`);
+  return stdout;
+};
+
 if (import.meta.main) {
   try {
     const tab = Bun.argv[2];
@@ -105,16 +116,8 @@ if (import.meta.main) {
       throw new Error("Usage: bun todoist.ts scheduled|backlog");
     }
     const config = Bun.TOML.parse(await Bun.file(new URL("./todoist.toml", import.meta.url)).text());
-    const run: Run = async args => {
-      const child = Bun.spawn(["td", ...args], { stdout: "pipe", stderr: "pipe" });
-      const [stdout, stderr, code] = await Promise.all([
-        new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited,
-      ]);
-      if (code !== 0) throw new Error(stderr.trim() || `td exited with status ${code}`);
-      return stdout;
-    };
-    const rows = await loadRows(config, tab, run);
-    if (rows.length) console.log(displayRows(rows, tab, localDate(new Date())).join("\n"));
+    const rows = await loadRows(config, tab, runTd);
+    console.log(displayRows(rows, tab, localDate(new Date())).join("\n"));
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;

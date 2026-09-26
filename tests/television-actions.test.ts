@@ -44,7 +44,7 @@ function fakeTd() {
   return { run, tasks, calls, failures };
 }
 
-test.failing("completion remembers the task only after Todoist succeeds", async () => {
+test("completion remembers the task only after Todoist succeeds", async () => {
   const td = fakeTd();
   const store = new MemoryStore();
   const run: Run = async args => {
@@ -56,7 +56,7 @@ test.failing("completion remembers the task only after Todoist succeeds", async 
   expect(store.taskId).toBe("one");
 });
 
-test.failing("undo reopens only the latest completion and consumes the undo slot", async () => {
+test("undo reopens only the latest completion and consumes the undo slot", async () => {
   const td = fakeTd();
   const store = new MemoryStore();
   await completeTask("one", td.run, store);
@@ -70,13 +70,13 @@ test.failing("undo reopens only the latest completion and consumes the undo slot
   expect(td.calls).toHaveLength(count);
 });
 
-test.failing("undo with no saved completion does not call Todoist", async () => {
+test("undo with no saved completion does not call Todoist", async () => {
   const td = fakeTd();
   await undoCompletion(td.run, new MemoryStore());
   expect(td.calls).toEqual([]);
 });
 
-test.failing("failed completion preserves the previous undo slot", async () => {
+test("failed completion preserves the previous undo slot", async () => {
   const td = fakeTd();
   const store = new MemoryStore("one");
   td.failures.add("complete");
@@ -85,7 +85,7 @@ test.failing("failed completion preserves the previous undo slot", async () => {
   expect(td.tasks.get("two")!.checked).toBe(false);
 });
 
-test.failing("failed undo retains the saved task for retry", async () => {
+test("failed undo retains the saved task for retry", async () => {
   const td = fakeTd();
   const store = new MemoryStore("one");
   td.tasks.get("one")!.checked = true;
@@ -98,7 +98,7 @@ test.failing("failed undo retains the saved task for retry", async () => {
   expect(store.taskId).toBeNull();
 });
 
-test.failing("recurring completion advances the date and native undo leaves it advanced", async () => {
+test("recurring completion advances the date and native undo leaves it advanced", async () => {
   const td = fakeTd();
   const store = new MemoryStore();
   await completeTask("recurring", td.run, store);
@@ -109,7 +109,7 @@ test.failing("recurring completion advances the date and native undo leaves it a
   expect(store.taskId).toBeNull();
 });
 
-test.failing("already-completed and uncompletable tasks cannot replace the undo slot", async () => {
+test("already-completed and uncompletable tasks cannot replace the undo slot", async () => {
   const td = fakeTd();
   td.tasks.get("one")!.checked = true;
   const store = new MemoryStore("two");
@@ -120,7 +120,7 @@ test.failing("already-completed and uncompletable tasks cannot replace the undo 
   expect(td.calls.every(args => args[2] === "view")).toBe(true);
 });
 
-test.failing("invalid or multiple selected task IDs are rejected before calling Todoist", async () => {
+test("invalid or multiple selected task IDs are rejected before calling Todoist", async () => {
   const td = fakeTd();
   const store = new MemoryStore("one");
   for (const id of ["", "one two", "one\ntwo", "x'; touch /tmp/no", "id:one"]) {
@@ -130,7 +130,7 @@ test.failing("invalid or multiple selected task IDs are rejected before calling 
   expect(store.taskId).toBe("one");
 });
 
-test.failing("corrupt undo state fails without calling Todoist or discarding the state", async () => {
+test("corrupt undo state fails without calling Todoist or discarding the state", async () => {
   const td = fakeTd();
   const store = new MemoryStore("one two");
   await expect(undoCompletion(td.run, store)).rejects.toThrow("task ID");
@@ -138,7 +138,7 @@ test.failing("corrupt undo state fails without calling Todoist or discarding the
   expect(store.taskId).toBe("one two");
 });
 
-test.failing("failed or malformed task lookup cannot trigger completion", async () => {
+test("failed or malformed task lookup cannot trigger completion", async () => {
   const store = new MemoryStore("one");
   for (const output of ['{}', 'null', '{"id":"two"}', '{"id":"other","checked":false,"isUncompletable":false}']) {
     const calls: string[][] = [];

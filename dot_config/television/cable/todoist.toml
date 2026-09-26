@@ -1,6 +1,6 @@
 [metadata]
 name = "todoist"
-description = "Search active Todoist tasks and open them in the browser"
+description = "Search, open, and complete Todoist tasks with single-level undo"
 requirements = ["td", "bun"]
 
 [source]
@@ -15,12 +15,27 @@ ansi = true
 output = "{strip_ansi|split:\t:1}"
 
 [preview]
-command = "td --no-spinner task view 'id:{strip_ansi|split:\t:1}' --raw"
+command = "id='{strip_ansi|split:\t:1}'; [ -z \"$id\" ] || td --no-spinner task view \"id:$id\" --raw"
 
 [keybindings]
 enter = "actions:open"
+ctrl-d = ["actions:complete", "reload_source"]
+ctrl-z = ["actions:undo", "reload_source"]
 
 [actions.open]
 description = "Open task in Todoist"
-command = "td --no-spinner task browse 'id:{strip_ansi|split:\t:1}'"
+command = "ids='{split:\n:..|map:{strip_ansi|split:\t:1}|join: }'; [ -z \"$ids\" ] || td --no-spinner task browse \"id:$ids\""
+separator = "\n"
 mode = "execute"
+
+[actions.complete]
+description = "Complete task"
+# Extract each ID before joining so multi-selection never interpolates task text.
+command = "bun \"${XDG_CONFIG_HOME:-$HOME/.config}/television/actions.ts\" complete '{split:\n:..|map:{strip_ansi|split:\t:1}|join: }'"
+separator = "\n"
+mode = "fork"
+
+[actions.undo]
+description = "Undo last completion"
+command = 'bun "${XDG_CONFIG_HOME:-$HOME/.config}/television/actions.ts" undo'
+mode = "fork"

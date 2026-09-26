@@ -1,7 +1,7 @@
 # Todoist Television channel
 
-Manual QA only: these commands contact Todoist. Do not add them to CI or hooks.
-Requires authenticated `td`, Bun, and Television 0.15.9 or newer.
+Manual QA only: the live checks contact Todoist. Do not add QA to CI or hooks.
+Live checks require authenticated `td`, Bun, and Television 0.15.9 or newer.
 
 ## Configuration
 
@@ -20,15 +20,19 @@ Preview and deploy only these files:
 
 ```sh
 chezmoi diff ~/.config/television/cable/todoist.toml \
-  ~/.config/television/todoist.toml ~/.config/television/todoist.ts
+  ~/.config/television/todoist.toml ~/.config/television/todoist.ts \
+  ~/.config/television/actions.ts
 chezmoi apply --include=files ~/.config/television/cable/todoist.toml \
-  ~/.config/television/todoist.toml ~/.config/television/todoist.ts
+  ~/.config/television/todoist.toml ~/.config/television/todoist.ts \
+  ~/.config/television/actions.ts
 ```
 
 ## Agent-driven checks
 
 ```sh
-bun test tests/television-todoist.test.ts
+bun test tests/television-todoist.test.ts tests/television-actions.test.ts
+# Offline, discretionary QA: real subprocesses/filesystem, isolated state, fake td.
+bash docs/qa/television-actions.sh
 # Run both real source commands; prints counts rather than private task content.
 bun - <<'JS'
 const path = `${process.env.XDG_CONFIG_HOME || `${process.env.HOME}/.config`}/television`;
@@ -41,7 +45,8 @@ for (const source of channel.source.command) {
   ]);
   if (code) throw new Error(`${source.name}: ${err}`);
   const plain = Bun.stripANSI(out);
-  const rows = plain.trimEnd() ? plain.trimEnd().split('\n') : [];
+  const rows = plain.replace(/\n$/, '').split('\n')
+    .filter(row => row !== '' && row !== 'No active tasks\t');
   for (const row of rows) {
     if (!/^[^\t\r\n]*\t[a-zA-Z0-9_-]+$/.test(row)) throw new Error('Invalid task row');
   }
@@ -79,5 +84,36 @@ Run `tv todoist`:
   the future. Classification uses the local calendar date when the source loads;
   reload or reopen after midnight. Only the date, not the task label, is colored.
 - Task previews work; Enter opens the selected task in Todoist's web app.
+- On a disposable non-recurring task, Ctrl+D completes it and refreshes the
+  current tab without exiting Television. Ctrl+Z reopens that task and refreshes.
+- Complete two disposable tasks, then undo: only the second reopens. Pressing
+  Ctrl+Z again does nothing. Undo does not act on the currently highlighted row.
+- On a disposable recurring task, completion advances its due date. Ctrl+Z
+  consumes the undo slot but leaves the task active with the advanced date,
+  matching native `td task uncomplete` semantics.
+- Completing the last task leaves a selectable `No active tasks` placeholder;
+  Ctrl+Z still works. The placeholder has no preview and cannot be completed.
+- If a search matches no rows (including after completion), clear it with Ctrl+U
+  before undoing: Television 0.15.9 requires a selected row for every action.
+- Selecting multiple tasks with Tab and pressing Ctrl+D must show an error and
+  change nothing. Clear the selection before retrying with one task.
+- Action failures remain visible until acknowledged with Enter. A failed
+  completion preserves the preceding undo slot; a failed undo can be retried.
 - Each tab contains only tasks from its own configured project; an empty project
   setting shows all projects without inheriting the other tab's setting.
+
+## Undo state
+
+The single undo slot is a task ID (JSON string, or `null` after undo) in
+`${XDG_STATE_HOME:-$HOME/.local/state}/television/todoist/completion.json`.
+It is private (0600), survives restarts, and is shared by both tabs and all
+Television instances. Only completions through this cable update it. Use the
+same active `td` account when completing and undoing; changing accounts is not
+tracked. To discard a stale slot, remove `completion.json`.
+
+Actions acquire a directory lock and replace the state file atomically. If an
+action is forcibly killed, remove the adjacent `lock` directory only after
+confirming no action is running. As with any local undo journal, an interruption
+between a successful Todoist mutation and the local write can leave stale state;
+check the task in Todoist before retrying. External edits to the task between
+completion and undo are not rolled back.
