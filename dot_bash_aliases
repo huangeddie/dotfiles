@@ -37,4 +37,5 @@ alias la='ls -a'
 alias cz='chezmoi'
 alias czd='cd $(chezmoi source-path)'
 alias cza='chezmoi apply --force'
+alias czs='chezmoi status'
 
