@@ -23,33 +23,33 @@ function fakeTodoist(): Todoist & { created: TaskInput[] } {
 }
 
 // Each expectation uses a hand-derived payload; the fake only replaces the external service.
-test.failing("next weekend is passed unchanged rather than computed locally", () => {
+test("next weekend is passed unchanged rather than computed locally", () => {
   expect(taskInput(draft({ projectId: "b", sectionId: "sb", due: { kind: "preset", value: "next weekend" } }), projects, sections))
     .toEqual({ title: "Ship release", projectId: "b", sectionId: "sb", due: "next weekend" });
 });
 
-test.failing("empty description and no date omit their optional properties", () => {
+test("empty description and no date omit their optional properties", () => {
   expect(taskInput(draft({ description: "  " }), projects, sections)).toEqual({ title: "Ship release", projectId: "a" });
 });
 
-test.failing("description preserves newlines verbatim", () => {
+test("description preserves newlines verbatim", () => {
   expect(taskInput(draft({ description: "first\nsecond" }), projects, sections))
     .toEqual({ title: "Ship release", description: "first\nsecond", projectId: "a" });
 });
 
 for (const phrase of ["today", "tomorrow", "next week", "next weekend"] as const) {
-  test.failing(`${phrase} remains a literal due phrase`, () => {
+  test(`${phrase} remains a literal due phrase`, () => {
     expect(taskInput(draft({ due: { kind: "preset", value: phrase } }), projects, sections))
       .toEqual({ title: "Ship release", projectId: "a", due: phrase });
   });
 }
 
-test.failing("custom date trims whitespace but is not interpreted", () => {
+test("custom date trims whitespace but is not interpreted", () => {
   expect(taskInput(draft({ due: { kind: "custom", value: "  every Monday  " } }), projects, sections))
     .toEqual({ title: "Ship release", projectId: "a", due: "every Monday" });
 });
 
-test.failing("omitting a project omits its flag and has no section", () => {
+test("omitting a project omits its flag and has no section", () => {
   expect(taskInput(draft({ projectId: null }), projects, [])).toEqual({ title: "Ship release" });
 });
 
@@ -59,28 +59,24 @@ for (const [name, invalid] of [
   ["blank custom date", { due: { kind: "custom", value: " \n " } }],
   ["unknown project ID", { projectId: "unknown" }],
   ["section belonging to another project", { projectId: "b", sectionId: "sa" }],
-  ["section absent from current sections", { sectionId: "sa" }],
+  ["section absent from current sections", { sectionId: "missing" }],
 ] as const) {
-  test.failing(`${name} prevents task creation`, async () => {
+  test(`${name} prevents task creation`, async () => {
     const fake = fakeTodoist();
     const form = new TaskForm(fake);
     await form.load();
     if ("title" in invalid) form.edit({ title: invalid.title });
     if ("due" in invalid) form.edit({ due: invalid.due });
-    // A selected ID can become invalid if remote metadata changes; validate the draft independently.
-    if ("projectId" in invalid || "sectionId" in invalid) {
-      const candidate = draft(invalid);
-      expect(() => taskInput(candidate, projects, invalid.sectionId === "sa" && invalid.projectId !== "b" ? [] : sections)).toThrow();
-    } else {
-      await form.submit();
-      expect(form.state.phase).toBe("ready");
-      expect(form.state.error).toBeTruthy();
-    }
+    if ("projectId" in invalid) await form.selectProject(invalid.projectId);
+    if ("sectionId" in invalid) form.selectSection(invalid.sectionId);
+    await form.submit();
+    expect(form.state.phase).toBe("ready");
+    expect(form.state.error).toBeTruthy();
     expect(fake.created).toEqual([]);
   });
 }
 
-test.failing("initial load selects Inbox and loads only its sections", async () => {
+test("initial load selects Inbox and loads only its sections", async () => {
   const form = new TaskForm(fakeTodoist());
   await form.load();
   expect(form.state.phase).toBe("ready");
@@ -88,7 +84,7 @@ test.failing("initial load selects Inbox and loads only its sections", async () 
   expect(form.state.sections).toEqual([{ id: "sa", projectId: "a", name: "First" }]);
 });
 
-test.failing("without an Inbox project, initial project is null and sections are empty", async () => {
+test("without an Inbox project, initial project is null and sections are empty", async () => {
   const fake = fakeTodoist();
   fake.projects = async () => [projects[1]];
   fake.sections = async () => { throw new Error("null project must not load sections"); };
@@ -99,7 +95,7 @@ test.failing("without an Inbox project, initial project is null and sections are
   expect(form.state.sections).toEqual([]);
 });
 
-test.failing("changing project clears the selected section before loading finishes", async () => {
+test("changing project clears the selected section before loading finishes", async () => {
   const gate = Promise.withResolvers<Section[]>();
   const fake = fakeTodoist();
   fake.sections = async id => id === "a" ? [sections[0]] : gate.promise;
@@ -114,12 +110,13 @@ test.failing("changing project clears the selected section before loading finish
   expect(form.state.sections.map(section => section.id)).toEqual(["sb"]);
 });
 
-test.failing("late section response from project a cannot replace project b", async () => {
+test("late section response from project a cannot replace project b", async () => {
   const gate = Promise.withResolvers<Section[]>();
   const fake = fakeTodoist();
   fake.sections = async id => id === "a" ? gate.promise : [sections[1]];
   const form = new TaskForm(fake);
   const initial = form.load();
+  await Promise.resolve(); // Let the project read start its deferred section read.
   await form.selectProject("b");
   expect(form.state.sections).toEqual([sections[1]]);
   gate.resolve([sections[0]]);
@@ -128,12 +125,13 @@ test.failing("late section response from project a cannot replace project b", as
   expect(form.state.sections).toEqual([sections[1]]);
 });
 
-test.failing("late project a rejection cannot show an error after project b succeeds", async () => {
+test("late project a rejection cannot show an error after project b succeeds", async () => {
   const gate = Promise.withResolvers<Section[]>();
   const fake = fakeTodoist();
   fake.sections = async id => id === "a" ? gate.promise : [sections[1]];
   const form = new TaskForm(fake);
   const initial = form.load();
+  await Promise.resolve(); // Let the project read start its deferred section read.
   await form.selectProject("b");
   gate.reject(new Error("stale read failure"));
   await initial;
@@ -141,7 +139,7 @@ test.failing("late project a rejection cannot show an error after project b succ
   expect(form.state.error).toBeNull();
 });
 
-test.failing("failed project load can be retried", async () => {
+test("failed project load can be retried", async () => {
   const fake = fakeTodoist();
   fake.projects = async () => { throw new Error("projects offline"); };
   const form = new TaskForm(fake);
@@ -155,7 +153,7 @@ test.failing("failed project load can be retried", async () => {
   expect(form.state.projects).toEqual(projects);
 });
 
-test.failing("failed section load can be retried by selecting the project again", async () => {
+test("failed section load can be retried by selecting the project again", async () => {
   const fake = fakeTodoist();
   fake.sections = async () => { throw new Error("sections offline"); };
   const form = new TaskForm(fake);
@@ -169,7 +167,7 @@ test.failing("failed section load can be retried by selecting the project again"
   expect(form.state.error).toBeNull();
 });
 
-test.failing("two concurrent submits send one task input", async () => {
+test("two concurrent submits send one task input", async () => {
   const gate = Promise.withResolvers<{ id: string }>();
   const fake = fakeTodoist();
   fake.create = async input => { fake.created.push(input); return gate.promise; };
@@ -189,7 +187,7 @@ test.failing("two concurrent submits send one task input", async () => {
   expect(form.state.createdId).toBe("created-2");
 });
 
-test.failing("failed create preserves the draft and does not automatically retry", async () => {
+test("failed create preserves the draft and does not automatically retry", async () => {
   const fake = fakeTodoist();
   fake.create = async input => { fake.created.push(input); throw new Error("connection lost; check Todoist before retrying"); };
   const form = new TaskForm(fake);
@@ -202,7 +200,7 @@ test.failing("failed create preserves the draft and does not automatically retry
   expect(fake.created).toEqual([{ title: "Retain me", description: "first\nsecond", projectId: "a" }]);
 });
 
-test.failing("successful create retains ID and ignores further submissions and edits", async () => {
+test("successful create retains ID and ignores further submissions and edits", async () => {
   const fake = fakeTodoist();
   const form = new TaskForm(fake);
   await form.load();
@@ -216,7 +214,7 @@ test.failing("successful create retains ID and ignores further submissions and e
   expect(fake.created).toEqual([{ title: "Created", projectId: "a" }]);
 });
 
-test.failing("unsubscribed listeners receive no further snapshots; earlier snapshots stay unchanged", async () => {
+test("unsubscribed listeners receive no further snapshots; earlier snapshots stay unchanged", async () => {
   const form = new TaskForm(fakeTodoist());
   const snapshots: typeof form.state[] = [];
   const unsubscribe = form.subscribe(state => snapshots.push(state));
