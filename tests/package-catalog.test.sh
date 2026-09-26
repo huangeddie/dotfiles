@@ -32,8 +32,11 @@ def render(packages=None, removals=None, os='linux', roles=None, denied=None, le
 {{ includeTemplate "resolve-packages.tmpl" $root }}
 ''' % json.dumps(json.dumps(values))
     if twice:
+        wrapper = wrapper.replace('{{ includeTemplate "resolve-packages.tmpl" $root }}',
+                                  '{{- $before := $root | toJson -}}{{ includeTemplate "resolve-packages.tmpl" $root }}', 1)
         wrapper += '''{{ "\\n" }}{{ includeTemplate "resolve-packages.tmpl" $root }}
-{{ "\\n" }}{{ $root.packages | toJson }}
+{{ "\\n" }}{{ $before }}
+{{ "\\n" }}{{ $root | toJson }}
 '''
     path = temp / 'case.tmpl'
     path.write_text(wrapper)
@@ -91,8 +94,8 @@ expected = copy.deepcopy(empty); expected['custom'] = [{'name': name, **custom[n
 success('custom numeric order tie and setup', expected, packages=custom)
 result = render(packages=custom, twice=True)
 assert result.returncode == 0, result.stderr
-first, second, original = map(json.loads, filter(str.strip, result.stdout.splitlines()))
-assert first == second == expected and original == custom, 'resolver mutated its root'
+first, second, before, after = map(json.loads, filter(str.strip, result.stdout.splitlines()))
+assert first == second == expected and before == after, 'resolver mutated its root'
 
 invalid = [
     ('root packages type', 'packages', {'packages': []}),
