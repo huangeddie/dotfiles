@@ -64,6 +64,10 @@ export function mountForm(renderer: CliRenderer, form: TaskForm, cancel: CancelF
 
   const controls = { title, description, projectFilter, project, sectionFilter, section, due, customDue };
   let field: Field = "title";
+  // Mouse autofocus bypasses focus(); keep keyboard navigation aligned with the actual control.
+  for (const name of Object.keys(controls) as Field[]) {
+    controls[name].on("focused", () => { field = name; });
+  }
   let lastProject: string | null = null;
   const ready = (state: FormState) => state.phase === "ready" && state.sectionsStatus !== "loading" && state.sectionsStatus !== "error";
   const canEdit = (state: FormState) => state.phase === "ready";

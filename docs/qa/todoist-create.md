@@ -47,8 +47,10 @@ This is discretionary QA, not a unit test.
 ## Human-driven terminal and live checklist
 
 - Run `todoist-add` in a real terminal. Check 80x24 layout and resize, title
-  initial focus, Tab / Shift+Tab focus transitions, multiline description,
-  filtered project and dependent section selection, section reset on project
+  initial focus, Tab / Shift+Tab focus transitions, click Description then type
+  multiple characters and Tab (typing must stay in Description; Tab moves to
+  Project filter), multiline description, filtered project and dependent section
+  selection, section reset on project
   changes, No date and all literal date presets, and Custom input visibility.
 - Cancel with Esc / Ctrl+C before submission: no task created and terminal
   restored. Exercise failed reads and retry, and a pending submit guard. For
