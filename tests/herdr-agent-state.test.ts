@@ -141,7 +141,7 @@ test("reload during an active parent starts working and ignores premature settli
   expect(h.reporter.state).toBe("working");
 });
 
-test.failing("reload retains busy claims restored before the integration session_start", async () => {
+test("reload retains busy claims restored before the integration session_start", async () => {
   const h = await createHarness("tui", true, [["busy", true]]);
   expect(h.reporter.state).toBe("working");
   await h.settle();
@@ -150,7 +150,7 @@ test.failing("reload retains busy claims restored before the integration session
   expect(h.reporter.state).toBe("idle");
 });
 
-test.failing("reload retains attention restored before the integration session_start", async () => {
+test("reload retains attention restored before the integration session_start", async () => {
   const h = await createHarness("tui", true, [["busy", true], ["blocked", true]]);
   expect(h.reporter.state).toBe("blocked");
   await h.blocked(false);

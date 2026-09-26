@@ -211,6 +211,9 @@ export function registerStateHandlers(pi: any, reporter: StateReporter): void {
   }
 
   function publishState(force = false) {
+    if (!rootSession) {
+      return;
+    }
     const next = desiredState();
     if (!force && next.state === lastState && next.message === lastMessage) {
       return;
@@ -221,18 +224,14 @@ export function registerStateHandlers(pi: any, reporter: StateReporter): void {
   }
 
   // Each producer owns balanced acquire/release events, not an absolute boolean.
+  // Packages can restore claims before our session_start handler runs on reload.
+  // Retain those claims now; publishState gates reporting on a confirmed TUI session.
   pi.events.on("herdr:busy", (data) => {
-    if (!rootSession) {
-      return;
-    }
     busyCount = data?.active ? busyCount + 1 : Math.max(0, busyCount - 1);
     publishState();
   });
 
   pi.events.on("herdr:blocked", (data) => {
-    if (!rootSession) {
-      return;
-    }
     if (!data?.active) {
       blockedCount = Math.max(0, blockedCount - 1);
       if (blockedCount === 0) {
