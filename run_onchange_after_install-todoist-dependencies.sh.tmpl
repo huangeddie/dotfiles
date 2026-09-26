@@ -1,0 +1,28 @@
+{{ template "validate-machine-package-data.tmpl" . }}
+{{- $root := . -}}
+{{- $policy := get $root "packagePolicy" | default dict -}}
+{{- $prefixes := concat (get $policy "deniedPrefixes" | default list) (get $root "blocked_prefixes" | default list) | uniq -}}
+{{- $denied := list -}}
+{{- range $requirement := list "@opentui/core" "@doist/todoist-cli" "bun" -}}
+  {{- range $prefix := $prefixes -}}
+    {{- if hasPrefix $prefix $requirement -}}
+      {{- $denied = append $denied $requirement -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+#!/bin/sh
+# package.json sha256: {{ include "dot_config/todoist/package.json" | sha256sum }}
+# bun.lock sha256: {{ include "dot_config/todoist/bun.lock" | sha256sum }}
+set -eu
+{{ if gt (len $denied) 0 -}}
+echo 'Skipping Todoist form dependencies: package policy denies {{ $denied | uniq | join ", " }}.'
+{{- else -}}
+bun_install=${BUN_INSTALL:-$HOME/.bun}
+export BUN_INSTALL="$bun_install"
+export PATH="$BUN_INSTALL/bin:$PATH"
+if ! command -v bun >/dev/null 2>&1; then
+  echo 'Bun is required to install Todoist form dependencies' >&2
+  exit 1
+fi
+bun install --cwd "$HOME/.config/todoist" --frozen-lockfile
+{{- end }}

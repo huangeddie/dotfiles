@@ -1,7 +1,7 @@
 [metadata]
 name = "todoist"
 description = "Search, open, and complete Todoist tasks with single-level undo"
-requirements = ["td", "bun"]
+requirements = ["td", "bun", "todoist-add"]
 
 [source]
 # Ctrl+S switches tabs. Project scope is configured in ../todoist.toml.
@@ -21,6 +21,12 @@ command = "id='{strip_ansi|split:\t:1}'; [ -z \"$id\" ] || td --no-spinner task 
 enter = "actions:open"
 ctrl-d = ["actions:complete", "reload_source"]
 ctrl-z = ["actions:undo", "reload_source"]
+ctrl-a = ["actions:create", "reload_source"]
+
+[actions.create]
+description = "Create task"
+command = "todoist-add"
+mode = "fork"
 
 [actions.open]
 description = "Open task in Todoist"

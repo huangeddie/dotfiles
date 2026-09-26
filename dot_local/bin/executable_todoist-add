@@ -1,0 +1,10 @@
+#!/bin/sh
+set -eu
+app="${XDG_CONFIG_HOME:-$HOME/.config}/todoist"
+command -v bun >/dev/null 2>&1 || { echo 'todoist-add requires Bun' >&2; exit 1; }
+command -v td >/dev/null 2>&1 || { echo 'todoist-add requires td' >&2; exit 1; }
+[ -d "$app/node_modules/@opentui/core" ] || {
+  echo 'Todoist form dependencies are missing; apply the chezmoi dependency installer.' >&2
+  exit 1
+}
+exec bun --no-install "$app/create.ts" "$@"
