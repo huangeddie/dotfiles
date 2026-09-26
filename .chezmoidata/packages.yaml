@@ -1,159 +1,352 @@
-# Declarative package manifest.
-
+# Declarative logical package catalog. Missing platform recipes install nothing on that OS.
 machineRolePolicy:
-  required: ["base"]
+  required: [base]
   platforms:
-    linux: ["base", "gaming"]
-    darwin: ["base"]
+    linux: [base, gaming]
+    darwin: [base]
 
 packages:
+  bat:
+    role: base
+    install:
+      darwin:
+        brew: "bat"
+      linux:
+        apt: ["bat"]
+  btop:
+    role: base
+    install:
+      darwin:
+        brew: "btop"
+      linux:
+        apt: ["btop"]
   bun:
-    global:
-      roles:
-        base: [
-          "prettier",
-          "@earendil-works/pi-coding-agent",
-          "hunkdiff",
-          "@doist/todoist-cli"
-        ]
-  darwin:
-    custom:
-      roles:
-        base:
-          - name: cargo
-            executable: cargo
-            install: |-
-              curl https://sh.rustup.rs -sSf | sh
-          - name: claude-code
-            executable: claude
-            install: |-
-              curl -fsSL https://claude.ai/install.sh | bash
-          - name: codex
-            executable: codex
-            install: |-
-              curl -fsSL https://chatgpt.com/codex/install.sh | sh
-    # Homebrew refuses to load formulae from third-party taps unless they are
-    # trusted. Scoped per-formula rather than per-tap, so formulae added to a
-    # tap later are not implicitly authorized.
-    trusted_formulae:
-      roles:
-        base: [
-          "modem-dev/tap/hunk",
-          "anomalyco/tap/opencode"
-        ]
-    # On darwin this list is AUTHORITATIVE: `chezmoi apply` runs `brew bundle`
-    # with `install --force-cleanup`, so any Homebrew package NOT listed here is
-    # uninstalled. Adding a package here installs it; removing it uninstalls it.
-    # Dependencies of listed packages are retained automatically.
-    brews:
-      roles:
-        base: [
-            # Search
-            "ripgrep",
-            "bat",
-            "fd",
-            "fzf",
-            "zoxide",
-            # Text editors
-            "neovim",
-            "universal-ctags",
-            # Version-control
-            "modem-dev/tap/hunk",
-            "git-delta",
-            "gh",
-            "chezmoi",
-            "jj",
-            "jjui",
-            "lazygit",
-            # Languages
-            "rust-analyzer",
-            "stylua",
-            "swiftformat",
-            "zig",
-            "python",
-            # Package managers
-            "node",
-            "bun",
-            "uv",
-            "mise",
-            # Libraries
-            "gmp",
-            "libyaml",
-            "openssl@3",
-            "cloudflared",
-            "ffmpeg",
-            "vips",
-            # Terminal
-            "mosh",
-            "herdr",
-            "television",
-            "btop",
-            # Agent Harnesses
-            "anomalyco/tap/opencode",
-          ]
-    casks:
-      roles:
-        base: ["font-jetbrains-mono-nerd-font", "gcloud-cli", "ghostty"]
+    role: base
+    install:
+      darwin:
+        brew: "bun"
+      linux:
+        custom:
+          executable: "bun"
+          install: |-
+            curl -fsSL https://bun.com/install | bash
+        order: 50
+  cargo:
+    role: base
+    install:
+      darwin:
+        custom:
+          executable: "cargo"
+          install: |-
+            curl https://sh.rustup.rs -sSf | sh
+        order: 10
+      linux:
+        custom:
+          executable: "cargo"
+          install: |-
+            curl https://sh.rustup.rs -sSf | sh
+        order: 60
+  chezmoi:
+    role: base
+    install:
+      darwin:
+        brew: "chezmoi"
+  claude-code:
+    role: base
+    install:
+      darwin:
+        custom:
+          executable: "claude"
+          install: |-
+            curl -fsSL https://claude.ai/install.sh | bash
+        order: 20
+  cloudflared:
+    role: base
+    install:
+      darwin:
+        brew: "cloudflared"
+  codex:
+    role: base
+    install:
+      darwin:
+        custom:
+          executable: "codex"
+          install: |-
+            curl -fsSL https://chatgpt.com/codex/install.sh | sh
+        order: 30
+  curl:
+    role: base
+    install:
+      linux:
+        apt: ["curl"]
+  fd:
+    role: base
+    install:
+      darwin:
+        brew: "fd"
+      linux:
+        apt: ["fd-find"]
+  ffmpeg:
+    role: base
+    install:
+      darwin:
+        brew: "ffmpeg"
+      linux:
+        apt: ["ffmpeg"]
+  font-jetbrains-mono-nerd-font:
+    role: base
+    install:
+      darwin:
+        cask: "font-jetbrains-mono-nerd-font"
+  fzf:
+    role: base
+    install:
+      darwin:
+        brew: "fzf"
+      linux:
+        apt: ["fzf"]
+  gcloud-cli:
+    role: base
+    install:
+      darwin:
+        cask: "gcloud-cli"
+  gh:
+    role: base
+    install:
+      darwin:
+        brew: "gh"
+      linux:
+        apt: ["gh"]
+  ghostty:
+    role: base
+    install:
+      darwin:
+        cask: "ghostty"
+      linux:
+        apt: ["ghostty"]
+  git:
+    role: base
+    install:
+      linux:
+        apt: ["git"]
+  git-delta:
+    role: base
+    install:
+      darwin:
+        brew: "git-delta"
+      linux:
+        apt: ["git-delta"]
+  gmp:
+    role: base
+    install:
+      darwin:
+        brew: "gmp"
+  golang-go:
+    role: base
+    install:
+      linux:
+        apt: ["golang-go"]
+  herdr:
+    role: base
+    install:
+      darwin:
+        brew: "herdr"
+      linux:
+        custom:
+          executable: "herdr"
+          install: |-
+            curl -fsSL https://herdr.dev/install.sh | sh
+        order: 30
+  hunk:
+    role: base
+    install:
+      darwin:
+        brew: "modem-dev/tap/hunk"
+        trusted: true
+  hunkdiff:
+    role: base
+    install:
+      darwin:
+        bun: "hunkdiff"
+      linux:
+        bun: "hunkdiff"
+  jj:
+    role: base
+    install:
+      darwin:
+        brew: "jj"
+  jjui:
+    role: base
+    install:
+      darwin:
+        brew: "jjui"
+  lazygit:
+    role: base
+    install:
+      darwin:
+        brew: "lazygit"
+      linux:
+        apt: ["lazygit"]
+  libyaml:
+    role: base
+    install:
+      darwin:
+        brew: "libyaml"
+  mise:
+    role: base
+    install:
+      darwin:
+        brew: "mise"
+  mosh:
+    role: base
+    install:
+      darwin:
+        brew: "mosh"
+  neovim:
+    role: base
+    install:
+      darwin:
+        brew: "neovim"
+      linux:
+        apt: ["neovim"]
+  node:
+    role: base
+    install:
+      darwin:
+        brew: "node"
+      linux:
+        apt: ["nodejs"]
+  npm:
+    role: base
+    install:
+      linux:
+        apt: ["npm"]
+  nvtop:
+    role: base
+    install:
+      linux:
+        apt: ["nvtop"]
+  opencode:
+    role: base
+    install:
+      darwin:
+        brew: "anomalyco/tap/opencode"
+        trusted: true
+  openssh-server:
+    role: base
+    install:
+      linux:
+        apt: ["openssh-server"]
+  openssl@3:
+    role: base
+    install:
+      darwin:
+        brew: "openssl@3"
+  pi-coding-agent:
+    role: base
+    install:
+      darwin:
+        bun: "@earendil-works/pi-coding-agent"
+      linux:
+        bun: "@earendil-works/pi-coding-agent"
+  prettier:
+    role: base
+    install:
+      darwin:
+        bun: "prettier"
+      linux:
+        bun: "prettier"
+  python:
+    role: base
+    install:
+      darwin:
+        brew: "python"
+  ripgrep:
+    role: base
+    install:
+      darwin:
+        brew: "ripgrep"
+      linux:
+        apt: ["ripgrep"]
+  rust-analyzer:
+    role: base
+    install:
+      darwin:
+        brew: "rust-analyzer"
+  steam:
+    role: gaming
+    install:
+      linux:
+        apt: ["steam-installer", "steam-devices"]
+  stylua:
+    role: base
+    install:
+      darwin:
+        brew: "stylua"
+  swiftformat:
+    role: base
+    install:
+      darwin:
+        brew: "swiftformat"
+  tailscale:
+    role: base
+    install:
+      linux:
+        custom:
+          executable: "tailscale"
+          install: |-
+            curl -fsSL https://tailscale.com/install.sh | sh
+        order: 40
+  television:
+    role: base
+    install:
+      darwin:
+        brew: "television"
+      linux:
+        custom:
+          executable: "tv"
+          install: |-
+            curl -fsSL https://alexpasmantier.github.io/television/install.sh | bash
+        order: 10
+  todoist-cli:
+    role: base
+    install:
+      darwin:
+        bun: "@doist/todoist-cli"
+      linux:
+        bun: "@doist/todoist-cli"
+  universal-ctags:
+    role: base
+    install:
+      darwin:
+        brew: "universal-ctags"
+  uv:
+    role: base
+    install:
+      darwin:
+        brew: "uv"
+  vips:
+    role: base
+    install:
+      darwin:
+        brew: "vips"
+  zig:
+    role: base
+    install:
+      darwin:
+        brew: "zig"
+  zoxide:
+    role: base
+    install:
+      darwin:
+        brew: "zoxide"
+      linux:
+        custom:
+          executable: "zoxide"
+          install: |-
+            curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh
+        order: 20
+
+packageRemovals:
   linux:
-    custom:
-      roles:
-        base:
-          - name: television
-            executable: tv
-            install: |-
-              curl -fsSL https://alexpasmantier.github.io/television/install.sh | bash
-          - name: zoxide
-            executable: zoxide
-            install: |-
-              curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh
-          - name: herdr
-            executable: herdr
-            install: |-
-              curl -fsSL https://herdr.dev/install.sh | sh
-          - name: tailscale
-            executable: tailscale
-            install: |-
-              curl -fsSL https://tailscale.com/install.sh | sh
-          - name: bun
-            executable: bun
-            install: |-
-              curl -fsSL https://bun.com/install | bash
-          - name: cargo
-            executable: cargo
-            install: |-
-              curl https://sh.rustup.rs -sSf | sh
-    # On linux, apt roles declare desired packages and apt.remove contains
-    # durable removal tombstones. Move a retired package from a role to remove;
-    # packages absent from both lists are left untouched. Apt-calculated orphan
-    # dependencies are purged automatically.
-    apt:
-      roles:
-        base: [
-            # Search
-            "bat",
-            "ripgrep",
-            "fd-find",
-            "fzf",
-            # Text Editors
-            "neovim",
-            # Version control
-            "git",
-            "lazygit",
-            "gh",
-            "git-delta",
-            # Languages
-            "golang-go",
-            # Libraries
-            "curl",
-            "openssh-server",
-            "ffmpeg",
-            # Package managers
-            "nodejs",
-            "npm",
-            # Terminal
-            "btop",
-            "nvtop",
-            "ghostty",
-          ]
-        gaming: ["steam-installer", "steam-devices"]
-      remove: []
+    apt: []

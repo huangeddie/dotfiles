@@ -65,7 +65,9 @@ machineRoles = ["base"]
 deniedPrefixes = ["unauthorized-prefix"]
 ```
 
-Packages whose names start with a denied prefix are never installed. Managed
+Prefixes match actual installation names (for example `fd-find`, not the logical
+ID `fd`), not catalog keys. Custom recipes use their logical ID as the policy
+name. Packages whose names start with a denied prefix are never installed. Managed
 Homebrew and Bun packages that later become denied are removed by their
 authoritative bundle/global cleanup. Managed apt packages matching a denied
 prefix are excluded from installation and left untouched on the host rather
@@ -80,10 +82,49 @@ can deny a package. New configuration must use `packagePolicy.deniedPrefixes`.
 ### Retired apt packages
 
 When a Linux apt package is retired from this repository, move it to the durable
-tombstone list, such as `packages.linux.apt.remove`, rather than simply deleting
+tombstone list, `packageRemovals.linux.apt`, rather than simply deleting
 it from the package list. Tombstones tell the next apply to purge the retired
 package. Disabling a role is different: it removes only the packages managed
 exclusively by that inactive role and does not create a tombstone.
+
+### Authoring the package catalog
+
+`.chezmoidata/packages.yaml` groups installation recipes by logical package ID.
+For example, `fd` maps to different native names, while `steam` owns two apt
+names. A missing OS recipe installs nothing on that OS:
+
+```yaml
+packages:
+  fd:
+    role: base
+    install:
+      darwin: {brew: fd}
+      linux: {apt: [fd-find]}
+  steam:
+    role: gaming
+    install:
+      linux: {apt: [steam-installer, steam-devices]}
+  claude-code:
+    role: base
+    install:
+      darwin:
+        order: 20
+        custom:
+          executable: claude
+          install: |-
+            curl -fsSL https://claude.ai/install.sh | bash
+```
+
+Declare each Bun global explicitly on both OSes when needed (`bun: prettier`);
+there is no platform inheritance. Custom `order` controls installer sequence on
+each OS. Third-party Homebrew formulae requiring trust use `trusted: true` on
+their `brew` recipe; this does not trust a whole tap. Apt retirement tombstones
+belong under `packageRemovals.linux.apt`, not under a package entry.
+
+Consumers overriding old OS-first paths such as `packages.linux.apt.roles` or
+`packages.bun.global.roles` must migrate to logical entries in `packages` and
+`packageRemovals`; consumers specifying only machine roles and deny policy need
+no change. Preview all removals with `chezmoi diff` before manually applying.
 
 ### Internal work composition
 

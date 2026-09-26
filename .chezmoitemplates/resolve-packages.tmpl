@@ -5,7 +5,8 @@
   "homebrew" (dict "brews" (list) "casks" (list) "taps" (list) "trustedFormulae" (list))
   "bun" (list) "custom" (list) -}}
 {{- $os := .chezmoi.os -}}
-{{- $denied := concat (get (get . "packagePolicy") "deniedPrefixes" | default (list)) (get . "blocked_prefixes" | default (list)) -}}
+{{- $packagePolicy := get . "packagePolicy" | default dict -}}
+{{- $denied := concat (get $packagePolicy "deniedPrefixes" | default (list)) (get . "blocked_prefixes" | default (list)) -}}
 {{- $orders := dict -}}
 {{- $taps := dict -}}
 {{- if eq $os "linux" -}}
