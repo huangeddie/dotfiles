@@ -153,6 +153,12 @@ test("changing the supplied date changes due-date color without changing task or
     .toEqual(["\x1b[31m2026-06-14\x1b[39m Task\t\x1b[2mone\x1b[22m"]);
 });
 
+test.failing("empty tabs keep a selectable placeholder so undo remains available", () => {
+  for (const tab of ["scheduled", "backlog"] as const) {
+    expect(displayRows([], tab, "2026-06-14")).toEqual(["No active tasks\t"]);
+  }
+});
+
 test("local date uses padded local calendar fields at both ends of the day", () => {
   expect(localDate(new Date(2026, 0, 2, 0, 0))).toBe("2026-01-02");
   expect(localDate(new Date(2026, 0, 2, 23, 59))).toBe("2026-01-02");
