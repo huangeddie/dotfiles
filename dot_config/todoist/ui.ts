@@ -120,7 +120,12 @@ export function mountForm(renderer: CliRenderer, form: TaskForm, cancel: CancelF
       const readStatus = state.phase === "loading" ? "Loading projects…" : state.phase === "load-error" ? "Project load failed (Ctrl+R to retry)" :
         state.sectionsStatus === "loading" ? "Loading sections…" : state.sectionsStatus === "error" ? "Section load failed (Ctrl+R to retry)" :
         state.phase === "submitting" ? "Creating task…" : "";
-      status.content = [readStatus, state.error, ready(state) ? "Ctrl+S to create" : ""].filter(Boolean).join(" — ");
+      const ambiguousCreate = state.error?.includes("Check Todoist before retrying") ?? false;
+      status.height = state.error ? 4 : 1;
+      status.content = [
+        ambiguousCreate ? "Check Todoist before retrying; creation may have succeeded." : "",
+        readStatus, state.error, ready(state) ? "Ctrl+S to create" : "",
+      ].filter(Boolean).join("\n");
       // OpenTUI has no disabled property on these renderables; also guard paste and key events below.
       for (const control of [title, description, projectFilter, project, due]) control.focusable = canEdit(state);
       const sectionsAvailable = canEdit(state) && state.draft.projectId !== null && state.sectionsStatus === "ready";
@@ -128,6 +133,8 @@ export function mountForm(renderer: CliRenderer, form: TaskForm, cancel: CancelF
       customDue.focusable = canEdit(state) && customDue.visible;
       if (canEdit(state) && !controls[field].focusable) focus("due");
       else if (canEdit(state) && !controls[field].focused) focus(field);
+      if (state.error) viewport.scrollChildIntoView(status.id);
+      else if (canEdit(state)) viewport.scrollChildIntoView(controls[field].id);
     } finally { syncing = false; }
   };
 
