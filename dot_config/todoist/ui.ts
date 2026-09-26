@@ -104,13 +104,13 @@ export function mountForm(renderer: CliRenderer, form: TaskForm, cancel: CancelF
         ...options(state.projects, projectFilter.value, state.draft.projectId),
       ].filter(option => option.value === null ? !projectFilter.value || "default inbox".includes(projectFilter.value.toLowerCase()) : true);
       const projectIndex = project.options.findIndex(option => option.value === state.draft.projectId);
-      if (!project.focused && projectIndex >= 0) project.selectedIndex = projectIndex;
+      if (!project.focused && project.options.length) project.selectedIndex = projectIndex >= 0 ? projectIndex : 0;
       section.options = state.sectionsStatus === "loading" || state.sectionsStatus === "error" ? [] : [
         { name: "No section", description: "", value: null },
         ...options(state.sections, sectionFilter.value, state.draft.sectionId),
       ].filter(option => option.value === null ? !sectionFilter.value || "no section".includes(sectionFilter.value.toLowerCase()) : true);
       const sectionIndex = section.options.findIndex(option => option.value === state.draft.sectionId);
-      if (!section.focused && sectionIndex >= 0) section.selectedIndex = sectionIndex;
+      if (!section.focused && section.options.length) section.selectedIndex = sectionIndex >= 0 ? sectionIndex : 0;
       const dueValue = state.draft.due.kind === "none" ? "none" : state.draft.due.kind === "custom" ? "custom" : state.draft.due.value;
       if (!due.focused) due.selectedIndex = dueOptions.findIndex(option => option.value === dueValue);
       customLabel.visible = customDue.visible = state.draft.due.kind === "custom";
@@ -202,6 +202,6 @@ export function mountForm(renderer: CliRenderer, form: TaskForm, cancel: CancelF
     unsubscribe();
     renderer.keyInput.off("keypress", onKey);
     renderer.keyInput.off("paste", onPaste);
-    renderer.root.remove(viewport);
+    viewport.destroyRecursively();
   };
 }
