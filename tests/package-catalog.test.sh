@@ -15,7 +15,7 @@ source, temp = map(pathlib.Path, sys.argv[1:])
 base = {'fd': {'role': 'base', 'install': {'linux': {'apt': ['fd-find']}, 'darwin': {'brew': 'fd'}}}}
 empty = {'apt': {'install': [], 'remove': []}, 'homebrew': {'brews': [], 'casks': [], 'taps': [], 'trustedFormulae': []}, 'bun': [], 'custom': []}
 
-def render(packages=None, removals=None, os='linux', roles=None, denied=None, legacy=None, twice=False):
+def render(packages=None, removals=None, os='linux', roles=None, denied=None, legacy=None, twice=False, no_policy=False, malformed_policy=False):
     values = {'packages': base if packages is None else packages,
               'packageRemovals': {'linux': {'apt': []}} if removals is None else removals,
               'os': os, 'roles': ['base'] if roles is None else roles,
@@ -31,6 +31,10 @@ def render(packages=None, removals=None, os='linux', roles=None, denied=None, le
 {{- $_ := set $root "packageRemovals" $input.packageRemovals -}}
 {{ includeTemplate "resolve-packages.tmpl" $root }}
 ''' % json.dumps(json.dumps(values))
+    if no_policy or malformed_policy:
+        wrapper = wrapper.replace('{{- $_ := set $root "packagePolicy" (dict "deniedPrefixes" $input.denied) -}}',
+                                  '{{- $_ := set $root "packagePolicy" "invalid" -}}' if malformed_policy else
+                                  '{{- $_ := unset $root "packagePolicy" -}}')
     if twice:
         wrapper = wrapper.replace('{{ includeTemplate "resolve-packages.tmpl" $root }}',
                                   '{{- $before := $root | toJson -}}{{ includeTemplate "resolve-packages.tmpl" $root }}', 1)
@@ -60,6 +64,9 @@ success('fd Linux alias and tombstone', expected, removals={'linux': {'apt': ['o
 expected = copy.deepcopy(empty)
 expected['homebrew']['brews'] = ['fd']
 success('fd Darwin alias', expected, os='darwin')
+success('missing optional packagePolicy', {'apt': {'install': ['fd-find'], 'remove': []}, 'homebrew': empty['homebrew'], 'bun': [], 'custom': []}, no_policy=True)
+success('legacy denial without packagePolicy', empty, legacy=['fd-find'], no_policy=True)
+failure('explicit malformed policy still rejected', 'packagePolicy', malformed_policy=True)
 success('Darwin-only Claude absent on Linux', empty, packages={'claude-code': {'role': 'base', 'install': {'darwin': {'custom': {'executable': 'claude', 'install': 'echo hello'}}}}})
 steam = {'steam': {'role': 'gaming', 'install': {'linux': {'apt': ['steam-installer', 'steam-devices']}}}}
 expected = copy.deepcopy(empty); expected['apt']['install'] = ['steam-installer', 'steam-devices']
@@ -143,5 +150,25 @@ invalid = [
 ]
 for name, path, params in invalid:
     failure(name, path, **params)
-print('package catalog: synthetic resolution, schema and purity contracts passed')
+# Production catalog parity is checked against the independent, immutable old-schema snapshot.
+fixture = json.loads((source / 'tests/fixtures/packages/baseline.json').read_text())
+def normalized(plan):
+    result = json.loads(json.dumps(plan))
+    for key in ('install', 'remove'):
+        result['apt'][key].sort()
+    for values in result['homebrew'].values():
+        values.sort()
+    result['bun'].sort()
+    return result
+
+for name, os, roles in [('darwin-base', 'darwin', ['base']),
+                        ('linux-base', 'linux', ['base']),
+                        ('linux-gaming', 'linux', ['base', 'gaming'])]:
+    wrapper = temp / 'production.tmpl'
+    wrapper.write_text('''{{- $root := deepCopy . -}}{{- $_ := set $root.chezmoi "os" %s -}}{{- $_ := set $root "machineRoles" (%s | fromJson) -}}{{ includeTemplate "resolve-packages.tmpl" $root }}''' % (json.dumps(os), json.dumps(json.dumps(roles))))
+    result = subprocess.run(['chezmoi', '--config', str(temp / 'empty.toml'), '--source', str(source),
+                             'execute-template', '-f', str(wrapper)], text=True, capture_output=True)
+    assert result.returncode == 0, (name, result.stderr)
+    assert normalized(json.loads(result.stdout)) == fixture[name], name
+print('package catalog: synthetic contracts and production baseline parity passed')
 PY
