@@ -186,7 +186,14 @@ packages:
       darwin:
         brew: "lazygit"
       linux:
-        apt: ["lazygit"]
+        custom:
+          executable: "lazygit"
+          setup: |-
+            export GOPATH="${GOPATH:-$HOME/.local/share/go}"
+            export PATH="$GOPATH/bin:$PATH"
+          install: |-
+            go install github.com/jesseduffield/lazygit@latest
+        order: 70
   libyaml:
     role: base
     install:
@@ -349,4 +356,4 @@ packages:
 
 packageRemovals:
   linux:
-    apt: []
+    apt: ["lazygit"]
