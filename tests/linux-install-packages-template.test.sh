@@ -68,6 +68,11 @@ import json, sys
 print(json.dumps(json.load(open(sys.argv[1]))["linux-gaming"]["apt"]["install"]))
 PY
 )
+gaming_remove=$(python3 - "$source_dir/tests/fixtures/packages/baseline.json" <<'PYJSON'
+import json,sys
+print(json.dumps(json.load(open(sys.argv[1]))['linux-gaming']['apt']['remove']))
+PYJSON
+)
 steam_purge=$(python3 - "$source_dir/tests/fixtures/packages/baseline.json" <<'PYJSON'
 import json,sys
 print(json.dumps(json.load(open(sys.argv[1]))['linux-base']['apt']['remove']))
@@ -78,16 +83,16 @@ render_linux base "$base_linux"
 assert_arrays "$test_dir/base.sh" "$base_install" "$steam_purge"
 
 render_linux gaming "$gaming_linux"
-assert_arrays "$test_dir/gaming.sh" "$gaming_install" '[]'
+assert_arrays "$test_dir/gaming.sh" "$gaming_install" "$gaming_remove"
 
 render_linux new-denial '{"chezmoi":{"os":"linux"},"machineRoles":["base","gaming"],"packagePolicy":{"deniedPrefixes":["steam"]}}'
-assert_arrays "$test_dir/new-denial.sh" "$base_install" '[]'
+assert_arrays "$test_dir/new-denial.sh" "$base_install" "$gaming_remove"
 
 render_linux legacy-denial '{"chezmoi":{"os":"linux"},"machineRoles":["base","gaming"],"blocked_prefixes":["steam"]}'
-assert_arrays "$test_dir/legacy-denial.sh" "$base_install" '[]'
+assert_arrays "$test_dir/legacy-denial.sh" "$base_install" "$gaming_remove"
 
 render_linux combined-denial '{"chezmoi":{"os":"linux"},"machineRoles":["base","gaming"],"packagePolicy":{"deniedPrefixes":["steam-installer"]},"blocked_prefixes":["steam-devices"]}'
-assert_arrays "$test_dir/combined-denial.sh" "$base_install" '[]'
+assert_arrays "$test_dir/combined-denial.sh" "$base_install" "$gaming_remove"
 
 base_denied_install=$(python3 - "$source_dir/tests/fixtures/packages/baseline.json" <<'PY'
 import json, sys

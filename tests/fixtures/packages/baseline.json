@@ -90,7 +90,6 @@
         "git",
         "git-delta",
         "golang-go",
-        "lazygit",
         "neovim",
         "nodejs",
         "npm",
@@ -99,6 +98,7 @@
         "ripgrep"
       ],
       "remove": [
+        "lazygit",
         "steam-devices",
         "steam-installer"
       ]
@@ -145,6 +145,12 @@
         "executable": "cargo",
         "install": "curl https://sh.rustup.rs -sSf | sh",
         "name": "cargo"
+      },
+      {
+        "executable": "lazygit",
+        "install": "go install github.com/jesseduffield/lazygit@latest",
+        "name": "lazygit",
+        "setup": "export GOPATH=\"${GOPATH:-$HOME/.local/share/go}\"\nexport PATH=\"$GOPATH/bin:$PATH\""
       }
     ]
   },
@@ -162,7 +168,6 @@
         "git",
         "git-delta",
         "golang-go",
-        "lazygit",
         "neovim",
         "nodejs",
         "npm",
@@ -172,7 +177,9 @@
         "steam-devices",
         "steam-installer"
       ],
-      "remove": []
+      "remove": [
+        "lazygit"
+      ]
     },
     "homebrew": {
       "brews": [],
@@ -216,6 +223,12 @@
         "executable": "cargo",
         "install": "curl https://sh.rustup.rs -sSf | sh",
         "name": "cargo"
+      },
+      {
+        "executable": "lazygit",
+        "install": "go install github.com/jesseduffield/lazygit@latest",
+        "name": "lazygit",
+        "setup": "export GOPATH=\"${GOPATH:-$HOME/.local/share/go}\"\nexport PATH=\"$GOPATH/bin:$PATH\""
       }
     ]
   }
