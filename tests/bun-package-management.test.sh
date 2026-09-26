@@ -20,9 +20,9 @@ with open(sys.argv[1], encoding="utf-8") as stream:
 
 with open(sys.argv[2], encoding="utf-8") as stream:
     expected = json.load(stream)
-assert sorted(packages["bun"]["global"]["roles"]["base"]) == expected["linux-base"]["bun"]
-assert expected["linux-base"]["bun"] == expected["darwin-base"]["bun"]
-assert "bun" in packages["darwin"]["brews"]["roles"]["base"]
+assert packages["pi-coding-agent"]["install"]["linux"]["bun"] == "@earendil-works/pi-coding-agent"
+assert packages["todoist-cli"]["install"]["darwin"]["bun"] == "@doist/todoist-cli"
+assert packages["bun"]["install"]["darwin"]["brew"] == "bun"
 PY
 
 linux_script="$test_root/linux-install-packages.sh"
@@ -59,24 +59,24 @@ assert_render_failure() {
 
 render_bun base "$base_linux"
 
-assert_render_failure unsupported-role \
-  '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"packages":{"bun":{"global":{"roles":{"work":[]}}}}}' \
-  'packages.bun.global.roles contains unknown role "work"'
-assert_render_failure non-list-role \
-  '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"packages":{"bun":{"global":{"roles":{"base":"prettier"}}}}}' \
-  'packages.bun.global.roles.base must be a list'
-assert_render_failure duplicate-within-role \
-  '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"packages":{"bun":{"global":{"roles":{"base":["shared","shared"]}}}}}' \
-  'packages.bun.global.roles.base contains duplicate package "shared"'
-assert_render_failure duplicate-ownership \
-  '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"packages":{"bun":{"global":{"roles":{"base":["shared"],"gaming":["shared"]}}}}}' \
-  'bun global package "shared" belongs to both roles "base" and "gaming"'
-assert_render_failure empty-identifier \
-  '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"packages":{"bun":{"global":{"roles":{"base":[""]}}}}}' \
-  'packages.bun.global.roles.base[0] must be a non-empty string'
-assert_render_failure whitespace-identifier \
-  '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"packages":{"bun":{"global":{"roles":{"base":[" prettier "]}}}}}' \
-  'packages.bun.global.roles.base[0] must not have leading or trailing whitespace'
+assert_render_failure shared-catalog-validation \
+  '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"packages":{"prettier":{"unexpected":true}}}' \
+  'packages.prettier.unexpected'
+
+execution_source="$test_root/execution-source"
+mkdir -p "$execution_source"
+cp -R "$source_dir/.chezmoitemplates" "$source_dir/.chezmoidata" "$execution_source/"
+cp "$source_dir/run_onchange_after_install-bun-global-packages.sh.tmpl" "$execution_source/"
+cat >"$execution_source/.chezmoidata/packages.yaml" <<'JSON'
+{"machineRolePolicy":{"required":["base"],"platforms":{"linux":["base","gaming"],"darwin":["base"]}},"packages":{"prettier":{"role":"base","install":{"linux":{"bun":"prettier"}}},"hunkdiff":{"role":"base","install":{"linux":{"bun":"hunkdiff"}}}},"packageRemovals":{"linux":{"apt":[]}}}
+JSON
+render_execution() {
+  local name=$1 override=$2
+  chezmoi --config "$empty_config" --source "$execution_source" --override-data "$override" \
+    execute-template -f "$execution_source/run_onchange_after_install-bun-global-packages.sh.tmpl" >"$test_root/$name.sh"
+  bash -n "$test_root/$name.sh"
+}
+render_execution execution "$base_linux"
 
 fake_bin="$test_root/fake-bin"
 mkdir -p "$fake_bin"
@@ -142,9 +142,9 @@ JSON
   PATH="$fake_bin:/usr/bin:/bin" HOME="$case_root/home" XDG_CONFIG_HOME="$case_root/config" bash "$rendered_script"
 }
 
-run_reconciliation_case "$test_root/base.sh" "$test_root/declared-case" \
+run_reconciliation_case "$test_root/execution.sh" "$test_root/declared-case" \
   'is-number prettier'
-printf 'add\t--global\tprettier@latest\t@earendil-works/pi-coding-agent@latest\thunkdiff@latest\t@doist/todoist-cli@latest\nremove\t--global\tis-number\n' \
+printf 'add\t--global\thunkdiff@latest\tprettier@latest\nremove\t--global\tis-number\n' \
   >"$test_root/expected-declared-invocations.log"
 diff -u \
   "$test_root/expected-declared-invocations.log" \
@@ -152,29 +152,28 @@ diff -u \
 test -x "$test_root/declared-case/bun-home/bin/prettier"
 PATH="$test_root/declared-case/bun-home/bin:$PATH" prettier --version >/dev/null
 
-render_bun denied-hunkdiff '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"packagePolicy":{"deniedPrefixes":["hunkdiff"]}}'
+render_execution denied-hunkdiff '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"packagePolicy":{"deniedPrefixes":["hunkdiff"]}}'
 run_reconciliation_case "$test_root/denied-hunkdiff.sh" "$test_root/denied-case" \
   'hunkdiff is-number prettier'
-printf 'add\t--global\tprettier@latest\t@earendil-works/pi-coding-agent@latest\t@doist/todoist-cli@latest\nremove\t--global\thunkdiff\tis-number\n' \
+printf 'add\t--global\tprettier@latest\nremove\t--global\thunkdiff\tis-number\n' \
   >"$test_root/expected-denied-invocations.log"
 diff -u \
   "$test_root/expected-denied-invocations.log" \
   "$test_root/denied-case/bun-invocation.log"
 
-render_bun legacy-denied-hunkdiff '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"blocked_prefixes":["hunkdiff"]}'
+render_execution legacy-denied-hunkdiff '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"blocked_prefixes":["hunkdiff"]}'
 run_reconciliation_case "$test_root/legacy-denied-hunkdiff.sh" "$test_root/legacy-denied-case" \
   'hunkdiff is-number prettier'
-printf 'add\t--global\tprettier@latest\t@earendil-works/pi-coding-agent@latest\t@doist/todoist-cli@latest\nremove\t--global\thunkdiff\tis-number\n' \
+printf 'add\t--global\tprettier@latest\nremove\t--global\thunkdiff\tis-number\n' \
   >"$test_root/expected-legacy-denied-invocations.log"
 diff -u \
   "$test_root/expected-legacy-denied-invocations.log" \
   "$test_root/legacy-denied-case/bun-invocation.log"
 
-render_bun combined-denials '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"packagePolicy":{"deniedPrefixes":["prettier","hunkdiff"]},"blocked_prefixes":["hunkdiff","@earendil-works/pi"]}'
+render_execution combined-denials '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"packagePolicy":{"deniedPrefixes":["prettier"]},"blocked_prefixes":["hunkdiff"]}'
 run_reconciliation_case "$test_root/combined-denials.sh" "$test_root/combined-denial-case" \
   'hunkdiff is-number prettier'
-printf 'add\t--global\t@doist/todoist-cli@latest\nremove\t--global\thunkdiff\tis-number\tprettier\n' \
+printf 'remove\t--global\thunkdiff\tis-number\tprettier\n' \
   >"$test_root/expected-combined-denial-invocations.log"
-diff -u \
-  "$test_root/expected-combined-denial-invocations.log" \
+diff -u "$test_root/expected-combined-denial-invocations.log" \
   "$test_root/combined-denial-case/bun-invocation.log"

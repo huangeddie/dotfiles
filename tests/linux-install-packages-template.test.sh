@@ -8,7 +8,7 @@ empty_config="$test_dir/empty-config.toml"
 : >"$empty_config"
 
 base_linux='{"chezmoi":{"os":"linux"},"machineRoles":["base"]}'
-execution_linux='{"chezmoi":{"os":"linux"},"machineRoles":["base"],"packages":{"linux":{"custom":{"roles":{"base":[]}}}}}'
+execution_linux='{"chezmoi":{"os":"linux"},"machineRoles":["base"]}'
 gaming_linux='{"chezmoi":{"os":"linux"},"machineRoles":["base","gaming"]}'
 
 schema_json="$test_dir/schema.json"
@@ -20,12 +20,8 @@ import sys
 with open(sys.argv[1], encoding="utf-8") as stream:
     packages = json.load(stream)["packages"]
 
-assert packages["linux"]["apt"]["roles"]["gaming"] == [
-    "steam-installer",
-    "steam-devices",
-]
-assert "nvtop" in packages["linux"]["apt"]["roles"]["base"]
-assert packages["linux"]["apt"]["remove"] == []
+assert packages["steam"]["install"]["linux"]["apt"] == ["steam-installer", "steam-devices"]
+assert packages["nvtop"]["install"]["linux"]["apt"] == ["nvtop"]
 PY
 
 render_linux() {
@@ -72,7 +68,11 @@ import json, sys
 print(json.dumps(json.load(open(sys.argv[1]))["linux-gaming"]["apt"]["install"]))
 PY
 )
-steam_purge='["steam-installer","steam-devices"]'
+steam_purge=$(python3 - "$source_dir/tests/fixtures/packages/baseline.json" <<'PYJSON'
+import json,sys
+print(json.dumps(json.load(open(sys.argv[1]))['linux-base']['apt']['remove']))
+PYJSON
+)
 
 render_linux base "$base_linux"
 assert_arrays "$test_dir/base.sh" "$base_install" "$steam_purge"
@@ -112,51 +112,15 @@ assert_render_failure() {
   grep -Fq "$expected_error" "$test_dir/$name.err"
 }
 
-assert_render_failure \
-  unsupported-role \
-  '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"packages":{"linux":{"apt":{"roles":{"work":[]}}}}}' \
-  'packages.linux.apt.roles contains unsupported linux role "work"'
-assert_render_failure \
-  non-list-role \
-  '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"packages":{"linux":{"apt":{"roles":{"base":"neovim"}}}}}' \
-  'packages.linux.apt.roles.base must be a list'
-assert_render_failure \
-  duplicate-ownership \
-  '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"packages":{"linux":{"apt":{"roles":{"base":["shared"],"gaming":["shared"]}}}}}' \
-  'apt package "shared" belongs to both roles "base" and "gaming"'
-assert_render_failure \
-  duplicate-tombstone \
-  '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"packages":{"linux":{"apt":{"remove":["obsolete","obsolete"]}}}}' \
-  'packages.linux.apt.remove contains duplicate package "obsolete"'
-assert_render_failure \
-  role-tombstone-overlap \
-  '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"packages":{"linux":{"apt":{"roles":{"base":["shared"]},"remove":["shared"]}}}}' \
-  'apt package "shared" cannot be both role-managed and a removal tombstone'
-assert_render_failure \
-  custom-unsupported-role \
-  '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"packages":{"linux":{"custom":{"roles":{"work":[]}}}}}' \
-  'packages.linux.custom.roles contains unsupported linux role "work"'
-assert_render_failure \
-  custom-non-list-role \
-  '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"packages":{"linux":{"custom":{"roles":{"base":{}}}}}}' \
-  'packages.linux.custom.roles.base must be a list'
-assert_render_failure \
-  custom-inactive-malformed-record \
-  '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"packages":{"linux":{"custom":{"roles":{"gaming":[{"name":"broken","executable":"","install":"true"}]}}}}}' \
-  'packages.linux.custom.roles.gaming 0: executable must not be empty'
-assert_render_failure \
-  custom-duplicate-within-role \
-  '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"packages":{"linux":{"custom":{"roles":{"base":[{"name":"shared","executable":"shared","install":"true"},{"name":"shared","executable":"other","install":"true"}]}}}}}' \
-  'packages.linux.custom.roles.base contains duplicate installer "shared"'
-assert_render_failure \
-  custom-duplicate-ownership \
-  '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"packages":{"linux":{"custom":{"roles":{"base":[{"name":"shared","executable":"shared","install":"true"}],"gaming":[{"name":"shared","executable":"other","install":"true"}]}}}}}' \
-  'linux custom installer "shared" belongs to both roles "base" and "gaming"'
+assert_render_failure shared-catalog-validation '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"packages":{"steam":{"unexpected":true}}}' 'packages.steam.unexpected'
 
 execution_source="$test_dir/execution-source"
 mkdir -p "$execution_source"
 cp -R "$source_dir/.chezmoitemplates" "$source_dir/.chezmoidata" "$execution_source/"
 cp "$source_dir/run_onchange_before_linux-install-packages.sh.tmpl" "$execution_source/"
+cat >"$execution_source/.chezmoidata/packages.yaml" <<'JSON'
+{"machineRolePolicy":{"required":["base"],"platforms":{"linux":["base","gaming"],"darwin":["base"]}},"packages":{"editor":{"role":"base","install":{"linux":{"apt":["neovim"]}}},"steam":{"role":"gaming","install":{"linux":{"apt":["steam-installer","steam-devices"]}}}},"packageRemovals":{"linux":{"apt":[]}}}
+JSON
 chezmoi --config "$empty_config" --source "$execution_source" --override-data "$execution_linux" \
   execute-template -f "$execution_source/run_onchange_before_linux-install-packages.sh.tmpl" >"$test_dir/execution.sh"
 bash -n "$test_dir/execution.sh"
@@ -177,19 +141,11 @@ fake_bin="$test_dir/fake-bin"
 mkdir -p "$fake_bin"
 dpkg_state="$test_dir/dpkg-state"
 apt_effects="$test_dir/apt-effects"
-python3 - "$dpkg_state" "$base_install" <<'PY'
-import json
-import sys
-
-state_path, base_install = sys.argv[1:]
-packages = json.loads(base_install)
-with open(state_path, "w", encoding="utf-8") as stream:
-    for package in packages:
-        state = "not-installed" if package == "neovim" else "installed"
-        stream.write(f"{package} {state}\n")
-    stream.write("steam-installer installed\n")
-    stream.write("steam-devices config-files\n")
-PY
+cat >"$dpkg_state" <<'STATE'
+neovim not-installed
+steam-installer installed
+steam-devices config-files
+STATE
 
 cat >"$fake_bin/dpkg-query" <<'SH'
 #!/usr/bin/env bash
@@ -245,28 +201,19 @@ HOME="$test_dir/home" XDG_CONFIG_HOME="$test_dir/config" \
 PATH="$fake_bin:/usr/bin:/bin" \
   "$supported_bash" "$test_dir/execution.sh" >/dev/null
 
-python3 - "$apt_effects" "$base_install" <<'PY'
-import json
+python3 - "$apt_effects" <<'PY'
 import sys
-
-effects_path, base_install = sys.argv[1:]
-desired = ["neovim", "ripgrep", "golang-go", "fd-find", "fzf", "git", "lazygit", "gh", "git-delta", "curl", "openssh-server", "ffmpeg", "nodejs", "npm", "btop", "nvtop", "bat", "ghostty"]
+actual = open(sys.argv[1], encoding='utf-8').read().splitlines()
 expected = [
-    "sudo apt-get update",
-    "apt-get update",
-    "apt-get --simulate install -- neovim",
-    "sudo apt-get install -y -- neovim",
-    "apt-get install -y -- neovim",
-    f"sudo apt-mark manual {' '.join(desired)}",
-    f"apt-mark manual {' '.join(desired)}",
-    "apt-get --simulate purge -- steam-installer steam-devices",
-    "sudo apt-get purge -y -- steam-installer steam-devices",
-    "apt-get purge -y -- steam-installer steam-devices",
-    "sudo apt-get autoremove --purge -y",
-    "apt-get autoremove --purge -y",
+    'sudo apt-get update', 'apt-get update',
+    'apt-get --simulate install -- neovim',
+    'sudo apt-get install -y -- neovim', 'apt-get install -y -- neovim',
+    'sudo apt-mark manual neovim', 'apt-mark manual neovim',
+    'apt-get --simulate purge -- steam-installer steam-devices',
+    'sudo apt-get purge -y -- steam-installer steam-devices',
+    'apt-get purge -y -- steam-installer steam-devices',
+    'sudo apt-get autoremove --purge -y', 'apt-get autoremove --purge -y',
 ]
-with open(effects_path, encoding="utf-8") as stream:
-    actual = [line.rstrip("\n") for line in stream]
-assert actual == expected, f"unexpected apt effects: {actual!r}"
+assert actual == expected, (actual, expected)
 PY
 fi

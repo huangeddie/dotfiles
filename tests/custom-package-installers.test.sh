@@ -16,45 +16,13 @@ import sys
 with open(sys.argv[1], encoding="utf-8") as stream:
     packages = json.load(stream)["packages"]
 
-expected_linux_custom = [
-    {
-        "name": "television",
-        "executable": "tv",
-        "install": "curl -fsSL https://alexpasmantier.github.io/television/install.sh | bash",
-    },
-    {
-        "name": "zoxide",
-        "executable": "zoxide",
-        "install": "curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh",
-    },
-    {
-        "name": "herdr",
-        "executable": "herdr",
-        "install": "curl -fsSL https://herdr.dev/install.sh | sh",
-    },
-    {
-        "name": "tailscale",
-        "executable": "tailscale",
-        "install": "curl -fsSL https://tailscale.com/install.sh | sh",
-    },
-    {
-        "name": "bun",
-        "executable": "bun",
-        "install": "curl -fsSL https://bun.com/install | bash",
-    },
-    {
-        "name": "cargo",
-        "executable": "cargo",
-        "install": "curl https://sh.rustup.rs -sSf | sh",
-    },
-]
-
-assert packages["darwin"]["custom"]["roles"]["base"] == [
-    {"name": "cargo", "executable": "cargo", "install": "curl https://sh.rustup.rs -sSf | sh"},
-    {"name": "claude-code", "executable": "claude", "install": "curl -fsSL https://claude.ai/install.sh | bash"},
-    {"name": "codex", "executable": "codex", "install": "curl -fsSL https://chatgpt.com/codex/install.sh | sh"},
-]
-assert packages["linux"]["custom"]["roles"]["base"] == expected_linux_custom
+assert packages["cargo"]["install"]["darwin"]["order"] == 10
+assert packages["cargo"]["install"]["linux"]["order"] == 60
+assert packages["claude-code"]["install"]["darwin"]["order"] == 20
+assert packages["codex"]["install"]["darwin"]["order"] == 30
+for name, order in (("television", 10), ("zoxide", 20), ("herdr", 30),
+                    ("tailscale", 40), ("bun", 50)):
+    assert packages[name]["install"]["linux"]["order"] == order
 PY
 
 render_linux() {

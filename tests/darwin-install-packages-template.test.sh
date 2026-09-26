@@ -8,7 +8,7 @@ empty_config="$test_dir/empty-config.toml"
 : >"$empty_config"
 
 base_darwin='{"chezmoi":{"os":"darwin"},"machineRoles":["base"]}'
-execution_darwin='{"chezmoi":{"os":"darwin"},"machineRoles":["base"],"packages":{"darwin":{"custom":{"roles":{"base":[]}}}}}'
+execution_darwin="$base_darwin"
 
 schema_json="$test_dir/schema.json"
 chezmoi --config "$empty_config" --source "$source_dir" data --format json >"$schema_json"
@@ -19,18 +19,10 @@ import sys
 with open(sys.argv[1], encoding="utf-8") as stream:
     packages = json.load(stream)["packages"]
 
-darwin = packages["darwin"]
-assert "taps" not in darwin
-assert darwin["trusted_formulae"]["roles"]["base"] == [
-    "modem-dev/tap/hunk",
-    "anomalyco/tap/opencode",
-]
-assert "git-delta" in darwin["brews"]["roles"]["base"]
-assert darwin["casks"]["roles"]["base"] == [
-    "font-jetbrains-mono-nerd-font",
-    "gcloud-cli",
-    "ghostty",
-]
+assert packages["hunk"]["install"]["darwin"]["trusted"] is True
+assert packages["opencode"]["install"]["darwin"]["trusted"] is True
+assert packages["git-delta"]["install"]["darwin"]["brew"] == "git-delta"
+assert packages["ghostty"]["install"]["darwin"]["cask"] == "ghostty"
 PY
 
 render_darwin() {
@@ -58,33 +50,14 @@ assert_render_failure() {
   grep -Fq "$expected_error" "$test_dir/$name.err"
 }
 
-assert_string_category_validation() {
-  local category=$1
-  local identifier=$2
-
-  assert_render_failure \
-    "$category-unsupported-role" \
-    "{\"chezmoi\":{\"os\":\"darwin\"},\"machineRoles\":[\"base\"],\"packages\":{\"darwin\":{\"$category\":{\"roles\":{\"work\":[]}}}}}" \
-    "packages.darwin.$category.roles contains unsupported darwin role \"work\""
-  assert_render_failure \
-    "$category-non-list-role" \
-    "{\"chezmoi\":{\"os\":\"darwin\"},\"machineRoles\":[\"base\"],\"packages\":{\"darwin\":{\"$category\":{\"roles\":{\"base\":\"$identifier\"}}}}}" \
-    "packages.darwin.$category.roles.base must be a list"
-  assert_render_failure \
-    "$category-empty-identifier" \
-    "{\"chezmoi\":{\"os\":\"darwin\"},\"machineRoles\":[\"base\"],\"packages\":{\"darwin\":{\"$category\":{\"roles\":{\"base\":[\"\"]}}}}}" \
-    "packages.darwin.$category.roles.base[0] must be a non-empty string"
-  assert_render_failure \
-    "$category-duplicate-within-role" \
-    "{\"chezmoi\":{\"os\":\"darwin\"},\"machineRoles\":[\"base\"],\"packages\":{\"darwin\":{\"$category\":{\"roles\":{\"base\":[\"shared\",\"shared\"]}}}}}" \
-    "packages.darwin.$category.roles.base contains duplicate $identifier \"shared\""
-}
-
 # Render executable cases from an isolated copy, never from the production source.
 execution_source="$test_dir/execution-source"
 mkdir -p "$execution_source"
 cp -R "$source_dir/.chezmoitemplates" "$source_dir/.chezmoidata" "$execution_source/"
 cp "$source_dir/run_onchange_before_darwin-install-packages.sh.tmpl" "$execution_source/"
+cat >"$execution_source/.chezmoidata/packages.yaml" <<'JSON'
+{"machineRolePolicy":{"required":["base"],"platforms":{"linux":["base","gaming"],"darwin":["base"]}},"packages":{"hunk":{"role":"base","install":{"darwin":{"brew":"modem-dev/tap/hunk","trusted":true}}},"opencode":{"role":"base","install":{"darwin":{"brew":"anomalyco/tap/opencode","trusted":true}}},"ghostty":{"role":"base","install":{"darwin":{"cask":"ghostty"}}}},"packageRemovals":{"linux":{"apt":[]}}}
+JSON
 render_execution() {
   local name=$1 override=$2
   chezmoi --config "$empty_config" --source "$execution_source" --override-data "$override" \
@@ -96,11 +69,17 @@ render_execution() {
 }
 
 render_darwin base "$base_darwin"
+python3 - "$test_dir/base.sh" "$source_dir/tests/fixtures/packages/baseline.json" <<'PY'
+import json, sys
+script = open(sys.argv[1], encoding='utf-8').read()
+records = json.load(open(sys.argv[2], encoding='utf-8'))['darwin-base']['custom']
+positions = [script.index(record['install']) for record in records]
+assert positions == sorted(positions), positions
+assert all(script.count(record['install']) == 1 for record in records)
+PY
 render_execution execution "$execution_darwin"
-assert_render_failure \
-  null-taps \
-  '{"chezmoi":{"os":"darwin"},"machineRoles":["base"],"packages":{"darwin":{"taps":null}}}' \
-  'packages.darwin.taps must be a map'
+# The consumer must call shared validation, including for unselected recipes.
+assert_render_failure invalid-catalog '{"chezmoi":{"os":"darwin"},"machineRoles":["base"],"packages":{"ghostty":{"unexpected":true}}}' 'packages.ghostty.unexpected'
 
 fake_bin="$test_dir/bin"
 mkdir -p "$fake_bin" "$test_dir/home" "$test_dir/config"
@@ -140,19 +119,13 @@ if ! grep -Fqx 'bundle install --file=/dev/stdin --force-cleanup' "$brew_calls";
   exit 1
 fi
 
-python3 - "$brewfile_input" "$source_dir/tests/fixtures/packages/baseline.json" <<'PY'
+python3 - "$brewfile_input" <<'PY'
 import json
 import sys
 
 with open(sys.argv[1], encoding="utf-8") as stream:
     declarations = [line.rstrip("\n") for line in stream]
-with open(sys.argv[2], encoding="utf-8") as stream:
-    expected = json.load(stream)["darwin-base"]["homebrew"]
-assert sorted(declarations) == sorted(
-    f'{category} "{name}"'
-    for key, category in (("brews", "brew"), ("casks", "cask"), ("taps", "tap"))
-    for name in expected[key]
-)
+assert sorted(declarations) == sorted(['brew "modem-dev/tap/hunk"', 'brew "anomalyco/tap/opencode"', 'cask "ghostty"'])
 PY
 
 assert_render_failure \
@@ -160,33 +133,7 @@ assert_render_failure \
   '{"chezmoi":{"os":"darwin"},"machineRoles":["base","gaming"]}' \
   'machine role "gaming" is not supported on darwin'
 
-assert_string_category_validation taps tap
-assert_string_category_validation trusted_formulae formula
-assert_string_category_validation brews brew
-assert_string_category_validation casks cask
-
-assert_render_failure \
-  custom-unsupported-role \
-  '{"chezmoi":{"os":"darwin"},"machineRoles":["base"],"packages":{"darwin":{"custom":{"roles":{"work":[]}}}}}' \
-  'packages.darwin.custom.roles contains unsupported darwin role "work"'
-assert_render_failure \
-  custom-non-list-role \
-  '{"chezmoi":{"os":"darwin"},"machineRoles":["base"],"packages":{"darwin":{"custom":{"roles":{"base":"synthetic-installer"}}}}}' \
-  'packages.darwin.custom.roles.base must be a list'
-assert_render_failure \
-  custom-malformed-record \
-  '{"chezmoi":{"os":"darwin"},"machineRoles":["base"],"packages":{"darwin":{"custom":{"roles":{"base":[{"name":"synthetic-installer","install":"true"}]}}}}}' \
-  'custom installer 0: executable must not be empty'
-assert_render_failure \
-  custom-empty-name \
-  '{"chezmoi":{"os":"darwin"},"machineRoles":["base"],"packages":{"darwin":{"custom":{"roles":{"base":[{"name":"","executable":"synthetic-installer","install":"true"}]}}}}}' \
-  'packages.darwin.custom.roles.base[0].name must be a non-empty string'
-assert_render_failure \
-  custom-duplicate-within-role \
-  '{"chezmoi":{"os":"darwin"},"machineRoles":["base"],"packages":{"darwin":{"custom":{"roles":{"base":[{"name":"shared","executable":"shared-one","install":"true"},{"name":"shared","executable":"shared-two","install":"true"}]}}}}}' \
-  'packages.darwin.custom.roles.base contains duplicate installer "shared"'
-
-render_execution denied-tap '{"chezmoi":{"os":"darwin"},"machineRoles":["base"],"packagePolicy":{"deniedPrefixes":["modem-dev/tap"]},"packages":{"darwin":{"custom":{"roles":{"base":[]}}}}}'
+render_execution denied-tap '{"chezmoi":{"os":"darwin"},"machineRoles":["base"],"packagePolicy":{"deniedPrefixes":["modem-dev/tap"]}}'
 denied_tap_calls="$test_dir/denied-tap-calls"
 denied_tap_brewfile="$test_dir/denied-tap-Brewfile"
 PATH="$fake_bin:/usr/bin:/bin" \
@@ -211,24 +158,6 @@ for declaration in [
 ]:
     assert declaration not in declarations, declaration
 PY
-
-render_execution custom-denial '{"chezmoi":{"os":"darwin"},"machineRoles":["base"],"packagePolicy":{"deniedPrefixes":["synthetic-installer"]},"packages":{"darwin":{"custom":{"roles":{"base":[{"name":"synthetic-installer","executable":"synthetic-installer","install":"printf custom-denial-marker > \\u0022$CUSTOM_EFFECT\\u0022"}]}}}}}'
-if grep -Fq 'custom-denial-marker' "$test_dir/custom-denial.sh"; then
-  echo "denied custom installer command remained in the rendered script" >&2
-  exit 1
-fi
-custom_effect="$test_dir/custom-effect"
-PATH="$fake_bin:/usr/bin:/bin" \
-HOME="$test_dir/home" \
-XDG_CONFIG_HOME="$test_dir/config" \
-BREW_CALLS="$test_dir/custom-denial-calls" \
-BREWFILE_INPUT="$test_dir/custom-denial-Brewfile" \
-CUSTOM_EFFECT="$custom_effect" \
-  bash "$test_dir/custom-denial.sh"
-if [[ -e $custom_effect ]]; then
-  echo "denied custom installer command executed" >&2
-  exit 1
-fi
 
 render_darwin new-denial '{"chezmoi":{"os":"darwin"},"machineRoles":["base"],"packagePolicy":{"deniedPrefixes":["git-delta","codex"]}}'
 if grep -Fqx 'brew "git-delta"' "$test_dir/new-denial.sh" ||
