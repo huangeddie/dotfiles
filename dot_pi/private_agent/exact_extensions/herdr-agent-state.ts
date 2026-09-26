@@ -176,6 +176,14 @@ async function drainStateQueue(): Promise<void> {
   }
 }
 
+export interface StateReporter {
+  updateSessionRef(ctx: any): void;
+  reportSession(source?: string): Promise<void>;
+  queueState(state: AgentState, message?: string): void;
+}
+
+export function registerStateHandlers(pi: any, reporter: StateReporter): void {}
+
 export default function (pi) {
   if (!enabled()) {
     return;
