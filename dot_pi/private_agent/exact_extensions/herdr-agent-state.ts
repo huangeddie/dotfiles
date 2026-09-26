@@ -3,6 +3,8 @@
 // add custom hooks/plugins beside this file instead of editing it.
 // HERDR_INTEGRATION_ID=pi
 // HERDR_INTEGRATION_VERSION=9
+// Local patch: honor counted herdr:busy events from background-work extensions.
+// Preserve this patch when refreshing the upstream integration until supported.
 // @ts-nocheck
 
 import net from "node:net";
@@ -182,14 +184,16 @@ export interface StateReporter {
   queueState(state: AgentState, message?: string): void;
 }
 
-export function registerStateHandlers(pi: any, reporter: StateReporter): void {}
-
 export default function (pi) {
   if (!enabled()) {
     return;
   }
+  registerStateHandlers(pi, { updateSessionRef, reportSession, queueState });
+}
 
+export function registerStateHandlers(pi: any, reporter: StateReporter): void {
   let agentActive = false;
+  let busyCount = 0;
   let blockedCount = 0;
   let blockedMessage: string | undefined;
   let lastState: AgentState | undefined;
@@ -200,7 +204,7 @@ export default function (pi) {
     if (blockedCount > 0) {
       return { state: "blocked" as const, message: blockedMessage };
     }
-    if (agentActive) {
+    if (agentActive || busyCount > 0) {
       return { state: "working" as const, message: undefined };
     }
     return { state: "idle" as const, message: undefined };
@@ -213,8 +217,17 @@ export default function (pi) {
     }
     lastState = next.state;
     lastMessage = next.message;
-    queueState(next.state, next.message);
+    reporter.queueState(next.state, next.message);
   }
+
+  // Each producer owns balanced acquire/release events, not an absolute boolean.
+  pi.events.on("herdr:busy", (data) => {
+    if (!rootSession) {
+      return;
+    }
+    busyCount = data?.active ? busyCount + 1 : Math.max(0, busyCount - 1);
+    publishState();
+  });
 
   pi.events.on("herdr:blocked", (data) => {
     if (!rootSession) {
@@ -241,8 +254,8 @@ export default function (pi) {
       return;
     }
     rootSession = true;
-    updateSessionRef(ctx);
-    await reportSession(event?.reason);
+    reporter.updateSessionRef(ctx);
+    await reporter.reportSession(event?.reason);
     // A reload can replace this extension mid-run without emitting another agent_start.
     agentActive = ctx?.isIdle?.() === false;
     publishState(true);
@@ -252,8 +265,8 @@ export default function (pi) {
     if (!rootSession) {
       return;
     }
-    updateSessionRef(ctx);
-    void reportSession();
+    reporter.updateSessionRef(ctx);
+    void reporter.reportSession();
     agentActive = true;
     publishState();
   });

@@ -50,7 +50,7 @@ async function createHarness(mode = "tui", idle = true) {
   };
 }
 
-test.failing("parent settling with background work stays working until the last busy release", async () => {
+test("parent settling with background work stays working until the last busy release", async () => {
   const h = await createHarness();
   await h.start();
   await h.busy(true);
@@ -60,7 +60,7 @@ test.failing("parent settling with background work stays working until the last 
   expect(h.reporter.state).toBe("idle");
 });
 
-test.failing("overlapping busy claims remain working after only one release", async () => {
+test("overlapping busy claims remain working after only one release", async () => {
   const h = await createHarness();
   await h.busy(true, "first");
   await h.busy(true, "second");
@@ -70,7 +70,7 @@ test.failing("overlapping busy claims remain working after only one release", as
   expect(h.reporter.state).toBe("idle");
 });
 
-test.failing("attention overrides background work and clearing attention restores working", async () => {
+test("attention overrides background work and clearing attention restores working", async () => {
   const h = await createHarness();
   await h.busy(true);
   await h.blocked(true);
@@ -83,7 +83,7 @@ test.failing("attention overrides background work and clearing attention restore
   expect(h.reporter.state).toBe("idle");
 });
 
-test.failing("releasing background work does not clear outstanding attention", async () => {
+test("releasing background work does not clear outstanding attention", async () => {
   const h = await createHarness();
   await h.busy(true);
   await h.blocked(true);
@@ -93,7 +93,7 @@ test.failing("releasing background work does not clear outstanding attention", a
   expect(h.reporter.state).toBe("idle");
 });
 
-test.failing("background completion keeps an active parent working until it settles", async () => {
+test("background completion keeps an active parent working until it settles", async () => {
   const h = await createHarness();
   await h.start();
   await h.busy(true);
@@ -103,7 +103,7 @@ test.failing("background completion keeps an active parent working until it sett
   expect(h.reporter.state).toBe("idle");
 });
 
-test.failing("unmatched busy releases do not swallow the next busy claim", async () => {
+test("unmatched busy releases do not swallow the next busy claim", async () => {
   const h = await createHarness();
   await h.busy(false);
   await h.busy(false);
@@ -114,7 +114,7 @@ test.failing("unmatched busy releases do not swallow the next busy claim", async
   expect(h.reporter.state).toBe("idle");
 });
 
-test.failing("background activity after parent settling changes idle to working", async () => {
+test("background activity after parent settling changes idle to working", async () => {
   const h = await createHarness();
   await h.start();
   await h.settle();
@@ -123,7 +123,7 @@ test.failing("background activity after parent settling changes idle to working"
   expect(h.reporter.state).toBe("working");
 });
 
-test.failing("reload during an active parent starts working and ignores premature settling", async () => {
+test("reload during an active parent starts working and ignores premature settling", async () => {
   const h = await createHarness("tui", false);
   expect(h.reporter.state).toBe("working");
   await h.settle();
