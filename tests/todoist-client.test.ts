@@ -17,7 +17,7 @@ function fakeRun(responses: [string[], string][]): { run: Run; calls: string[][]
   };
 }
 
-test.failing("task fields remain literal arguments including leading dashes and shell syntax", async () => {
+test("task fields remain literal arguments including leading dashes and shell syntax", async () => {
   const calls: string[][] = [];
   const api = createTodoist(async args => {
     calls.push(args);
@@ -34,7 +34,7 @@ test.failing("task fields remain literal arguments including leading dashes and 
   ]]);
 });
 
-test.failing("minimal task has no optional flags and tolerates unrelated output fields", async () => {
+test("minimal task has no optional flags and tolerates unrelated output fields", async () => {
   const args = ["--no-spinner", "task", "add", "--content", "plain", "--json"];
   const { run, calls } = fakeRun([[args, '{"id":"t","content":"plain","priority":1}']]);
   expect(await createTodoist(run).create({ title: "plain" })).toEqual({ id: "t" });
@@ -42,7 +42,7 @@ test.failing("minimal task has no optional flags and tolerates unrelated output 
 });
 
 for (const phrase of ["today", "tomorrow", "next week", "next weekend"]) {
-  test.failing(`due phrase ${phrase} is passed unchanged`, async () => {
+  test(`due phrase ${phrase} is passed unchanged`, async () => {
     const args = ["--no-spinner", "task", "add", "--content", "task", "--due", phrase, "--json"];
     const { run, calls } = fakeRun([[args, '{"id":"new"}']]);
     expect(await createTodoist(run).create({ title: "task", due: phrase })).toEqual({ id: "new" });
@@ -50,7 +50,7 @@ for (const phrase of ["today", "tomorrow", "next week", "next weekend"]) {
   });
 }
 
-test.failing("projects fetch all/full, normalize inbox and preserve duplicate names by ID", async () => {
+test("projects fetch all/full, normalize inbox and preserve duplicate names by ID", async () => {
   const { run, calls } = fakeRun([[projectArgs, JSON.stringify({
     results: [
       { id: "inbox", name: "Inbox", inboxProject: true, color: "blue" },
@@ -66,7 +66,7 @@ test.failing("projects fetch all/full, normalize inbox and preserve duplicate na
   expect(calls).toEqual([projectArgs]);
 });
 
-test.failing("sections fetch all for project ID and preserve duplicate names by ID", async () => {
+test("sections fetch all for project ID and preserve duplicate names by ID", async () => {
   const { run, calls } = fakeRun([[sectionArgs, JSON.stringify({ results: [
     { id: "s1", projectId: "p", name: "Same", sectionOrder: 1 },
     { id: "s2", projectId: "p", name: "Same", sectionOrder: 2 },
@@ -78,7 +78,7 @@ test.failing("sections fetch all for project ID and preserve duplicate names by 
   expect(calls).toEqual([sectionArgs]);
 });
 
-test.failing("empty project and section results are valid", async () => {
+test("empty project and section results are valid", async () => {
   const { run, calls } = fakeRun([
     [projectArgs, '{"results":[],"nextCursor":null}'],
     [sectionArgs, '{"results":[],"nextCursor":null}'],
@@ -98,9 +98,9 @@ for (const [name, response] of [
   ["invalid project name", '{"results":[{"id":"p","name":5}]}'],
   ["invalid inbox value", '{"results":[{"id":"p","name":"Work","inboxProject":"true"}]}'],
 ] as const) {
-  test.failing(`projects reject ${name}`, async () => {
+  test(`projects reject ${name}`, async () => {
     const { run } = fakeRun([[projectArgs, response]]);
-    expect(createTodoist(run).projects()).rejects.toThrow();
+    await expect(createTodoist(run).projects()).rejects.toThrow();
   });
 }
 
@@ -111,23 +111,23 @@ for (const [name, response] of [
   ["missing project ID", '{"results":[{"id":"s","name":"Name"}]}'],
   ["wrong-project section", '{"results":[{"id":"s","projectId":"other","name":"Name"}]}'],
 ] as const) {
-  test.failing(`sections reject ${name}`, async () => {
+  test(`sections reject ${name}`, async () => {
     const { run } = fakeRun([[sectionArgs, response]]);
-    expect(createTodoist(run).sections("p")).rejects.toThrow();
+    await expect(createTodoist(run).sections("p")).rejects.toThrow();
   });
 }
 
 for (const response of ['{}', '{"id":""}', '{"id":9}', 'not json']) {
-  test.failing(`create rejects missing or invalid ID: ${response}`, async () => {
+  test(`create rejects missing or invalid ID: ${response}`, async () => {
     const { run } = fakeRun([[["--no-spinner", "task", "add", "--content", "task", "--json"], response]]);
-    expect(createTodoist(run).create({ title: "task" })).rejects.toThrow();
+    await expect(createTodoist(run).create({ title: "task" })).rejects.toThrow();
   });
 }
 
-test.failing("runner rejection propagates without fabricated success", async () => {
+test("runner rejection propagates without fabricated success", async () => {
   const error = new Error("td unavailable");
   const api = createTodoist(async () => { throw error; });
-  expect(api.projects()).rejects.toBe(error);
-  expect(api.sections("p")).rejects.toBe(error);
-  expect(api.create({ title: "task" })).rejects.toBe(error);
+  await expect(api.projects()).rejects.toBe(error);
+  await expect(api.sections("p")).rejects.toBe(error);
+  await expect(api.create({ title: "task" })).rejects.toBe(error);
 });
