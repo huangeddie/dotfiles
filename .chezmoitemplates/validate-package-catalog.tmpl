@@ -1,0 +1,93 @@
+{{- $root := . -}}
+{{- $packages := get $root "packages" -}}
+{{- if not (kindIs "map" $packages) -}}{{ fail "packages must be a map" }}{{- end -}}
+{{- $removals := get $root "packageRemovals" -}}
+{{- if not (kindIs "map" $removals) -}}{{ fail "packageRemovals must be a map" }}{{- end -}}
+{{- $owners := dict -}}
+{{- range $id := keys $packages | sortAlpha -}}
+  {{- $path := printf "packages.%s" $id -}}
+  {{- if or (not (kindIs "string" $id)) (eq (trim $id) "") (ne (trim $id) $id) -}}{{ fail (printf "%s must be a nonempty trimmed logical ID" $path) }}{{- end -}}
+  {{- $entry := index $packages $id -}}
+  {{- if not (kindIs "map" $entry) -}}{{ fail (printf "%s must be a map" $path) }}{{- end -}}
+  {{- range $key := keys $entry -}}
+    {{- if not (has $key (list "role" "install")) -}}{{ fail (printf "%s.%s is unknown" $path $key) }}{{- end -}}
+  {{- end -}}
+  {{- $role := get $entry "role" -}}
+  {{- if or (not (kindIs "string" $role)) (not (has $role (list "base" "gaming"))) -}}{{ fail (printf "%s.role must be base or gaming" $path) }}{{- end -}}
+  {{- $install := get $entry "install" -}}
+  {{- if not (kindIs "map" $install) -}}{{ fail (printf "%s.install must be a nonempty map" $path) }}{{- end -}}
+  {{- if eq (len $install) 0 -}}{{ fail (printf "%s.install must be a nonempty map" $path) }}{{- end -}}
+  {{- range $os := keys $install | sortAlpha -}}
+    {{- $recipePath := printf "%s.install.%s" $path $os -}}
+    {{- if not (has $os (list "linux" "darwin")) -}}{{ fail (printf "%s is an unsupported platform" $recipePath) }}{{- end -}}
+    {{- if and (eq $role "gaming") (eq $os "darwin") -}}{{ fail (printf "%s cannot use gaming on darwin" $recipePath) }}{{- end -}}
+    {{- $recipe := index $install $os -}}
+    {{- if not (kindIs "map" $recipe) -}}{{ fail (printf "%s must be a map" $recipePath) }}{{- end -}}
+    {{- $installer := "" -}}
+    {{- range $key := keys $recipe | sortAlpha -}}
+      {{- if has $key (list "brew" "cask" "apt" "bun" "custom") -}}
+        {{- if ne $installer "" -}}{{ fail (printf "%s must have exactly one installer" $recipePath) }}{{- end -}}
+        {{- $installer = $key -}}
+      {{- else if not (has $key (list "trusted" "tap" "order")) -}}
+        {{- fail (printf "%s.%s is unknown" $recipePath $key) -}}
+      {{- end -}}
+    {{- end -}}
+    {{- if eq $installer "" -}}{{ fail (printf "%s must have exactly one installer" $recipePath) }}{{- end -}}
+    {{- $namePath := printf "%s.%s" $recipePath $installer -}}
+    {{- if and (eq $os "linux") (has $installer (list "brew" "cask")) -}}{{ fail (printf "%s is Darwin-only" $namePath) }}{{- end -}}
+    {{- if and (eq $os "darwin") (eq $installer "apt") -}}{{ fail (printf "%s is Linux-only" $namePath) }}{{- end -}}
+    {{- if hasKey $recipe "trusted" -}}
+      {{- if ne $installer "brew" -}}{{ fail (printf "%s.trusted requires brew" $recipePath) }}{{- end -}}
+      {{- if not (kindIs "bool" $recipe.trusted) -}}{{ fail (printf "%s.trusted must be boolean" $recipePath) }}{{- end -}}
+    {{- end -}}
+    {{- if hasKey $recipe "tap" -}}
+      {{- if not (has $installer (list "brew" "cask")) -}}{{ fail (printf "%s.tap requires brew or cask" $recipePath) }}{{- end -}}
+      {{- if or (not (kindIs "string" $recipe.tap)) (eq (trim (toString $recipe.tap)) "") (ne (trim (toString $recipe.tap)) (toString $recipe.tap)) -}}{{ fail (printf "%s.tap must be a nonempty trimmed string" $recipePath) }}{{- end -}}
+    {{- end -}}
+    {{- if hasKey $recipe "order" -}}
+      {{- if ne $installer "custom" -}}{{ fail (printf "%s.order requires custom" $recipePath) }}{{- end -}}
+      {{- if not (regexMatch "^(0|[1-9][0-9]*)$" (toJson $recipe.order)) -}}{{ fail (printf "%s.order must be a nonnegative integer" $recipePath) }}{{- end -}}
+    {{- end -}}
+    {{- $names := list -}}
+    {{- if eq $installer "apt" -}}
+      {{- $apt := get $recipe "apt" -}}
+      {{- if not (kindIs "slice" $apt) -}}{{ fail (printf "%s must be a nonempty list" $namePath) }}{{- end -}}
+      {{- if eq (len $apt) 0 -}}{{ fail (printf "%s must be a nonempty list" $namePath) }}{{- end -}}
+      {{- $names = $apt -}}
+    {{- else if eq $installer "custom" -}}
+      {{- $custom := get $recipe "custom" -}}
+      {{- if not (kindIs "map" $custom) -}}{{ fail (printf "%s must be a map" $namePath) }}{{- end -}}
+      {{- range $key := keys $custom -}}
+        {{- if not (has $key (list "executable" "install" "setup")) -}}{{ fail (printf "%s.%s is unknown" $namePath $key) }}{{- end -}}
+      {{- end -}}
+      {{- $record := deepCopy $custom -}}
+      {{- $_ := set $record "name" $id -}}
+      {{- includeTemplate "validate-custom-installers.tmpl" (dict "installers" (list $record) "context" $namePath) -}}
+      {{- $names = list $id -}}
+    {{- else -}}
+      {{- $names = list (get $recipe $installer) -}}
+    {{- end -}}
+    {{- range $index, $name := $names -}}
+      {{- if or (not (kindIs "string" $name)) (eq (trim (toString $name)) "") (ne (trim (toString $name)) (toString $name)) -}}{{ fail (printf "%s[%d] must be a nonempty trimmed string" $namePath $index) }}{{- end -}}
+      {{- $owner := printf "%s/%s/%s" $os $installer $name -}}
+      {{- if hasKey $owners $owner -}}{{ fail (printf "%s has duplicate ownership of %q by %s" $namePath $name (get $owners $owner)) }}{{- end -}}
+      {{- $_ := set $owners $owner $id -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- range $key := keys $removals -}}
+  {{- if ne $key "linux" -}}{{ fail (printf "packageRemovals.%s is unknown" $key) }}{{- end -}}
+{{- end -}}
+{{- $linux := get $removals "linux" -}}
+{{- if not (kindIs "map" $linux) -}}{{ fail "packageRemovals.linux must be a map" }}{{- end -}}
+{{- range $key := keys $linux -}}
+  {{- if ne $key "apt" -}}{{ fail (printf "packageRemovals.linux.%s is unknown" $key) }}{{- end -}}
+{{- end -}}
+{{- $apt := get $linux "apt" -}}
+{{- if not (kindIs "slice" $apt) -}}{{ fail "packageRemovals.linux.apt must be a list" }}{{- end -}}
+{{- $seen := dict -}}
+{{- range $index, $name := $apt -}}
+  {{- if or (not (kindIs "string" $name)) (eq (trim (toString $name)) "") (ne (trim (toString $name)) (toString $name)) -}}{{ fail (printf "packageRemovals.linux.apt[%d] must be a nonempty trimmed string" $index) }}{{- end -}}
+  {{- if or (hasKey $seen $name) (hasKey $owners (printf "linux/apt/%s" $name)) -}}{{ fail (printf "packageRemovals.linux.apt[%d] duplicates a tombstone or catalog name %q" $index $name) }}{{- end -}}
+  {{- $_ := set $seen $name true -}}
+{{- end -}}

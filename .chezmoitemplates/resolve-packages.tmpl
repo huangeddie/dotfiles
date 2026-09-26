@@ -1,0 +1,76 @@
+{{- includeTemplate "validate-machine-package-data.tmpl" . -}}
+{{- includeTemplate "validate-package-catalog.tmpl" . -}}
+{{- $plan := dict
+  "apt" (dict "install" (list) "remove" (list))
+  "homebrew" (dict "brews" (list) "casks" (list) "taps" (list) "trustedFormulae" (list))
+  "bun" (list) "custom" (list) -}}
+{{- $os := .chezmoi.os -}}
+{{- $denied := concat (get (get . "packagePolicy") "deniedPrefixes" | default (list)) (get . "blocked_prefixes" | default (list)) -}}
+{{- $orders := dict -}}
+{{- $taps := dict -}}
+{{- if eq $os "linux" -}}
+  {{- $_ := set $plan.apt "remove" (deepCopy .packageRemovals.linux.apt) -}}
+{{- end -}}
+{{- range $id := keys .packages | sortAlpha -}}
+  {{- $entry := index $.packages $id -}}
+  {{- if hasKey $entry.install $os -}}
+    {{- $recipe := index $entry.install $os -}}
+    {{- $active := has $entry.role $.machineRoles -}}
+    {{- if hasKey $recipe "apt" -}}
+      {{- range $name := $recipe.apt -}}
+        {{- if not $active -}}
+          {{- $_ := set $plan.apt "remove" (append $plan.apt.remove $name) -}}
+        {{- else -}}
+          {{- $allowed := true -}}
+          {{- range $prefix := $denied -}}{{- if hasPrefix $prefix $name -}}{{- $allowed = false -}}{{- end -}}{{- end -}}
+          {{- if $allowed -}}{{- $_ := set $plan.apt "install" (append $plan.apt.install $name) -}}{{- end -}}
+        {{- end -}}
+      {{- end -}}
+    {{- else if $active -}}
+      {{- $installer := "" -}}
+      {{- range $key := list "brew" "cask" "bun" "custom" -}}{{- if hasKey $recipe $key -}}{{- $installer = $key -}}{{- end -}}{{- end -}}
+      {{- $name := $id -}}
+      {{- if ne $installer "custom" -}}{{- $name = get $recipe $installer -}}{{- end -}}
+      {{- $allowed := true -}}
+      {{- range $prefix := $denied -}}{{- if hasPrefix $prefix $name -}}{{- $allowed = false -}}{{- end -}}{{- end -}}
+      {{- if $allowed -}}
+        {{- if eq $installer "brew" -}}
+          {{- $_ := set $plan.homebrew "brews" (append $plan.homebrew.brews $name) -}}
+          {{- if and (hasKey $recipe "trusted") $recipe.trusted -}}{{- $_ := set $plan.homebrew "trustedFormulae" (append $plan.homebrew.trustedFormulae $name) -}}{{- end -}}
+        {{- else if eq $installer "cask" -}}
+          {{- $_ := set $plan.homebrew "casks" (append $plan.homebrew.casks $name) -}}
+        {{- else if eq $installer "bun" -}}
+          {{- $_ := set $plan "bun" (append $plan.bun $name) -}}
+        {{- else -}}
+          {{- $order := 0 -}}
+          {{- if hasKey $recipe "order" -}}{{- $order = int $recipe.order -}}{{- end -}}
+          {{- $key := printf "%d" $order -}}
+          {{- $ids := get $orders $key | default (list) -}}
+          {{- $_ := set $orders $key (append $ids $id) -}}
+        {{- end -}}
+        {{- if hasKey $recipe "tap" -}}
+          {{- $tapAllowed := true -}}
+          {{- range $prefix := $denied -}}{{- if hasPrefix $prefix $recipe.tap -}}{{- $tapAllowed = false -}}{{- end -}}{{- end -}}
+          {{- if $tapAllowed -}}{{- $_ := set $taps $recipe.tap true -}}{{- end -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- $_ := set $plan.homebrew "taps" (keys $taps | sortAlpha) -}}
+{{- $remaining := deepCopy $orders -}}
+{{- range $orders -}}
+  {{- $minimum := -1 -}}
+  {{- $minimumKey := "" -}}
+  {{- range $key := keys $remaining -}}
+    {{- $value := int $key -}}
+    {{- if or (eq $minimum -1) (lt $value $minimum) -}}{{- $minimum = $value -}}{{- $minimumKey = $key -}}{{- end -}}
+  {{- end -}}
+  {{- range $id := get $remaining $minimumKey | sortAlpha -}}
+    {{- $record := deepCopy (index (index (index $.packages $id).install $os) "custom") -}}
+    {{- $_ := set $record "name" $id -}}
+    {{- $_ := set $plan "custom" (append $plan.custom $record) -}}
+  {{- end -}}
+  {{- $_ := unset $remaining $minimumKey -}}
+{{- end -}}
+{{- $plan | toJson -}}
