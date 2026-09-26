@@ -32,13 +32,24 @@ class RecordingReporter implements StateReporter {
   }
 }
 
-async function createHarness(mode = "tui", idle = true) {
+async function createHarness(
+  mode = "tui",
+  idle = true,
+  restoredSignals: ["busy" | "blocked", boolean][] = [],
+) {
   const events = createEventBus();
   const lifecycle = createEventBus();
   const reporter = new RecordingReporter();
   const context = { mode, hasUI: mode === "tui" || mode === "rpc", isIdle: () => idle };
+  // Package session_start handlers may run before the auto-discovered integration.
+  lifecycle.on("session_start", async () => {
+    for (const [kind, active] of restoredSignals) {
+      await events.emit(`herdr:${kind}`, { active, label: "restored work" });
+    }
+    expect(reporter.reports).toEqual([]);
+  });
   registerStateHandlers({ events, on: lifecycle.on }, reporter);
-  await lifecycle.emit("session_start", { reason: "startup" }, context);
+  await lifecycle.emit("session_start", { reason: "reload" }, context);
   return {
     reporter,
     busy: (active: boolean, label = "background work") =>
@@ -130,9 +141,36 @@ test("reload during an active parent starts working and ignores premature settli
   expect(h.reporter.state).toBe("working");
 });
 
+test.failing("reload retains busy claims restored before the integration session_start", async () => {
+  const h = await createHarness("tui", true, [["busy", true]]);
+  expect(h.reporter.state).toBe("working");
+  await h.settle();
+  expect(h.reporter.state).toBe("working");
+  await h.busy(false);
+  expect(h.reporter.state).toBe("idle");
+});
+
+test.failing("reload retains attention restored before the integration session_start", async () => {
+  const h = await createHarness("tui", true, [["busy", true], ["blocked", true]]);
+  expect(h.reporter.state).toBe("blocked");
+  await h.blocked(false);
+  expect(h.reporter.state).toBe("working");
+  await h.busy(false);
+  expect(h.reporter.state).toBe("idle");
+});
+
+test("busy work completed before session_start is not resurrected on reload", async () => {
+  const h = await createHarness("tui", true, [["busy", true], ["busy", false]]);
+  expect(h.reporter.state).toBe("idle");
+  await h.busy(true);
+  expect(h.reporter.state).toBe("working");
+  await h.busy(false);
+  expect(h.reporter.state).toBe("idle");
+});
+
 for (const mode of ["rpc", "json", "print"]) {
   test(`${mode} sessions never publish parent pane state`, async () => {
-    const h = await createHarness(mode);
+    const h = await createHarness(mode, true, [["busy", true], ["blocked", true]]);
     await h.busy(true);
     await h.blocked(true);
     await h.start();
