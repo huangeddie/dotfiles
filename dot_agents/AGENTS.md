@@ -58,7 +58,8 @@ All commit messages MUST follow the
 [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/)
 specification.
 
-Before committing, classify changes into two tracks and commit each separately:
+During implementation, classify changes into two tracks but put them under one
+commit:
 
 - **Track A — Contracts & Verification:** schemas, types, migrations, DTOs,
   models; interfaces, API contracts, signatures, abstract classes; unit tests,
@@ -69,7 +70,7 @@ Before committing, classify changes into two tracks and commit each separately:
   shells, type placeholders) in Track A so tests compile, and keep all real
   logic here.
 
-### Red-Green Across Commits
+### Red-Green Across Changes
 
 If the test framework supports expected-failure (xfail), prefer it:
 
