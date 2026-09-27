@@ -7,8 +7,8 @@ import subprocess
 import tempfile
 
 repo = Path(__file__).resolve().parents[2]
-script = runpy.run_path(str(repo / 'dot_local/bin/executable_sync-upstream'))
-with tempfile.TemporaryDirectory(prefix='sync-upstream-qa-') as temporary:
+script = runpy.run_path(str(repo / 'dot_local/bin/executable_chezmoi-sync'))
+with tempfile.TemporaryDirectory(prefix='chezmoi-sync-qa-') as temporary:
     root = Path(temporary)
     source, destination = root / 'source', root / 'destination'
     (source / 'dot_agents').mkdir(parents=True)

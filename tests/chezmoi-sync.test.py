@@ -3,7 +3,7 @@ import runpy
 import unittest
 from pathlib import Path
 
-script = runpy.run_path(str(Path(__file__).parents[1] / 'dot_local/bin/executable_sync-upstream'))
+script = runpy.run_path(str(Path(__file__).parents[1] / 'dot_local/bin/executable_chezmoi-sync'))
 
 
 class SyncTest(unittest.TestCase):

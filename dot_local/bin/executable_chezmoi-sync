@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check upstream skills and sync managed agent inputs and Codex packages. See docs/sync-upstream.md."""
+"""Check upstream skills and sync managed agent inputs and Codex packages. See docs/chezmoi-sync.md."""
 import argparse
 import hashlib
 import json
@@ -58,7 +58,7 @@ def check_superpowers(remote, checkout, home, run, snapshot, is_dir):
 
 def inspect_upstream(source, home):
     remote = superpowers_remote(source, os.walk, Path.read_text)
-    with tempfile.TemporaryDirectory(prefix='sync-upstream-') as temporary:
+    with tempfile.TemporaryDirectory(prefix='chezmoi-sync-') as temporary:
         return check_superpowers(remote, Path(temporary) / 'repo', home,
                                  run, snapshot, Path.is_dir)
 

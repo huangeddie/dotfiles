@@ -134,7 +134,7 @@ Inspect all removals in `chezmoi diff` before `chezmoi apply`. Do not add
 network or production-package QA to automated CI; run any real package changes
 manually on the intended machine.
 
-## Upstream sync
+## Chezmoi sync
 
-Use `sync-upstream` , [source](dot_local/bin/executable_sync-upstream), to sync
+Use `chezmoi-sync`, [source](dot_local/bin/executable_chezmoi-sync), to sync
 / verify that our upstream modules are in sync with the latest versions.

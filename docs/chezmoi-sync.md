@@ -1,6 +1,6 @@
-# Upstream sync
+# Chezmoi sync
 
-`sync-upstream` checks deployed Superpowers skills against their upstream Git
+`chezmoi-sync` checks deployed Superpowers skills against their upstream Git
 branch, compares chezmoi's rendered state with deployed `.agents/` and
 `.codex/AGENTS.md`, and compares installed `local-agents` plugin caches with
 `.agents/packages/<name>/`. Snapshots include contents, executable bits and
@@ -8,9 +8,9 @@ symlink targets. It uses the configured chezmoi source and destination;
 a conflicting `CODEX_HOME` fails before changes.
 
 ```sh
-sync-upstream --check        # 0 current, 1 stale, 2 error
-sync-upstream                # Apply, install, verify, restart Codex daemon
-sync-upstream --no-restart   # Sync without restarting
+chezmoi-sync --check        # 0 current, 1 stale, 2 error
+chezmoi-sync                # Apply, install, verify, restart Codex daemon
+chezmoi-sync --no-restart   # Sync without restarting
 ```
 
 Both modes require network access: the Superpowers check shallow-clones the
@@ -45,8 +45,8 @@ cannot be refreshed; standalone clients may also need restarting.
 Memory extraction counts are informational, not proof of semantic freshness.
 No memory databases or conversation histories are modified.
 
-This command replaces `sync-codex`, `check-superpowers-freshness`, and
-`refresh-codex`; chezmoi removes the old executables on apply. `--refresh`
+This command replaces `sync-upstream`, `sync-codex`,
+`check-superpowers-freshness`, and `refresh-codex`; chezmoi removes the old executables on apply. `--refresh`
 remains an alias for `--sync`. Register the local marketplace on new machines
 with `codex plugin marketplace add ~` after applying dotfiles.
 
@@ -58,14 +58,14 @@ Requires Python 3, Git, chezmoi, and a Codex CLI supporting `plugin list --json`
 Deterministic unit tests use fake command runners and in-memory filesystem data:
 
 ```sh
-python3 tests/sync-upstream.test.py
+python3 tests/chezmoi-sync.test.py
 ```
 
 Manual QA exercises real filesystem and chezmoi effects in temporary fixtures:
 
 ```sh
-python3 docs/qa/sync-upstream.py
-sync-upstream --check  # Live network and installed Codex checks
+python3 docs/qa/chezmoi-sync.py
+chezmoi-sync --check  # Live network and installed Codex checks
 ```
 
 Keep QA out of hooks and CI. Real plugin reinstallation and daemon restart

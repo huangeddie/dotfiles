@@ -6,5 +6,6 @@
 .config/television/cable/sesh.toml
 .local/bin/refresh-codex
 .local/bin/sync-codex
+.local/bin/sync-upstream
 .local/bin/check-superpowers-freshness
 .agents/packages/devops/skills/chezmoi
