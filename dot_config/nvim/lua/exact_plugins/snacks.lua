@@ -23,12 +23,21 @@ return {
 			return s
 		end
 
-		-- Clear lingering loading indicator extmark when placement updates
+		-- Remove only loading indicators: image placeholders share this namespace,
+		-- and Snacks skips redrawing them when the placement state is unchanged.
 		local placement = require("snacks.image.placement")
 		local orig_update = placement.update
 		placement.update = function(self)
 			if not self.opts.inline and vim.api.nvim_buf_is_valid(self.buf) then
-				vim.api.nvim_buf_clear_namespace(self.buf, placement.ns, 0, -1)
+				local marks = vim.api.nvim_buf_get_extmarks(self.buf, placement.ns, 0, -1, { details = true })
+				for _, mark in ipairs(marks) do
+					for _, chunk in ipairs(mark[4].virt_text or {}) do
+						if chunk[2] == "SnacksImageSpinner" or chunk[2] == "SnacksImageLoading" then
+							vim.api.nvim_buf_del_extmark(self.buf, placement.ns, mark[1])
+							break
+						end
+					end
+				end
 			end
 			return orig_update(self)
 		end
