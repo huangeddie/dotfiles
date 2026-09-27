@@ -61,45 +61,25 @@ specification.
 During implementation, classify changes into two tracks but put them under one
 commit:
 
-- **Track A — Contracts & Verification:** schemas, types, migrations, DTOs,
-  models; interfaces, API contracts, signatures, abstract classes; unit tests,
-  fixtures, test utilities.
-- **Track B — Implementation:** concrete implementations, business logic,
-  algorithms, service code, UI code. When Track A tests reference interfaces or
-  schemas that do not yet exist, put minimal stubs (empty functions, interface
-  shells, type placeholders) in Track A so tests compile, and keep all real
-  logic here.
+- **Track A (RED) — Contracts & Verification:** schemas, types, migrations,
+  DTOs, models; interfaces, API contracts, signatures, abstract classes; unit
+  tests, fixtures, test utilities.
+- **Track B (GREEN) — Implementation:** concrete implementations, business
+  logic, algorithms, service code, UI code. When Track A tests reference
+  interfaces or schemas that do not yet exist, put minimal stubs (empty
+  functions, interface shells, type placeholders) in Track A so tests compile,
+  and keep all real logic here.
 
 ### Red-Green Across Changes
 
 If the test framework supports expected-failure (xfail), prefer it:
 
 1. **RED**: Write tests with correct assertions, marked expected-to-fail. Add
-   minimal stubs needed to compile. Commit to Track A (`test:` / `red:`).
-2. **GREEN**: Remove the marker, add the implementation. Commit to Track B
-   (`impl:` / `feat:`).
-
-Xfail RED commits are safe to publish alone; the suite treats them as
-anticipated failures, not broken builds.
-
-**Fallback: Local Red-Green** If your framework does NOT support
-expected-failure, use this approach:
-
-1. **RED (local only)**: Commit raw failing tests to Track A with correct
-   assertions. Label prefix: `test:` or `red:`
-2. **GREEN (local only)**: Commit implementation to Track B that makes those
-   tests pass. Label prefix: `impl:` or `feat:`
-3. **Publish together**: Do NOT publish or share the RED commit alone. Keep both
-   commits local until GREEN is complete. Publish the branch only after both
-   commits exist, ensuring the branch tip is GREEN and the automated test suite
-   passes.
-
-If the current branch has already been published, do not add raw RED commits
-directly to it. Complete the RED-GREEN pair locally first, then publish.
+   minimal stubs needed to compile.
+2. **GREEN**: Remove the marker, add the implementation.
 
 If the framework has no expected-failure, skip, or todo mechanism, temporarily
-comment out test blocks in Track A and uncomment them in Track B as a last
-resort.
+comment out test blocks in Track A and uncomment them in Track B.
 
 #### Exceptions
 
