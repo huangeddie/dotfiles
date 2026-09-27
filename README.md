@@ -3,39 +3,6 @@
 Personal dotfiles managed with [chezmoi](https://www.chezmoi.io/). Reference the
 chezmoi skill for more info.
 
-## Agent Harness Config
-
-There're many terminal agent harnesses e.g. Codex CLI, Claude Code, Pi. _We aim
-to decouple as much of our agent configuration from specific harness
-implemenations as much as possible_.
-
-As such, we make it an effort to put most of our agent configs including skills,
-prompts, and context files under @dot_agents/.
-
-Directory structure:
-
-```text
-dot_agents/
-├── AGENTS.md                    # Shared agent instructions; applies to ~/.agents/AGENTS.md.
-├── exact_plugins/               # Shared plugin marketplace; applies to ~/.agents/plugins/.
-│   └── marketplace.json         # Codex marketplace catalog.
-└── exact_packages/              # Shared package registry; applies to ~/.agents/packages/.
-    └── <package>/
-        ├── exact_skills/        # Shared skills; applies to skills/.
-        ├── dot_claude-plugin/   # Claude Code manifest; applies to .claude-plugin/.
-        ├── dot_codex-plugin/    # Codex CLI manifest; applies to .codex-plugin/.
-        ├── gemini-extension.json
-        └── package.json         # Pi package manifest.
-```
-
-Agent harnesses with configs that don't quite align with our configuration can
-refer to those configs by either pointing to the resulting target path
-(~/.agents/) or by symlink.
-
-Note that we have agent-provider specific manifests like `dot_claude-plugin`
-within our config. This is ok because it doesn't compromise the content of our
-agnostic configs.
-
 ## Package Management
 
 ### Machine roles
@@ -67,13 +34,12 @@ deniedPrefixes = ["unauthorized-prefix"]
 
 Prefixes match actual installation names (for example `fd-find`, not the logical
 ID `fd`), not catalog keys. Custom recipes use their logical ID as the policy
-name. Packages whose names start with a denied prefix are never installed. Managed
-Homebrew and Bun packages that later become denied are removed by their
+name. Packages whose names start with a denied prefix are never installed.
+Managed Homebrew and Bun packages that later become denied are removed by their
 authoritative bundle/global cleanup. Managed apt packages matching a denied
-prefix are excluded from installation and left untouched on the host rather
-than purged. Custom script installers are skipped, but their existing
-installations cannot be automatically removed because they have no uninstall
-instruction.
+prefix are excluded from installation and left untouched on the host rather than
+purged. Custom script installers are skipped, but their existing installations
+cannot be automatically removed because they have no uninstall instruction.
 
 `blocked_prefixes` remains accepted for older configuration during migration.
 Its entries are combined with `packagePolicy.deniedPrefixes`, so either field
@@ -82,10 +48,10 @@ can deny a package. New configuration must use `packagePolicy.deniedPrefixes`.
 ### Retired apt packages
 
 When a Linux apt package is retired from this repository, move it to the durable
-tombstone list, `packageRemovals.linux.apt`, rather than simply deleting
-it from the package list. Tombstones tell the next apply to purge the retired
-package. Disabling a role is different: it removes only the packages managed
-exclusively by that inactive role and does not create a tombstone.
+tombstone list, `packageRemovals.linux.apt`, rather than simply deleting it from
+the package list. Tombstones tell the next apply to purge the retired package.
+Disabling a role is different: it removes only the packages managed exclusively
+by that inactive role and does not create a tombstone.
 
 ### Authoring the package catalog
 
@@ -98,12 +64,12 @@ packages:
   fd:
     role: base
     install:
-      darwin: {brew: fd}
-      linux: {apt: [fd-find]}
+      darwin: { brew: fd }
+      linux: { apt: [fd-find] }
   steam:
     role: gaming
     install:
-      linux: {apt: [steam-installer, steam-devices]}
+      linux: { apt: [steam-installer, steam-devices] }
   claude-code:
     role: base
     install:
@@ -168,9 +134,7 @@ Inspect all removals in `chezmoi diff` before `chezmoi apply`. Do not add
 network or production-package QA to automated CI; run any real package changes
 manually on the intended machine.
 
-## Development Guidelines
+## Upstream sync
 
-Despite whatever skills framework like `superpowers` may suggest, this project
-is small enough such that changes can be made _directly_ to main without any
-worktrees. Do NOT ask the user about creating new branches or worktrees. Just
-commit directly to main.
+Use `sync-upstream` , [source](dot_local/bin/executable_sync-upstream), to sync
+/ verify that our upstream modules are in sync with the latest versions.
