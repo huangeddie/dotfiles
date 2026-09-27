@@ -104,5 +104,84 @@ class SyncTest(unittest.TestCase):
         self.assertEqual(len(calls), 1)
 
 
+class UpstreamTest(unittest.TestCase):
+    def config(self, location='', content=None):
+        text = content if content is not None else ('[".agents/packages/superpowers/skills"]\n'
+            'url = "https://github.com/huangeddie/superpowers/archive/refs/heads/main.tar.gz"\n')
+        def walk(root):
+            dirs = ['.git', 'nested']
+            yield str(root), dirs, ['.chezmoiexternal.toml'] if not location else []
+            if '.git' in dirs:
+                yield str(root / '.git'), [], ['.chezmoiexternal.toml']
+            if location:
+                yield str(root / location), [], ['.chezmoiexternal.toml']
+        return script['superpowers_remote'](Path('/source'), walk, lambda path: text)
+
+    @unittest.expectedFailure
+    def test_personal_work_and_deep_configs_resolve_upstream(self):
+        for location in ['', '_personal', 'some/deeply/nested/directory']:
+            with self.subTest(location=location):
+                self.assertEqual(self.config(location), ('huangeddie', 'superpowers', 'main'))
+
+    @unittest.expectedFailure
+    def test_git_directory_is_pruned_and_missing_config_raises(self):
+        def walk(root):
+            dirs = ['.git']
+            yield str(root), dirs, []
+            if '.git' in dirs:
+                yield str(root / '.git'), [], ['.chezmoiexternal.toml']
+        with self.assertRaisesRegex(ValueError, 'Could not find url'):
+            script['superpowers_remote'](Path('/source'), walk, lambda path: 'unused')
+
+    @unittest.expectedFailure
+    def test_unrelated_section_does_not_supply_url(self):
+        with self.assertRaisesRegex(ValueError, 'Could not find url'):
+            self.config(content='["other"]\nurl = "https://example.com"\n')
+
+    @unittest.expectedFailure
+    def test_unsupported_url_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, 'Unrecognized archive url'):
+            self.config(content='[".agents/packages/superpowers/skills"]\nurl = "https://example.com"\n')
+
+    def check(self, local=None, missing=None, failure=None):
+        self.calls = []
+        def run(command):
+            self.calls.append(command)
+            if failure:
+                raise RuntimeError('clone failed')
+            return '0123456789abcdef\n' if 'rev-parse' in command else ''
+        snapshots = {Path('/checkout/skills'): {'skill': 'new'},
+                     Path('/home/.agents/packages/superpowers/skills'): local if local is not None else {'skill': 'new'}}
+        return script['check_superpowers'](
+            ('huangeddie', 'superpowers', 'main'), Path('/checkout'), Path('/home'),
+            run, snapshots.__getitem__, lambda path: path != missing)
+
+    @unittest.expectedFailure
+    def test_matching_skills_return_no_staleness_after_shallow_clone(self):
+        self.assertEqual(self.check(), [])
+        self.assertEqual(self.calls[0], ['git', 'clone', '--quiet', '--depth', '1',
+            '--branch', 'main', '--single-branch', 'https://github.com/huangeddie/superpowers.git', '/checkout'])
+
+    @unittest.expectedFailure
+    def test_changed_missing_and_extra_skills_report_staleness(self):
+        for local in [{'skill': 'old'}, {}, {'skill': 'new', 'extra': 'file'}]:
+            with self.subTest(local=local):
+                self.assertIn('stale', ' '.join(self.check(local)))
+
+    @unittest.expectedFailure
+    def test_missing_local_skills_report_staleness(self):
+        self.assertIn('Missing', ' '.join(self.check(missing=Path('/home/.agents/packages/superpowers/skills'))))
+
+    @unittest.expectedFailure
+    def test_missing_upstream_skills_raise_error(self):
+        with self.assertRaisesRegex(ValueError, 'no skills'):
+            self.check(missing=Path('/checkout/skills'))
+
+    @unittest.expectedFailure
+    def test_clone_failure_propagates_without_comparison(self):
+        with self.assertRaisesRegex(RuntimeError, 'clone failed'):
+            self.check(failure=True)
+
+
 if __name__ == '__main__':
     unittest.main()

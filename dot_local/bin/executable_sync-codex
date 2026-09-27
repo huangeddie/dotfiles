@@ -10,6 +10,14 @@ import subprocess
 import sys
 
 
+def superpowers_remote(source, walk, read):
+    return None
+
+
+def check_superpowers(remote, checkout, home, run, snapshot, is_dir):
+    return None
+
+
 def pending_targets(status):
     return [line[3:] for line in status.splitlines() if len(line) > 3 and line[1] != ' ']
 
