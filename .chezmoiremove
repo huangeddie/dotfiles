@@ -1,4 +1,5 @@
 .local/bin/pi-subagent
+.local/bin/pi-subagents
 .pi/agent/APPEND_SYSTEM.md
 .tmux.conf
 .tmux

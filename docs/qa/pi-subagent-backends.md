@@ -1,4 +1,8 @@
-# Pi subagent backend manual QA
+# Pi subagent backend manual QA (retired)
+
+> **Historical reference only — do not run.** The local subagent extension and
+> its `pi-subagents` profile CLI have been removed in favor of `npm:pi-subagents`.
+> This procedure does not apply to the installed npm extension.
 
 > **Manual QA only. Do not add this procedure to hooks or CI.**
 
