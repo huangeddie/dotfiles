@@ -1,0 +1,221 @@
+#!/usr/bin/env python3
+"""Check upstream skills and sync managed agent inputs and Codex packages. See docs/sync-upstream.md."""
+import argparse
+import hashlib
+import json
+import os
+import re
+import tempfile
+from pathlib import Path
+import sqlite3
+import subprocess
+import sys
+
+
+def superpowers_remote(source, walk, read):
+    key = '.agents/packages/superpowers/skills'
+    for root, directories, files in walk(source):
+        directories[:] = sorted(name for name in directories if name != '.git')
+        if '.chezmoiexternal.toml' not in files:
+            continue
+        in_section = False
+        for line in read(Path(root) / '.chezmoiexternal.toml').splitlines():
+            line = line.strip()
+            if line.startswith('['):
+                in_section = line == f'["{key}"]'
+            elif in_section:
+                match = re.fullmatch(r'url\s*=\s*"([^"]+)"\s*(?:#.*)?', line)
+                if not match:
+                    continue
+                url = match[1]
+                remote = re.fullmatch(
+                    r'https://github\.com/([^/]+)/([^/]+)/archive/refs/heads/(.+)\.tar\.gz', url)
+                if not remote:
+                    raise ValueError(f'Unrecognized archive url format: {url}')
+                return remote.groups()
+    raise ValueError(f'Could not find url for ["{key}"] under {source}')
+
+
+def check_superpowers(remote, checkout, home, run, snapshot, is_dir):
+    owner, repository, branch = remote
+    run(['git', 'clone', '--quiet', '--depth', '1', '--branch', branch,
+         '--single-branch', f'https://github.com/{owner}/{repository}.git', str(checkout)])
+    revision = run(['git', '-C', str(checkout), 'rev-parse', 'HEAD']).strip()
+    if not revision:
+        raise ValueError('Could not resolve latest upstream commit')
+    upstream = checkout / 'skills'
+    if not is_dir(upstream):
+        raise ValueError('Cloned repository has no skills/ directory')
+    target = home / '.agents/packages/superpowers/skills'
+    if not is_dir(target):
+        return [f'Missing local skills: {target}']
+    changed = differences(snapshot(upstream), snapshot(target))
+    if changed:
+        return [f'Superpowers skills stale against {owner}/{repository}@{branch} '
+                f'({revision[:7]}): {len(changed)} changed/missing/extra files']
+    return []
+
+
+def inspect_upstream(source, home):
+    remote = superpowers_remote(source, os.walk, Path.read_text)
+    with tempfile.TemporaryDirectory(prefix='sync-upstream-') as temporary:
+        return check_superpowers(remote, Path(temporary) / 'repo', home,
+                                 run, snapshot, Path.is_dir)
+
+
+def pending_targets(status):
+    return [line[3:] for line in status.splitlines() if len(line) > 3 and line[1] != ' ']
+
+
+def local_plugins(installed):
+    return [plugin for plugin in installed
+            if plugin['marketplaceName'] == 'local-agents' and plugin['installed']]
+
+
+def differences(source, cached):
+    return sorted(key for key in source.keys() | cached.keys()
+                  if source.get(key) != cached.get(key))
+
+
+def missing_plugins(required, installed):
+    return sorted(set(required) - {plugin['pluginId'] for plugin in installed})
+
+
+def package_plugins(home):
+    return sorted(f'{manifest.parent.parent.name}@local-agents'
+                  for manifest in (home / '.agents/packages').glob('*/.codex-plugin/plugin.json'))
+
+
+def sync(run, targets, plugins, restart=True, verify=lambda: None, discover=lambda: []):
+    # The CLI has no enable/disable command. Reinstallation would enable a
+    # deliberately disabled plugin, so fail before modifying anything.
+    if any(not plugin['enabled'] for plugin in plugins):
+        raise ValueError('An installed local plugin is disabled; sync would enable it.')
+    run(['chezmoi', 'apply', '--force', '--exclude', 'scripts', '--refresh-externals=always',
+         *targets])
+    missing = missing_plugins(discover(), plugins)
+    for plugin in plugins:
+        selector = plugin['pluginId']
+        run(['codex', 'plugin', 'remove', selector])
+        try:
+            run(['codex', 'plugin', 'add', selector])
+        except Exception as error:
+            raise RuntimeError(f'Reinstall failed. Recover with: codex plugin add {selector}') from error
+    for selector in missing:
+        try:
+            run(['codex', 'plugin', 'add', selector])
+        except Exception as error:
+            raise RuntimeError(f'Install failed. Recover with: codex plugin add {selector}') from error
+    verify()
+    if restart:
+        run(['codex', 'app-server', 'daemon', 'restart'])
+
+
+def run(command):
+    return subprocess.run(command, check=True, text=True, stdout=subprocess.PIPE).stdout
+
+
+def snapshot(root):
+    if not root.is_dir():
+        return {}
+    result = {}
+    for path in sorted(root.rglob('*')):
+        relative = path.relative_to(root)
+        if '.git' in relative.parts:
+            continue
+        if path.is_symlink():
+            result[str(relative)] = ('link', os.readlink(path))
+        elif path.is_file():
+            result[str(relative)] = ('file', hashlib.sha256(path.read_bytes()).hexdigest(),
+                                     bool(path.stat().st_mode & 0o111))
+    return result
+
+
+def inspect(targets, codex_home, home):
+    status = run(['chezmoi', 'status', '--exclude', 'scripts', '--refresh-externals=never',
+                  *targets])
+    stale = [f'Unapplied: {path}' for path in pending_targets(status)]
+    plugins = local_plugins(json.loads(run(['codex', 'plugin', 'list', '--json']))['installed'])
+    stale.extend(f'Missing local plugin: {selector}'
+                 for selector in missing_plugins(package_plugins(home), plugins))
+    for plugin in plugins:
+        name, version = plugin['name'], plugin['version']
+        if any(Path(part).name != part or part in ('.', '..', '') for part in (name, version)):
+            raise ValueError('Invalid plugin name or version in Codex output')
+        source = home / '.agents/packages' / name
+        cached = codex_home / 'plugins/cache/local-agents' / name / version
+        if not source.is_dir():
+            stale.append(f'Missing local plugin source: {source}')
+        elif not cached.is_dir():
+            stale.append(f'Missing plugin cache: {cached}')
+        else:
+            changed = differences(snapshot(source), snapshot(cached))
+            if changed:
+                stale.append(f'Stale plugin {name}: {len(changed)} changed/missing/extra files')
+    return stale, plugins
+
+
+def memory_status(codex_home):
+    database = codex_home / 'memories_1.sqlite'
+    if not database.exists():
+        return 'Memory: no local memories_1.sqlite database found; freshness unverified.'
+    try:
+        with sqlite3.connect(database.as_uri() + '?mode=ro', uri=True) as connection:
+            count = connection.execute('SELECT count(*) FROM stage1_outputs').fetchone()[0]
+        return f'Memory: {count} stored extraction rows; semantic freshness unverified.'
+    except sqlite3.Error:
+        return 'Memory: database could not be inspected; freshness unverified.'
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument('--check', action='store_true', help='Check upstream and disk freshness; exit 1 if stale')
+    mode.add_argument('--sync', '--refresh', action='store_true', help='Force sync (default)')
+    parser.add_argument('--no-restart', action='store_true', help='Sync files and plugins only')
+    args = parser.parse_args()
+    home = Path(run(['chezmoi', 'execute-template', '{{ .chezmoi.destDir }}']).strip()).resolve()
+    codex_home = Path(os.environ.get('CODEX_HOME', str(Path.home() / '.codex'))).expanduser().resolve()
+    if codex_home != (home / '.codex').resolve():
+        raise ValueError('CODEX_HOME does not match the chezmoi destination .codex directory')
+    targets = [str(home / '.agents'), str(home / '.codex/AGENTS.md')]
+    source = Path(os.environ.get('CHEZMOI_SOURCE_DIR') or run(['chezmoi', 'source-path']).strip())
+    stale, plugins = inspect(targets, codex_home, home)
+    stale.extend(inspect_upstream(source, home))
+    for message in stale:
+        print(message, flush=True)
+    if not stale:
+        print('Upstream skills, managed files, and installed plugin caches are current.', flush=True)
+    print(f'Installed local-agents plugins: {len(plugins)}; sync installs all local packages.', flush=True)
+    print(memory_status(codex_home), flush=True)
+    print('Existing conversation instructions cannot be checked or replaced by this script.', flush=True)
+    if args.check:
+        return int(bool(stale))
+
+    def verify():
+        remaining, installed = inspect(targets, codex_home, home)
+        remaining.extend(inspect_upstream(source, home))
+        missing = {p['pluginId'] for p in plugins} - {p['pluginId'] for p in installed}
+        if remaining or missing:
+            raise RuntimeError('Sync verification failed: ' + '; '.join(remaining + sorted(missing)))
+
+    def execute(command):
+        print('Running: ' + ' '.join(command), flush=True)
+        output = run(command)
+        if output.strip():
+            print(output.strip(), flush=True)
+
+    sync(execute, targets, plugins, restart=not args.no_restart, verify=verify,
+         discover=lambda: package_plugins(home))
+    print('Disk sync verified. Start a NEW Codex conversation to load current instructions.')
+    if args.no_restart:
+        print('Daemon restart skipped; restart Codex before starting that conversation.')
+    return 0
+
+
+if __name__ == '__main__':
+    try:
+        sys.exit(main())
+    except (OSError, ValueError, KeyError, RuntimeError, subprocess.CalledProcessError) as error:
+        print(f'Error: {error}', file=sys.stderr)
+        sys.exit(2)
