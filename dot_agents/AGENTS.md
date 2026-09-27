@@ -83,7 +83,7 @@ commit:
 The following code changes SHOULD NOT use red-green TDD.
 
 - UI development; too hard to test
-- Pure refactors may be single commits; covered by existing tests
+- Pure refactors; covered by existing tests
 - Data schema migrations; unnecessary to test
 - Bug fixes with trivial test adjustments; trivial
 - Config changes; too shallow to have meaningful tests
