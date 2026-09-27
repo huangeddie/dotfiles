@@ -72,14 +72,11 @@ commit:
 
 ### Red-Green Across Changes
 
-If the test framework supports expected-failure (xfail), prefer it:
-
-1. **RED**: Write tests with correct assertions, marked expected-to-fail. Add
-   minimal stubs needed to compile.
-2. **GREEN**: Remove the marker, add the implementation.
-
-If the framework has no expected-failure, skip, or todo mechanism, temporarily
-comment out test blocks in Track A and uncomment them in Track B.
+1. **RED:** Write tests with correct assertions and minimal contracts/stubs
+   needed to compile. Run them and confirm they fail for the intended reason.
+2. **GREEN:** Implement the behavior. Run the tests and confirm they pass.
+3. **REFACTOR:** Improve structure while keeping tests passing.
+4. **COMMIT:** Commit both tracks together after relevant checks pass.
 
 #### Exceptions
 
