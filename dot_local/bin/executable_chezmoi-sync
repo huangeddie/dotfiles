@@ -86,13 +86,95 @@ def package_plugins(home):
                   for manifest in (home / '.agents/packages').glob('*/.codex-plugin/plugin.json'))
 
 
-def sync(run, targets, plugins, restart=True, verify=lambda: None, discover=lambda: []):
+LAYER_KEYS = {'source', 'persistentState'}
+
+
+def resolve_layers(raw, source, config_dir):
+    """Resolve `chezmoiLayers` data: sources applied, in order, before the configured source."""
+    if raw is None:
+        return []
+    if not isinstance(raw, list):
+        raise ValueError('chezmoiLayers must be a list')
+    layers = []
+    for index, entry in enumerate(raw):
+        if not isinstance(entry, dict) or set(entry) != LAYER_KEYS:
+            raise ValueError(f'chezmoiLayers[{index}] must have exactly source and persistentState')
+        for key in sorted(LAYER_KEYS):
+            value = entry[key]
+            if (not isinstance(value, str) or not value or Path(value).is_absolute()
+                    or '..' in Path(value).parts):
+                raise ValueError(f'chezmoiLayers[{index}].{key} must be a relative path without ..')
+        layers.append({'name': entry['source'], 'source': source / entry['source'],
+                       'state': config_dir / entry['persistentState']})
+    return layers
+
+
+def layer_args(layer):
+    return ['--source', str(layer['source']), '--persistent-state', str(layer['state'])]
+
+
+def managed_targets(managed, args, targets):
+    return [target for target in targets if managed(args, target)]
+
+
+def parse_branch_status(text):
+    """Parse `git status --porcelain=v2 --branch`; untracked files are not local changes."""
+    status = {'upstream': None, 'ahead': 0, 'behind': 0, 'dirty': False}
+    for line in text.splitlines():
+        if line.startswith('# branch.upstream '):
+            status['upstream'] = line.split(' ', 2)[2]
+        elif line.startswith('# branch.ab '):
+            ahead, behind = line.split()[2:4]
+            status['ahead'], status['behind'] = int(ahead), -int(behind)
+        elif line and not line.startswith(('#', '?', '!')):
+            status['dirty'] = True
+    return status
+
+
+def inspect_layer(run, layer):
+    checkout = str(layer['source'])
+    run(['git', '-C', checkout, 'fetch', '--quiet'])
+    return parse_branch_status(run(['git', '-C', checkout, 'status', '--porcelain=v2', '--branch']))
+
+
+def layer_messages(layer, status):
+    name, upstream = layer['name'], status['upstream']
+    if upstream is None:
+        return [], [f'Layer {name} has no upstream branch; not checked']
+    stale = [f'Layer {name} behind {upstream} by {status["behind"]} commits'] if status['behind'] else []
+    notices = [f'Layer {name} has {status["ahead"]} unpublished commits'] if status['ahead'] else []
+    return stale, notices
+
+
+def needs_fast_forward(status):
+    return status['upstream'] is not None and status['behind'] > 0
+
+
+def check_updatable(layer, status):
+    name = layer['name']
+    if status['dirty']:
+        raise ValueError(f'Layer {name} has uncommitted changes; commit or stash them before syncing.')
+    if status['upstream'] is not None and status['ahead'] and status['behind']:
+        raise ValueError(f'Layer {name} has diverged from {status["upstream"]}; reconcile it before syncing.')
+
+
+def sync(run, targets, plugins, restart=True, verify=lambda: None, discover=lambda: [],
+         sources=([],), managed=lambda args, target: True, layers=()):
     # The CLI has no enable/disable command. Reinstallation would enable a
     # deliberately disabled plugin, so fail before modifying anything.
     if any(not plugin['enabled'] for plugin in plugins):
         raise ValueError('An installed local plugin is disabled; sync would enable it.')
-    run(['chezmoi', 'apply', '--force', '--exclude', 'scripts', '--refresh-externals=always',
-         *targets])
+    for layer, status in layers:
+        check_updatable(layer, status)
+    for layer, status in layers:
+        if needs_fast_forward(status):
+            run(['git', '-C', str(layer['source']), 'merge', '--ff-only', '--quiet', '@{u}'])
+    # Managed targets are selected after fast-forwarding so new layer files count.
+    for args in sources:
+        selected = managed_targets(managed, args, targets)
+        if selected:
+            run(['chezmoi', *args, 'apply', '--force', '--exclude', 'scripts',
+                 '--refresh-externals=always', *selected])
     missing = missing_plugins(discover(), plugins)
     for plugin in plugins:
         selector = plugin['pluginId']
@@ -131,10 +213,19 @@ def snapshot(root):
     return result
 
 
-def inspect(targets, codex_home, home):
-    status = run(['chezmoi', 'status', '--exclude', 'scripts', '--refresh-externals=never',
-                  *targets])
-    stale = [f'Unapplied: {path}' for path in pending_targets(status)]
+def is_managed(args, target):
+    command = ['chezmoi', *args, 'source-path', target]
+    return subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
+
+
+def inspect(targets, codex_home, home, sources=([],)):
+    stale = []
+    for args in sources:
+        selected = managed_targets(is_managed, args, targets)
+        if selected:
+            status = run(['chezmoi', *args, 'status', '--exclude', 'scripts',
+                          '--refresh-externals=never', *selected])
+            stale.extend(f'Unapplied: {path}' for path in pending_targets(status))
     plugins = local_plugins(json.loads(run(['codex', 'plugin', 'list', '--json']))['installed'])
     stale.extend(f'Missing local plugin: {selector}'
                  for selector in missing_plugins(package_plugins(home), plugins))
@@ -174,18 +265,35 @@ def main():
     mode.add_argument('--sync', '--refresh', action='store_true', help='Force sync (default)')
     parser.add_argument('--no-restart', action='store_true', help='Sync files and plugins only')
     args = parser.parse_args()
-    home = Path(run(['chezmoi', 'execute-template', '{{ .chezmoi.destDir }}']).strip()).resolve()
+    context = json.loads(run(['chezmoi', 'execute-template',
+                              '{{ dict "destDir" .chezmoi.destDir "configFile" .chezmoi.configFile '
+                              '"layers" (get . "chezmoiLayers" | default list) | toJson }}']))
+    home = Path(context['destDir']).resolve()
     codex_home = Path(os.environ.get('CODEX_HOME', str(Path.home() / '.codex'))).expanduser().resolve()
     if codex_home != (home / '.codex').resolve():
         raise ValueError('CODEX_HOME does not match the chezmoi destination .codex directory')
     targets = [str(home / '.agents'), str(home / '.codex/AGENTS.md')]
     source = Path(os.environ.get('CHEZMOI_SOURCE_DIR') or run(['chezmoi', 'source-path']).strip())
-    stale, plugins = inspect(targets, codex_home, home)
-    stale.extend(inspect_upstream(source, home))
-    for message in stale:
+    layers = resolve_layers(context['layers'], source, Path(context['configFile']).parent)
+    sources = [*map(layer_args, layers), []]
+
+    def inspect_all():
+        stale, installed = inspect(targets, codex_home, home, sources)
+        statuses, notices = [], []
+        for layer in layers:
+            status = inspect_layer(run, layer)
+            layer_stale, layer_notices = layer_messages(layer, status)
+            statuses.append((layer, status))
+            stale.extend(layer_stale)
+            notices.extend(layer_notices)
+        stale.extend(inspect_upstream(source, home))
+        return stale, notices, installed, statuses
+
+    stale, notices, plugins, statuses = inspect_all()
+    for message in stale + notices:
         print(message, flush=True)
     if not stale:
-        print('Upstream skills, managed files, and installed plugin caches are current.', flush=True)
+        print('Upstream skills, layers, managed files, and installed plugin caches are current.', flush=True)
     print(f'Installed local-agents plugins: {len(plugins)}; sync installs all local packages.', flush=True)
     print(memory_status(codex_home), flush=True)
     print('Existing conversation instructions cannot be checked or replaced by this script.', flush=True)
@@ -193,8 +301,7 @@ def main():
         return int(bool(stale))
 
     def verify():
-        remaining, installed = inspect(targets, codex_home, home)
-        remaining.extend(inspect_upstream(source, home))
+        remaining, _, installed, _ = inspect_all()
         missing = {p['pluginId'] for p in plugins} - {p['pluginId'] for p in installed}
         if remaining or missing:
             raise RuntimeError('Sync verification failed: ' + '; '.join(remaining + sorted(missing)))
@@ -206,10 +313,15 @@ def main():
             print(output.strip(), flush=True)
 
     sync(execute, targets, plugins, restart=not args.no_restart, verify=verify,
-         discover=lambda: package_plugins(home))
+         discover=lambda: package_plugins(home), sources=sources, managed=is_managed,
+         layers=statuses)
     print('Disk sync verified. Start a NEW Codex conversation to load current instructions.')
     if args.no_restart:
         print('Daemon restart skipped; restart Codex before starting that conversation.')
+    for layer, status in statuses:
+        if needs_fast_forward(status):
+            print(f'Updated layer {layer["name"]}: commit its new pointer in {source}, and run '
+                  '`chezmoi apply` to deploy its other changed dotfiles.')
     return 0
 
 

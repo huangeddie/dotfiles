@@ -23,7 +23,31 @@ The supported URL format is `https://github.com/OWNER/REPO/archive/refs/heads/BR
 
 Only Superpowers currently has a live upstream freshness check. Other managed
 files are checked against chezmoi's cached state. Generic imported-repository
-or Git submodule updates are not implemented yet.
+updates are not implemented yet.
+
+## Layered sources
+
+A consuming repository (e.g. the internal work repository, which nests this
+repository as `_personal/`) declares extra chezmoi sources applied before its
+own in its chezmoi data:
+
+```yaml
+chezmoiLayers:
+  - source: _personal                       # relative to the configured source
+    persistentState: personal-state.boltdb  # relative to the chezmoi config dir
+```
+
+Without `chezmoiLayers`, only the configured source is used. Each source checks
+and applies only the targets it manages (`chezmoi source-path`), layers first in
+declared order, then the configured source.
+
+Each layer is an upstream dependency: `git fetch` compares it with its tracking
+branch. Behind is stale; unpublished commits and missing upstreams are
+informational. Sync aborts before any change if a layer has uncommitted tracked
+changes or has diverged, otherwise fast-forwards it (`git merge --ff-only`)
+before applying. Sync does not commit the parent repository's new submodule
+pointer or apply the layer's non-agent dotfiles; it prints a reminder to commit
+the pointer and run `chezmoi apply`.
 
 Sync force-applies only `.agents/` and `.codex/AGENTS.md`, excluding scripts,
 and refreshes their external sources. **Local edits under those targets are
