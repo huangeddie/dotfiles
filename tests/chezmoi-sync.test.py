@@ -176,7 +176,6 @@ class UpstreamTest(unittest.TestCase):
 
 
 class CodexCliTest(unittest.TestCase):
-    @unittest.expectedFailure
     def test_codex_cli_is_detected_by_version_banner(self):
         calls = []
         def run(command):
@@ -185,7 +184,6 @@ class CodexCliTest(unittest.TestCase):
         self.assertTrue(script['codex_cli_available'](run))
         self.assertEqual(calls, [['codex', '--version']])
 
-    @unittest.expectedFailure
     def test_unrelated_codex_binary_or_missing_command_is_not_codex_cli(self):
         def missing(command):
             raise FileNotFoundError('codex')
@@ -196,7 +194,6 @@ class CodexCliTest(unittest.TestCase):
             with self.subTest(run=run):
                 self.assertFalse(script['codex_cli_available'](run))
 
-    @unittest.expectedFailure
     def test_sync_without_codex_cli_applies_files_without_plugin_commands_or_restart(self):
         calls = []
         script['sync'](calls.append, ['/h/.agents'], [], discover=lambda: ['coding@local-agents'],

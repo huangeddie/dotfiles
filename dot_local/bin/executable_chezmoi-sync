@@ -158,8 +158,16 @@ def check_updatable(layer, status):
         raise ValueError(f'Layer {name} has diverged from {status["upstream"]}; reconcile it before syncing.')
 
 
+def codex_cli_available(run):
+    """Whether `codex` is the Codex CLI; other tools (e.g. Google's file printer) share the name."""
+    try:
+        return run(['codex', '--version']).startswith('codex-cli ')
+    except (OSError, subprocess.CalledProcessError):
+        return False
+
+
 def sync(run, targets, plugins, restart=True, verify=lambda: None, discover=lambda: [],
-         sources=([],), managed=lambda args, target: True, layers=()):
+         sources=([],), managed=lambda args, target: True, layers=(), codex_cli=True):
     # The CLI has no enable/disable command. Reinstallation would enable a
     # deliberately disabled plugin, so fail before modifying anything.
     if any(not plugin['enabled'] for plugin in plugins):
@@ -175,6 +183,9 @@ def sync(run, targets, plugins, restart=True, verify=lambda: None, discover=lamb
         if selected:
             run(['chezmoi', *args, 'apply', '--force', '--exclude', 'scripts',
                  '--refresh-externals=always', *selected])
+    if not codex_cli:
+        verify()
+        return
     missing = missing_plugins(discover(), plugins)
     for plugin in plugins:
         selector = plugin['pluginId']
@@ -218,7 +229,7 @@ def is_managed(args, target):
     return subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
 
 
-def inspect(targets, codex_home, home, sources=([],)):
+def inspect(targets, codex_home, home, sources=([],), codex_cli=True):
     stale = []
     for args in sources:
         selected = managed_targets(is_managed, args, targets)
@@ -226,6 +237,8 @@ def inspect(targets, codex_home, home, sources=([],)):
             status = run(['chezmoi', *args, 'status', '--exclude', 'scripts',
                           '--refresh-externals=never', *selected])
             stale.extend(f'Unapplied: {path}' for path in pending_targets(status))
+    if not codex_cli:
+        return stale, []
     plugins = local_plugins(json.loads(run(['codex', 'plugin', 'list', '--json']))['installed'])
     stale.extend(f'Missing local plugin: {selector}'
                  for selector in missing_plugins(package_plugins(home), plugins))
@@ -276,9 +289,10 @@ def main():
     source = Path(os.environ.get('CHEZMOI_SOURCE_DIR') or run(['chezmoi', 'source-path']).strip())
     layers = resolve_layers(context['layers'], source, Path(context['configFile']).parent)
     sources = [*map(layer_args, layers), []]
+    codex_cli = codex_cli_available(run)
 
     def inspect_all():
-        stale, installed = inspect(targets, codex_home, home, sources)
+        stale, installed = inspect(targets, codex_home, home, sources, codex_cli)
         statuses, notices = [], []
         for layer in layers:
             status = inspect_layer(run, layer)
@@ -290,13 +304,16 @@ def main():
         return stale, notices, installed, statuses
 
     stale, notices, plugins, statuses = inspect_all()
+    if not codex_cli:
+        notices.append('Codex CLI not found (`codex --version` is not codex-cli); plugin checks and sync skipped.')
     for message in stale + notices:
         print(message, flush=True)
     if not stale:
         print('Upstream skills, layers, managed files, and installed plugin caches are current.', flush=True)
-    print(f'Installed local-agents plugins: {len(plugins)}; sync installs all local packages.', flush=True)
-    print(memory_status(codex_home), flush=True)
-    print('Existing conversation instructions cannot be checked or replaced by this script.', flush=True)
+    if codex_cli:
+        print(f'Installed local-agents plugins: {len(plugins)}; sync installs all local packages.', flush=True)
+        print(memory_status(codex_home), flush=True)
+        print('Existing conversation instructions cannot be checked or replaced by this script.', flush=True)
     if args.check:
         return int(bool(stale))
 
@@ -314,10 +331,13 @@ def main():
 
     sync(execute, targets, plugins, restart=not args.no_restart, verify=verify,
          discover=lambda: package_plugins(home), sources=sources, managed=is_managed,
-         layers=statuses)
-    print('Disk sync verified. Start a NEW Codex conversation to load current instructions.')
-    if args.no_restart:
-        print('Daemon restart skipped; restart Codex before starting that conversation.')
+         layers=statuses, codex_cli=codex_cli)
+    if codex_cli:
+        print('Disk sync verified. Start a NEW Codex conversation to load current instructions.')
+        if args.no_restart:
+            print('Daemon restart skipped; restart Codex before starting that conversation.')
+    else:
+        print('Disk sync verified.')
     for layer, status in statuses:
         if needs_fast_forward(status):
             print(f'Updated layer {layer["name"]}: commit its new pointer in {source}, and run '

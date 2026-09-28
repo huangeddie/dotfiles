@@ -77,6 +77,10 @@ with `codex plugin marketplace add ~` after applying dotfiles.
 Requires Python 3, Git, chezmoi, and a Codex CLI supporting `plugin list --json`,
 `plugin remove`, `plugin add`, and `app-server daemon restart`.
 
+The Codex CLI is detected by `codex --version` printing `codex-cli …`; another
+`codex` on `PATH` does not count. Without it, plugin checks, reinstallation,
+and daemon restart are skipped with a notice; layers and skills still sync.
+
 ## Verification
 
 Deterministic unit tests use fake command runners and in-memory filesystem data:
