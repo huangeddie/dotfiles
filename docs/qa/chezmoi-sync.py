@@ -77,4 +77,62 @@ with tempfile.TemporaryDirectory(prefix='chezmoi-sync-qa-') as temporary:
     (local_skills / 'SKILL.md').write_text('current skill\n')
     assert not script['check_superpowers'](remote, root / 'clone-green', destination,
                                           local_git, script['snapshot'], Path.is_dir)
-print('PASS: stale detection, forced apply, symlink repair, script exclusion, idempotence, manifest discovery, cache comparison, nested external discovery, local Git upstream red/green')
+
+    # Layered sources: a nested layer tracks a real upstream; the configured
+    # source overlays .agents but does not manage .codex/AGENTS.md.
+    identity = ['-c', 'user.name=QA', '-c', 'user.email=qa@example.com', '-c', 'commit.gpgsign=false']
+    def commit(checkout, message):
+        git('-C', str(checkout), 'add', '.')
+        git('-C', str(checkout), *identity, 'commit', '-q', '-m', message)
+    bare, author, work = root / 'layer.git', root / 'layer-author', root / 'work'
+    git('init', '-q', '--bare', '-b', 'main', str(bare))
+    git('clone', '-q', bare.as_uri(), str(author))
+    (author / 'dot_agents').mkdir()
+    (author / 'dot_codex').mkdir()
+    (author / 'dot_agents/AGENTS.md').write_text('layer v1\n')
+    (author / 'dot_codex/symlink_AGENTS.md').write_text('../.agents/AGENTS.md\n')
+    commit(author, 'v1')
+    git('-C', str(author), 'push', '-q', 'origin', 'HEAD:main')
+    (work / 'dot_agents/hooks').mkdir(parents=True)
+    (work / 'dot_agents/hooks/hook.sh').write_text('work hook\n')
+    (work / '.chezmoiignore').write_text('_personal/\n')
+    git('clone', '-q', bare.as_uri(), str(work / '_personal'))
+    (author / 'dot_agents/AGENTS.md').write_text('layer v2\n')
+    commit(author, 'v2')
+    git('-C', str(author), 'push', '-q', 'origin', 'HEAD:main')
+    layered_home = root / 'layered-home'
+    (layered_home / '.codex').mkdir(parents=True)
+    layer = script['resolve_layers']([{'source': '_personal', 'persistentState': 'layer-state'}], work, root)[0]
+    def chezmoi_command(command):
+        extra = [] if '--source' in command else ['--source', str(work), '--persistent-state', str(root / 'work-state')]
+        return ['chezmoi', '--destination', str(layered_home), '--config', str(config),
+                '--cache', str(root / 'layered-cache'), *extra, *command[1:]]
+    def layered_run(command):
+        if command[0] == 'git':
+            return git(*command[1:])
+        return subprocess.run(chezmoi_command(command), check=True, capture_output=True, text=True).stdout
+    def managed(args, target):
+        command = chezmoi_command(['chezmoi', *args, 'source-path', target])
+        return subprocess.run(command, capture_output=True).returncode == 0
+    layered_targets = [str(layered_home / '.agents'), str(layered_home / '.codex/AGENTS.md')]
+    assert script['managed_targets'](managed, [], layered_targets) == layered_targets[:1]
+    status = script['inspect_layer'](layered_run, layer)
+    assert script['layer_messages'](layer, status)[0] == ['Layer _personal behind origin/main by 1 commits'], status
+    (work / '_personal/dot_agents/AGENTS.md').write_text('local edit\n')
+    dirty = script['inspect_layer'](layered_run, layer)
+    try:
+        script['sync'](layered_run, layered_targets, [], restart=False, layers=[(layer, dirty)],
+                       sources=[script['layer_args'](layer), []], managed=managed)
+        raise AssertionError('RED: dirty layer must abort sync')
+    except ValueError as error:
+        assert 'uncommitted' in str(error), error
+    assert not (layered_home / '.agents').exists(), 'Dirty layer abort must precede apply'
+    git('-C', str(work / '_personal'), 'checkout', '-q', '--', '.')
+    script['sync'](layered_run, layered_targets, [], restart=False,
+                   layers=[(layer, script['inspect_layer'](layered_run, layer))],
+                   sources=[script['layer_args'](layer), []], managed=managed)
+    assert (layered_home / '.agents/AGENTS.md').read_text() == 'layer v2\n'
+    assert (layered_home / '.agents/hooks/hook.sh').read_text() == 'work hook\n'
+    assert (layered_home / '.codex/AGENTS.md').is_symlink()
+    assert script['layer_messages'](layer, script['inspect_layer'](layered_run, layer)) == ([], [])
+print('PASS: stale detection, forced apply, symlink repair, script exclusion, idempotence, manifest discovery, cache comparison, nested external discovery, local Git upstream red/green, layer upstream fast-forward, layered apply with managed filtering, dirty layer guard')

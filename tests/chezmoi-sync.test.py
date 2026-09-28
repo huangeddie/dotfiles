@@ -174,5 +174,120 @@ class UpstreamTest(unittest.TestCase):
             self.check(failure=True)
 
 
+class LayerTest(unittest.TestCase):
+    layer = {'name': '_personal', 'source': Path('/work/_personal'),
+             'state': Path('/config/personal-state.boltdb')}
+    current = {'upstream': 'origin/main', 'ahead': 0, 'behind': 0, 'dirty': False}
+
+    @unittest.expectedFailure
+    def test_missing_layer_data_uses_only_configured_source(self):
+        for raw in (None, []):
+            with self.subTest(raw=raw):
+                self.assertEqual(script['resolve_layers'](raw, Path('/work'), Path('/config')), [])
+
+    @unittest.expectedFailure
+    def test_layer_paths_resolve_relative_to_source_and_config_dirs(self):
+        raw = [{'source': '_personal', 'persistentState': 'personal-state.boltdb'}]
+        self.assertEqual(script['resolve_layers'](raw, Path('/work'), Path('/config')), [self.layer])
+        self.assertEqual(script['layer_args'](self.layer), [
+            '--source', '/work/_personal', '--persistent-state', '/config/personal-state.boltdb'])
+
+    @unittest.expectedFailure
+    def test_absolute_or_malformed_layer_entries_are_rejected(self):
+        for raw in ({'source': '_personal'}, [{'source': '/abs', 'persistentState': 's'}],
+                    [{'source': '_personal'}], [{'source': 'a', 'persistentState': '../s'}],
+                    [{'source': 'a', 'persistentState': 's', 'extra': 1}]):
+            with self.subTest(raw=raw), self.assertRaises(ValueError):
+                script['resolve_layers'](raw, Path('/work'), Path('/config'))
+
+    @unittest.expectedFailure
+    def test_branch_status_parses_upstream_divergence_and_tracked_changes(self):
+        text = ('# branch.oid abc\n# branch.head main\n# branch.upstream origin/main\n'
+                '# branch.ab +2 -3\n1 .M N... 100644 100644 100644 a b README.md\n')
+        self.assertEqual(script['parse_branch_status'](text),
+                         {'upstream': 'origin/main', 'ahead': 2, 'behind': 3, 'dirty': True})
+
+    @unittest.expectedFailure
+    def test_branch_status_without_upstream_reports_none(self):
+        self.assertEqual(script['parse_branch_status']('# branch.oid abc\n# branch.head (detached)\n'),
+                         {'upstream': None, 'ahead': 0, 'behind': 0, 'dirty': False})
+
+    @unittest.expectedFailure
+    def test_untracked_files_do_not_mark_layer_dirty(self):
+        text = '# branch.upstream origin/main\n# branch.ab +0 -0\n? scratch.txt\n'
+        self.assertFalse(script['parse_branch_status'](text)['dirty'])
+
+    @unittest.expectedFailure
+    def test_layer_inspection_fetches_before_reading_status(self):
+        calls = []
+        def run(command):
+            calls.append(command)
+            return '# branch.upstream origin/main\n# branch.ab +0 -1\n' if 'status' in command else ''
+        status = script['inspect_layer'](run, self.layer)
+        self.assertEqual(calls, [['git', '-C', '/work/_personal', 'fetch', '--quiet'],
+                                 ['git', '-C', '/work/_personal', 'status', '--porcelain=v2', '--branch']])
+        self.assertEqual(status['behind'], 1)
+
+    @unittest.expectedFailure
+    def test_layer_behind_upstream_is_reported_stale(self):
+        stale, notices = script['layer_messages'](self.layer, dict(self.current, behind=3))
+        self.assertEqual(stale, ['Layer _personal behind origin/main by 3 commits'])
+        self.assertEqual(notices, [])
+
+    @unittest.expectedFailure
+    def test_layer_ahead_of_upstream_reports_unpublished_commits_without_staleness(self):
+        stale, notices = script['layer_messages'](self.layer, dict(self.current, ahead=2))
+        self.assertEqual(stale, [])
+        self.assertEqual(notices, ['Layer _personal has 2 unpublished commits'])
+
+    @unittest.expectedFailure
+    def test_layer_without_upstream_reports_notice_without_staleness(self):
+        stale, notices = script['layer_messages'](self.layer, dict(self.current, upstream=None))
+        self.assertEqual(stale, [])
+        self.assertEqual(notices, ['Layer _personal has no upstream branch; not checked'])
+
+    @unittest.expectedFailure
+    def test_targets_unmanaged_by_a_source_are_excluded_from_its_commands(self):
+        managed = lambda args, target: not (args == [] and target.endswith('.codex/AGENTS.md'))
+        self.assertEqual(script['managed_targets'](managed, [], ['/h/.agents', '/h/.codex/AGENTS.md']),
+                         ['/h/.agents'])
+
+    @unittest.expectedFailure
+    def test_layers_apply_in_declared_order_before_configured_source(self):
+        calls = []
+        args = script['layer_args'](self.layer)
+        managed = lambda source, target: source == args or target == '/h/.agents'
+        script['sync'](calls.append, ['/h/.agents', '/h/.codex/AGENTS.md'], [], restart=False,
+                       sources=[args, []], managed=managed)
+        apply = ['apply', '--force', '--exclude', 'scripts', '--refresh-externals=always']
+        self.assertEqual(calls, [['chezmoi', *args, *apply, '/h/.agents', '/h/.codex/AGENTS.md'],
+                                 ['chezmoi', *apply, '/h/.agents']])
+
+    @unittest.expectedFailure
+    def test_sync_fast_forwards_layers_before_applying(self):
+        calls = []
+        script['sync'](calls.append, ['/h/.agents'], [], restart=False,
+                       layers=[(self.layer, dict(self.current, behind=1))])
+        self.assertEqual(calls[0], ['git', '-C', '/work/_personal', 'merge', '--ff-only', '--quiet', '@{u}'])
+        self.assertEqual(calls[1][:2], ['chezmoi', 'apply'])
+
+    @unittest.expectedFailure
+    def test_current_or_ahead_layer_is_not_merged(self):
+        for status in (self.current, dict(self.current, ahead=2), dict(self.current, upstream=None)):
+            calls = []
+            with self.subTest(status=status):
+                script['sync'](calls.append, ['/h/.agents'], [], restart=False, layers=[(self.layer, status)])
+                self.assertEqual([call[0] for call in calls], ['chezmoi'])
+
+    @unittest.expectedFailure
+    def test_dirty_or_diverged_layer_aborts_sync_before_mutation(self):
+        for status, message in ((dict(self.current, dirty=True), 'uncommitted'),
+                                (dict(self.current, ahead=1, behind=1), 'diverged')):
+            calls = []
+            with self.subTest(message=message), self.assertRaisesRegex(ValueError, message):
+                script['sync'](calls.append, ['/h/.agents'], [], layers=[(self.layer, status)])
+            self.assertEqual(calls, [])
+
+
 if __name__ == '__main__':
     unittest.main()
