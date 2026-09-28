@@ -1,5 +1,6 @@
 """Deterministic unit tests; subprocesses and file snapshots are faked."""
 import runpy
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -172,6 +173,37 @@ class UpstreamTest(unittest.TestCase):
     def test_clone_failure_propagates_without_comparison(self):
         with self.assertRaisesRegex(RuntimeError, 'clone failed'):
             self.check(failure=True)
+
+
+class CodexCliTest(unittest.TestCase):
+    @unittest.expectedFailure
+    def test_codex_cli_is_detected_by_version_banner(self):
+        calls = []
+        def run(command):
+            calls.append(command)
+            return 'codex-cli 0.153.4\n'
+        self.assertTrue(script['codex_cli_available'](run))
+        self.assertEqual(calls, [['codex', '--version']])
+
+    @unittest.expectedFailure
+    def test_unrelated_codex_binary_or_missing_command_is_not_codex_cli(self):
+        def missing(command):
+            raise FileNotFoundError('codex')
+        def failing(command):
+            raise subprocess.CalledProcessError(1, command)
+        google_file_printer = lambda command: 'codex\nBuilt on Sep 21 2026 08:15:53\n'
+        for run in (google_file_printer, missing, failing):
+            with self.subTest(run=run):
+                self.assertFalse(script['codex_cli_available'](run))
+
+    @unittest.expectedFailure
+    def test_sync_without_codex_cli_applies_files_without_plugin_commands_or_restart(self):
+        calls = []
+        script['sync'](calls.append, ['/h/.agents'], [], discover=lambda: ['coding@local-agents'],
+                       verify=lambda: calls.append(['verify']), codex_cli=False)
+        self.assertEqual(calls, [
+            ['chezmoi', 'apply', '--force', '--exclude', 'scripts', '--refresh-externals=always', '/h/.agents'],
+            ['verify']])
 
 
 class LayerTest(unittest.TestCase):
