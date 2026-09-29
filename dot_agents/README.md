@@ -14,8 +14,8 @@ dot_agents/
 ├── AGENTS.md                    # Shared agent instructions; applies to ~/.agents/AGENTS.md.
 ├── exact_plugins/               # Shared plugin marketplace; applies to ~/.agents/plugins/.
 │   └── marketplace.json         # Codex marketplace catalog.
-└── exact_packages/              # Shared package registry; applies to ~/.agents/packages/.
-    └── <package>/
+└── packages/                    # Shared package registry; applies to ~/.agents/packages/.
+    └── exact_<package>/         # Non-exact parent lets other chezmoi layers add packages.
         ├── exact_skills/        # Shared skills; applies to skills/.
         ├── dot_claude-plugin/   # Claude Code manifest; applies to .claude-plugin/.
         ├── dot_codex-plugin/    # Codex CLI manifest; applies to .codex-plugin/.

@@ -13,11 +13,11 @@ with tempfile.TemporaryDirectory(prefix='chezmoi-sync-qa-') as temporary:
     source, destination = root / 'source', root / 'destination'
     (source / 'dot_agents').mkdir(parents=True)
     (source / 'dot_codex').mkdir()
-    manifest = source / 'dot_agents/exact_packages/example/dot_codex-plugin/plugin.json'
+    manifest = source / 'dot_agents/packages/exact_example/dot_codex-plugin/plugin.json'
     manifest.parent.mkdir(parents=True)
     manifest.write_text('{"name": "example", "skills": "./skills/"}')
-    (source / 'dot_agents/exact_packages/non-codex').mkdir()
-    (source / 'dot_agents/exact_packages/non-codex/README.md').write_text('No Codex manifest')
+    (source / 'dot_agents/packages/exact_non-codex').mkdir()
+    (source / 'dot_agents/packages/exact_non-codex/README.md').write_text('No Codex manifest')
     (destination / '.agents').mkdir(parents=True)
     (destination / '.codex').mkdir()
     (source / 'dot_agents/AGENTS.md').write_text('current instructions\n')
