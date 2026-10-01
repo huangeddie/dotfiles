@@ -28,7 +28,7 @@ on_demand_loading = false
 
 [hotkey]
 enabled = true
-key = "X"
+key = "EVTEST_45"
 modifiers = ["LEFTALT"]
 mode = "push_to_talk"
 cancel_key = "ESC"
