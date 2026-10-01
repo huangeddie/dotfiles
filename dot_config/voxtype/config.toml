@@ -28,8 +28,8 @@ on_demand_loading = false
 
 [hotkey]
 enabled = true
-key = "SPACE"
-modifiers = ["LEFTSHIFT"]
+key = "X"
+modifiers = ["LEFTALT"]
 mode = "push_to_talk"
 cancel_key = "ESC"
 

@@ -48,8 +48,8 @@ def test_voxtype_config_valid_toml_and_parakeet_int8_schema():
 
     hotkey = cfg.get("hotkey", {})
     assert hotkey.get("enabled") is True, hotkey
-    assert hotkey.get("key") == "SPACE", hotkey
-    assert hotkey.get("modifiers") == ["LEFTSHIFT"], hotkey
+    assert hotkey.get("key") == "X", hotkey
+    assert hotkey.get("modifiers") == ["LEFTALT"], hotkey
     assert hotkey.get("cancel_key") == "ESC", hotkey
     assert hotkey.get("mode") == "push_to_talk", hotkey
 
