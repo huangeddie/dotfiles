@@ -21,7 +21,7 @@ assert packages["cargo"]["install"]["linux"]["order"] == 60
 assert packages["claude-code"]["install"]["darwin"]["order"] == 20
 assert packages["codex"]["install"]["darwin"]["order"] == 30
 for name, order in (("television", 10), ("zoxide", 20), ("herdr", 30),
-                    ("tailscale", 40), ("bun", 50)):
+                    ("tailscale", 40), ("bun", 50), ("dotool", 80), ("voxtype", 90)):
     assert packages[name]["install"]["linux"]["order"] == order
 PY
 
@@ -49,6 +49,8 @@ install_commands = [
     "curl -fsSL https://tailscale.com/install.sh | sh",
     "curl -fsSL https://bun.com/install | bash",
     "curl https://sh.rustup.rs -sSf | sh",
+    "git clone --depth 1 https://git.sr.ht/~geb/dotool",
+    "https://github.com/peteonrails/voxtype/releases/download/",
 ]
 positions = [script.index(command) for command in install_commands]
 if positions != sorted(positions):

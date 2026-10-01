@@ -4,6 +4,29 @@
       "install": [],
       "remove": []
     },
+    "bun": [
+      "@doist/todoist-cli",
+      "@earendil-works/pi-coding-agent",
+      "hunkdiff",
+      "prettier"
+    ],
+    "custom": [
+      {
+        "executable": "cargo",
+        "install": "curl https://sh.rustup.rs -sSf | sh",
+        "name": "cargo"
+      },
+      {
+        "executable": "claude",
+        "install": "curl -fsSL https://claude.ai/install.sh | bash",
+        "name": "claude-code"
+      },
+      {
+        "executable": "codex",
+        "install": "curl -fsSL https://chatgpt.com/codex/install.sh | sh",
+        "name": "codex"
+      }
+    ],
     "homebrew": {
       "brews": [
         "anomalyco/tap/opencode",
@@ -44,37 +67,17 @@
       "casks": [
         "font-jetbrains-mono-nerd-font",
         "gcloud-cli",
-        "ghostty"
+        "ghostty",
+        "voxtype"
       ],
-      "taps": [],
+      "taps": [
+        "peteonrails/voxtype"
+      ],
       "trustedFormulae": [
         "anomalyco/tap/opencode",
         "modem-dev/tap/hunk"
       ]
-    },
-    "bun": [
-      "@doist/todoist-cli",
-      "@earendil-works/pi-coding-agent",
-      "hunkdiff",
-      "prettier"
-    ],
-    "custom": [
-      {
-        "executable": "cargo",
-        "install": "curl https://sh.rustup.rs -sSf | sh",
-        "name": "cargo"
-      },
-      {
-        "executable": "claude",
-        "install": "curl -fsSL https://claude.ai/install.sh | bash",
-        "name": "claude-code"
-      },
-      {
-        "executable": "codex",
-        "install": "curl -fsSL https://chatgpt.com/codex/install.sh | sh",
-        "name": "codex"
-      }
-    ]
+    }
   },
   "linux-base": {
     "apt": {
@@ -90,24 +93,21 @@
         "git",
         "git-delta",
         "golang-go",
+        "libxkbcommon-dev",
         "neovim",
         "nodejs",
         "npm",
         "nvtop",
         "openssh-server",
-        "ripgrep"
+        "pipewire-alsa",
+        "ripgrep",
+        "wl-clipboard"
       ],
       "remove": [
         "lazygit",
         "steam-devices",
         "steam-installer"
       ]
-    },
-    "homebrew": {
-      "brews": [],
-      "casks": [],
-      "taps": [],
-      "trustedFormulae": []
     },
     "bun": [
       "@doist/todoist-cli",
@@ -151,8 +151,24 @@
         "install": "go install github.com/jesseduffield/lazygit@latest",
         "name": "lazygit",
         "setup": "export GOPATH=\"${GOPATH:-$HOME/.local/share/go}\"\nexport PATH=\"$GOPATH/bin:$PATH\""
+      },
+      {
+        "executable": "dotool",
+        "install": "DOTOOL_TMP=$(mktemp -d)\ntrap 'rm -rf \"$DOTOOL_TMP\"' EXIT\ngit clone --depth 1 https://git.sr.ht/~geb/dotool \"$DOTOOL_TMP\"\nmkdir -p \"$DOTOOL_TMP/build\"\n(cd \"$DOTOOL_TMP/build\" && cmake -DCMAKE_BUILD_TYPE=Release .. && make -j\"$(nproc)\")\nmkdir -p ~/.local/bin\ninstall -m 755 \"$DOTOOL_TMP/build/dotool\" ~/.local/bin/dotool\ninstall -m 755 \"$DOTOOL_TMP/build/dotoolc\" ~/.local/bin/dotoolc\ninstall -m 755 \"$DOTOOL_TMP/dotoold\" ~/.local/bin/dotoold",
+        "name": "dotool"
+      },
+      {
+        "executable": "voxtype",
+        "install": "mkdir -p ~/.local/bin ~/.local/share/voxtype/models\nVOXTYPE_VERSION=\"1.1.0\"\nif grep -q \"avx512\" /proc/cpuinfo 2>/dev/null; then\n  VARIANT=\"onnx-avx512\"\nelse\n  VARIANT=\"onnx-avx2\"\nfi\nVOXTYPE_URL=\"https://github.com/peteonrails/voxtype/releases/download/v${VOXTYPE_VERSION}/voxtype-${VOXTYPE_VERSION}-linux-x86_64-${VARIANT}\"\ncurl -fsSL \"$VOXTYPE_URL\" -o ~/.local/bin/voxtype\nchmod 755 ~/.local/bin/voxtype\n~/.local/bin/voxtype setup --download --model \"parakeet-tdt-0.6b-v3-int8\" --no-post-install",
+        "name": "voxtype"
       }
-    ]
+    ],
+    "homebrew": {
+      "brews": [],
+      "casks": [],
+      "taps": [],
+      "trustedFormulae": []
+    }
   },
   "linux-gaming": {
     "apt": {
@@ -168,24 +184,21 @@
         "git",
         "git-delta",
         "golang-go",
+        "libxkbcommon-dev",
         "neovim",
         "nodejs",
         "npm",
         "nvtop",
         "openssh-server",
+        "pipewire-alsa",
         "ripgrep",
         "steam-devices",
-        "steam-installer"
+        "steam-installer",
+        "wl-clipboard"
       ],
       "remove": [
         "lazygit"
       ]
-    },
-    "homebrew": {
-      "brews": [],
-      "casks": [],
-      "taps": [],
-      "trustedFormulae": []
     },
     "bun": [
       "@doist/todoist-cli",
@@ -229,7 +242,23 @@
         "install": "go install github.com/jesseduffield/lazygit@latest",
         "name": "lazygit",
         "setup": "export GOPATH=\"${GOPATH:-$HOME/.local/share/go}\"\nexport PATH=\"$GOPATH/bin:$PATH\""
+      },
+      {
+        "executable": "dotool",
+        "install": "DOTOOL_TMP=$(mktemp -d)\ntrap 'rm -rf \"$DOTOOL_TMP\"' EXIT\ngit clone --depth 1 https://git.sr.ht/~geb/dotool \"$DOTOOL_TMP\"\nmkdir -p \"$DOTOOL_TMP/build\"\n(cd \"$DOTOOL_TMP/build\" && cmake -DCMAKE_BUILD_TYPE=Release .. && make -j\"$(nproc)\")\nmkdir -p ~/.local/bin\ninstall -m 755 \"$DOTOOL_TMP/build/dotool\" ~/.local/bin/dotool\ninstall -m 755 \"$DOTOOL_TMP/build/dotoolc\" ~/.local/bin/dotoolc\ninstall -m 755 \"$DOTOOL_TMP/dotoold\" ~/.local/bin/dotoold",
+        "name": "dotool"
+      },
+      {
+        "executable": "voxtype",
+        "install": "mkdir -p ~/.local/bin ~/.local/share/voxtype/models\nVOXTYPE_VERSION=\"1.1.0\"\nif grep -q \"avx512\" /proc/cpuinfo 2>/dev/null; then\n  VARIANT=\"onnx-avx512\"\nelse\n  VARIANT=\"onnx-avx2\"\nfi\nVOXTYPE_URL=\"https://github.com/peteonrails/voxtype/releases/download/v${VOXTYPE_VERSION}/voxtype-${VOXTYPE_VERSION}-linux-x86_64-${VARIANT}\"\ncurl -fsSL \"$VOXTYPE_URL\" -o ~/.local/bin/voxtype\nchmod 755 ~/.local/bin/voxtype\n~/.local/bin/voxtype setup --download --model \"parakeet-tdt-0.6b-v3-int8\" --no-post-install",
+        "name": "voxtype"
       }
-    ]
+    ],
+    "homebrew": {
+      "brews": [],
+      "casks": [],
+      "taps": [],
+      "trustedFormulae": []
+    }
   }
 }

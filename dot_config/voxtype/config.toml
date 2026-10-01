@@ -1,0 +1,62 @@
+# Voxtype Configuration
+# Managed via chezmoi. Changes here trigger run_onchange_after_voxtype-sync.sh.tmpl
+# on `chezmoi apply` to download missing models and restart voxtype.service.
+
+# Available engines: "parakeet", "whisper", "moonshine", "sensevoice", "paraformer", "dolphin", "omnilingual", "cohere"
+engine = "parakeet"
+state_file = "auto"
+
+[parakeet]
+# Available Parakeet models:
+#   - "parakeet-tdt-0.6b-v3-int8" : INT8 (~650 MB), multilingual (25 langs), fast CPU (~35x real-time)
+#   - "parakeet-tdt-0.6b-v3"      : FP32 (~2.4 GB), multilingual (25 langs), full precision
+#   - "parakeet-tdt-0.6b-v2-int8" : INT8 (~650 MB), English-only (100% capacity dedicated to English)
+#   - "parakeet-tdt-0.6b-v2"      : FP32 (~2.4 GB), English-only, highest pure-English accuracy
+#   - "parakeet-unified-en-0.6b"  : FP32, English-only cache-aware streaming variant
+model = "parakeet-tdt-0.6b-v3-int8"
+model_type = "tdt"
+on_demand_loading = false
+
+[whisper]
+# Available Whisper models (.en = English-only; omit .en for multilingual):
+#   - "tiny.en" / "base.en" / "small.en" / "medium.en"
+#   - "large-v3-turbo" (fast 4-decoder-layer distil) / "large-v3" (full 32-layer)
+model = "base.en"
+language = "en"
+translate = false
+on_demand_loading = false
+
+[hotkey]
+enabled = true
+key = "RIGHTALT"
+modifiers = []
+mode = "push_to_talk"
+cancel_key = "ESC"
+
+[audio]
+device = "default"
+sample_rate = 16000
+max_duration_secs = 60
+
+[audio.feedback]
+enabled = true
+theme = "subtle"
+volume = 0.7
+
+[output]
+mode = "type"
+driver_order = ["dotool", "clipboard"]
+fallback_to_clipboard = true
+type_delay_ms = 0
+pre_type_delay_ms = 0
+
+[output.notification]
+on_recording_start = false
+on_recording_stop = false
+on_transcription = true
+
+[osd]
+enabled = false
+frontend = "gtk4"
+style = "default"
+layout = "compact"

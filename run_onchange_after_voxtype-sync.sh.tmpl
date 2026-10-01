@@ -1,0 +1,51 @@
+#!/bin/bash
+
+# run_onchange_after_voxtype-sync.sh.tmpl
+# Re-runs whenever Voxtype config or systemd unit files change in chezmoi:
+#   config.toml:     {{ include "dot_config/voxtype/config.toml" | sha256sum }}
+{{- if eq .chezmoi.os "linux" }}
+#   dotoold.service: {{ include "dot_config/systemd/user/dotoold.service" | sha256sum }}
+#   voxtype.service: {{ include "dot_config/systemd/user/voxtype.service" | sha256sum }}
+{{- end }}
+
+set -euo pipefail
+
+VOXTYPE_BIN="$HOME/.local/bin/voxtype"
+if command -v voxtype >/dev/null 2>&1; then
+  VOXTYPE_CMD="voxtype"
+elif [[ -x "$VOXTYPE_BIN" ]]; then
+  VOXTYPE_CMD="$VOXTYPE_BIN"
+else
+  VOXTYPE_CMD=""
+fi
+
+CONFIG_FILE="$HOME/.config/voxtype/config.toml"
+
+if [[ -n "$VOXTYPE_CMD" && -f "$CONFIG_FILE" ]]; then
+  model=$(python3 - "$CONFIG_FILE" <<'PY'
+import sys
+import tomllib
+
+with open(sys.argv[1], "rb") as f:
+    cfg = tomllib.load(f)
+
+engine = cfg.get("engine", "whisper")
+section = cfg.get(engine, {})
+if isinstance(section, dict) and section.get("model"):
+    print(section["model"])
+PY
+)
+  if [[ -n "$model" ]]; then
+    echo "🎙️ Ensuring Voxtype model '$model' is downloaded..."
+    "$VOXTYPE_CMD" setup --download --model "$model" --no-post-install
+  fi
+fi
+
+{{ if eq .chezmoi.os "linux" -}}
+if command -v systemctl >/dev/null 2>&1 && [[ -n "$VOXTYPE_CMD" && -x "$HOME/.local/bin/dotoold" ]]; then
+  echo "🔄 Reloading and restarting dotoold and voxtype user services..."
+  systemctl --user daemon-reload
+  systemctl --user enable --now dotoold.service voxtype.service
+  systemctl --user restart voxtype.service
+fi
+{{ end -}}

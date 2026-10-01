@@ -79,6 +79,23 @@ packages:
     install:
       linux:
         apt: ["curl"]
+  dotool:
+    role: base
+    install:
+      linux:
+        custom:
+          executable: "dotool"
+          install: |-
+            DOTOOL_TMP=$(mktemp -d)
+            trap 'rm -rf "$DOTOOL_TMP"' EXIT
+            git clone --depth 1 https://git.sr.ht/~geb/dotool "$DOTOOL_TMP"
+            mkdir -p "$DOTOOL_TMP/build"
+            (cd "$DOTOOL_TMP/build" && cmake -DCMAKE_BUILD_TYPE=Release .. && make -j"$(nproc)")
+            mkdir -p ~/.local/bin
+            install -m 755 "$DOTOOL_TMP/build/dotool" ~/.local/bin/dotool
+            install -m 755 "$DOTOOL_TMP/build/dotoolc" ~/.local/bin/dotoolc
+            install -m 755 "$DOTOOL_TMP/dotoold" ~/.local/bin/dotoold
+        order: 80
   fd:
     role: base
     install:
@@ -337,6 +354,33 @@ packages:
     install:
       darwin:
         brew: "vips"
+  voxtype:
+    role: base
+    install:
+      darwin:
+        cask: "voxtype"
+        tap: "peteonrails/voxtype"
+      linux:
+        custom:
+          executable: "voxtype"
+          install: |-
+            mkdir -p ~/.local/bin ~/.local/share/voxtype/models
+            VOXTYPE_VERSION="1.1.0"
+            if grep -q "avx512" /proc/cpuinfo 2>/dev/null; then
+              VARIANT="onnx-avx512"
+            else
+              VARIANT="onnx-avx2"
+            fi
+            VOXTYPE_URL="https://github.com/peteonrails/voxtype/releases/download/v${VOXTYPE_VERSION}/voxtype-${VOXTYPE_VERSION}-linux-x86_64-${VARIANT}"
+            curl -fsSL "$VOXTYPE_URL" -o ~/.local/bin/voxtype
+            chmod 755 ~/.local/bin/voxtype
+            ~/.local/bin/voxtype setup --download --model "parakeet-tdt-0.6b-v3-int8" --no-post-install
+        order: 90
+  voxtype-deps:
+    role: base
+    install:
+      linux:
+        apt: ["libxkbcommon-dev", "pipewire-alsa", "wl-clipboard"]
   zig:
     role: base
     install:

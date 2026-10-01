@@ -1,0 +1,14 @@
+[Unit]
+Description=dotool daemon for low-latency uinput keyboard injection
+After=default.target
+
+[Service]
+Type=simple
+Environment="PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin"
+ExecStartPre=/bin/rm -f /tmp/dotool-pipe
+ExecStart=%h/.local/bin/dotoold
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target
