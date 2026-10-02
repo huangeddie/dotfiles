@@ -26,6 +26,17 @@ alias hd='hunk diff'
 alias cl='claude'
 alias co='codex'
 
+# Temporary workaround until Pi releases a proper remote clipboard fix:
+# Herdr panes can lack SSH variables, making Pi copy to the host clipboard.
+# Enable OSC 52 in all Herdr panes (including local ones); remove once fixed.
+pi() {
+  if [ "${HERDR_ENV:-}" = 1 ]; then
+    SSH_CLIENT="${SSH_CLIENT:-herdr-remote}" command pi "$@"
+  else
+    command pi "$@"
+  fi
+}
+
 # Obsidian
 alias vault='cd ~/Documents/Obsidian/ && nvim'
 
