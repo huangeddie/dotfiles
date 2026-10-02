@@ -30,7 +30,7 @@ on_demand_loading = false
 enabled = true
 key = "RIGHTALT"
 modifiers = []
-mode = "toggle"
+mode = "push_to_talk"
 cancel_key = "ESC"
 
 [audio]
