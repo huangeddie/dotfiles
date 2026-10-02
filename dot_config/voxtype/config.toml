@@ -3,7 +3,7 @@
 # on `chezmoi apply` to download missing models and restart voxtype.service.
 
 # Available engines: "parakeet", "whisper", "moonshine", "sensevoice", "paraformer", "dolphin", "omnilingual", "cohere"
-engine = "parakeet"
+engine = "whisper"
 state_file = "auto"
 
 [parakeet]
@@ -21,7 +21,7 @@ on_demand_loading = false
 # Available Whisper models (.en = English-only; omit .en for multilingual):
 #   - "tiny.en" / "base.en" / "small.en" / "medium.en"
 #   - "large-v3-turbo" (fast 4-decoder-layer distil) / "large-v3" (full 32-layer)
-model = "base.en"
+model = "small.en"
 language = "en"
 translate = false
 on_demand_loading = false

@@ -35,11 +35,13 @@ def chezmoi(*args, source_dir=source):
     return result.stdout
 
 
-def test_voxtype_config_valid_toml_and_parakeet_int8_schema():
+def test_voxtype_config_selects_whisper_small_en():
     assert config_file.is_file(), f"Missing {config_file}"
     cfg = tomllib.loads(config_file.read_text())
 
-    assert cfg.get("engine") == "parakeet", cfg.get("engine")
+    assert cfg.get("engine") == "whisper", cfg.get("engine")
+    assert cfg.get("whisper", {}).get("model") == "small.en"
+    assert cfg.get("whisper", {}).get("language") == "en"
     assert cfg.get("state_file") == "auto", cfg.get("state_file")
 
     parakeet = cfg.get("parakeet", {})
