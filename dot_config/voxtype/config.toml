@@ -28,8 +28,8 @@ on_demand_loading = false
 
 [hotkey]
 enabled = true
-key = "EVTEST_45"
-modifiers = ["LEFTALT"]
+key = "RIGHTALT"
+modifiers = []
 mode = "push_to_talk"
 cancel_key = "ESC"
 

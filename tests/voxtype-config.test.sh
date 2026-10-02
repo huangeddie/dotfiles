@@ -50,8 +50,8 @@ def test_voxtype_config_selects_whisper_small_en():
 
     hotkey = cfg.get("hotkey", {})
     assert hotkey.get("enabled") is True, hotkey
-    assert hotkey.get("key") == "EVTEST_45", hotkey
-    assert hotkey.get("modifiers") == ["LEFTALT"], hotkey
+    assert hotkey.get("key") == "RIGHTALT", hotkey
+    assert hotkey.get("modifiers") == [], hotkey
     assert hotkey.get("cancel_key") == "ESC", hotkey
     assert hotkey.get("mode") == "push_to_talk", hotkey
 
