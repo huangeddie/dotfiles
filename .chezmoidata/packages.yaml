@@ -250,12 +250,6 @@ packages:
     install:
       linux:
         apt: ["nvtop"]
-  opencode:
-    role: base
-    install:
-      darwin:
-        brew: "anomalyco/tap/opencode"
-        trusted: true
   openssh-server:
     role: base
     install:

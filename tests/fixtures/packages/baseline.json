@@ -29,7 +29,6 @@
     ],
     "homebrew": {
       "brews": [
-        "anomalyco/tap/opencode",
         "bat",
         "btop",
         "bun",
@@ -74,7 +73,6 @@
         "peteonrails/voxtype"
       ],
       "trustedFormulae": [
-        "anomalyco/tap/opencode",
         "modem-dev/tap/hunk"
       ]
     }

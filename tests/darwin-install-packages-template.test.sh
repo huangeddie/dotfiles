@@ -20,7 +20,7 @@ with open(sys.argv[1], encoding="utf-8") as stream:
     packages = json.load(stream)["packages"]
 
 assert packages["hunk"]["install"]["darwin"]["trusted"] is True
-assert packages["opencode"]["install"]["darwin"]["trusted"] is True
+assert "opencode" not in packages
 assert packages["git-delta"]["install"]["darwin"]["brew"] == "git-delta"
 assert packages["ghostty"]["install"]["darwin"]["cask"] == "ghostty"
 PY
@@ -56,7 +56,7 @@ mkdir -p "$execution_source"
 cp -R "$source_dir/.chezmoitemplates" "$source_dir/.chezmoidata" "$execution_source/"
 cp "$source_dir/run_onchange_before_darwin-install-packages.sh.tmpl" "$execution_source/"
 cat >"$execution_source/.chezmoidata/packages.yaml" <<'JSON'
-{"machineRolePolicy":{"required":["base"],"platforms":{"linux":["base","gaming"],"darwin":["base"]}},"packages":{"hunk":{"role":"base","install":{"darwin":{"brew":"modem-dev/tap/hunk","trusted":true}}},"opencode":{"role":"base","install":{"darwin":{"brew":"anomalyco/tap/opencode","trusted":true}}},"ghostty":{"role":"base","install":{"darwin":{"cask":"ghostty"}}},"voxtype":{"role":"base","install":{"darwin":{"cask":"voxtype","tap":"peteonrails/voxtype","trusted":true}}}},"packageRemovals":{"linux":{"apt":[]}}}
+{"machineRolePolicy":{"required":["base"],"platforms":{"linux":["base","gaming"],"darwin":["base"]}},"packages":{"hunk":{"role":"base","install":{"darwin":{"brew":"modem-dev/tap/hunk","trusted":true}}},"example-tool":{"role":"base","install":{"darwin":{"brew":"example/tap/tool","trusted":true}}},"ghostty":{"role":"base","install":{"darwin":{"cask":"ghostty"}}},"voxtype":{"role":"base","install":{"darwin":{"cask":"voxtype","tap":"peteonrails/voxtype","trusted":true}}}},"packageRemovals":{"linux":{"apt":[]}}}
 JSON
 render_execution() {
   local name=$1 override=$2
@@ -127,7 +127,7 @@ with open(sys.argv[1], encoding="utf-8") as stream:
 # Trust commands before/after bundle cannot preserve trust during that step.
 assert sorted(declarations) == sorted([
     'brew "modem-dev/tap/hunk", trusted: true',
-    'brew "anomalyco/tap/opencode", trusted: true',
+    'brew "example/tap/tool", trusted: true',
     'cask "ghostty"',
     'cask "peteonrails/voxtype/voxtype", trusted: true',
     'tap "peteonrails/voxtype"',
@@ -160,7 +160,7 @@ with open(sys.argv[1], encoding="utf-8") as stream:
     declarations = {line.rstrip("\n") for line in stream}
 
 assert declarations == {
-    'brew "anomalyco/tap/opencode", trusted: true',
+    'brew "example/tap/tool", trusted: true',
     'cask "ghostty"',
 }, declarations
 PY

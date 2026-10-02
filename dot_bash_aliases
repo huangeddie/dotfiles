@@ -25,7 +25,6 @@ alias hd='hunk diff'
 # Agent harnesses
 alias cl='claude'
 alias co='codex'
-alias oc='opencode'
 
 # Obsidian
 alias vault='cd ~/Documents/Obsidian/ && nvim'
