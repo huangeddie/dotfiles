@@ -37,7 +37,7 @@
     {{- if and (eq $os "linux") (has $installer (list "brew" "cask")) -}}{{ fail (printf "%s is Darwin-only" $namePath) }}{{- end -}}
     {{- if and (eq $os "darwin") (eq $installer "apt") -}}{{ fail (printf "%s is Linux-only" $namePath) }}{{- end -}}
     {{- if hasKey $recipe "trusted" -}}
-      {{- if ne $installer "brew" -}}{{ fail (printf "%s.trusted requires brew" $recipePath) }}{{- end -}}
+      {{- if not (has $installer (list "brew" "cask")) -}}{{ fail (printf "%s.trusted requires brew or cask" $recipePath) }}{{- end -}}
       {{- if not (kindIs "bool" $recipe.trusted) -}}{{ fail (printf "%s.trusted must be boolean" $recipePath) }}{{- end -}}
     {{- end -}}
     {{- if hasKey $recipe "tap" -}}

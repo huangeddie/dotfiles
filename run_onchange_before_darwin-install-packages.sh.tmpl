@@ -2,6 +2,7 @@
 {{- $plan := includeTemplate "resolve-packages.tmpl" . | fromJson -}}
 {{- $selectedTaps := $plan.homebrew.taps -}}
 {{- $selectedTrustedFormulae := $plan.homebrew.trustedFormulae -}}
+{{- $selectedTrustedCasks := $plan.homebrew.trustedCasks -}}
 {{- $selectedBrews := $plan.homebrew.brews -}}
 {{- $selectedCasks := $plan.homebrew.casks -}}
 #!/bin/bash
@@ -18,13 +19,16 @@ fi
 # match interactive shells -- otherwise the two read different files.
 export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 
-# Authorize third-party tap formulae. Called twice: before the bundle, which
-# cannot load them otherwise, and again after, because
+# Authorize individual third-party formulae and casks. Called twice: before
+# the bundle, which cannot load them otherwise, and again after, because
 # `brew bundle install --force-cleanup` prunes the allowlist and would leave
 # interactive brew commands untrusted.
 grant_tap_trust() {
 {{- range $formula := $selectedTrustedFormulae }}
   brew trust --formula {{ $formula | quote }} >/dev/null
+{{- end }}
+{{- range $cask := $selectedTrustedCasks }}
+  brew trust --cask {{ $cask | quote }} >/dev/null
 {{- end }}
   :
 }

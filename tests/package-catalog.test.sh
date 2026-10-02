@@ -13,7 +13,7 @@ import sys
 
 source, temp = map(pathlib.Path, sys.argv[1:])
 base = {'fd': {'role': 'base', 'install': {'linux': {'apt': ['fd-find']}, 'darwin': {'brew': 'fd'}}}}
-empty = {'apt': {'install': [], 'remove': []}, 'homebrew': {'brews': [], 'casks': [], 'taps': [], 'trustedFormulae': []}, 'bun': [], 'custom': []}
+empty = {'apt': {'install': [], 'remove': []}, 'homebrew': {'brews': [], 'casks': [], 'taps': [], 'trustedFormulae': [], 'trustedCasks': []}, 'bun': [], 'custom': []}
 
 def render(packages=None, removals=None, os='linux', roles=None, denied=None, legacy=None, twice=False, no_policy=False, malformed_policy=False):
     values = {'packages': base if packages is None else packages,
@@ -86,6 +86,21 @@ trust = {'hunk': {'role': 'base', 'install': {'darwin': {'brew': 'modem-dev/tap/
 success('trusted brew denied', empty, packages=trust, os='darwin', denied=['modem-dev'])
 expected = copy.deepcopy(empty); expected['homebrew']['brews'] = ['modem-dev/tap/hunk']; expected['homebrew']['trustedFormulae'] = ['modem-dev/tap/hunk']
 success('trusted brew selected', expected, packages=trust, os='darwin')
+cask = {'voxtype': {'role': 'base', 'install': {'darwin': {'cask': 'voxtype', 'tap': 'peteonrails/voxtype', 'trusted': True}}}}
+expected = copy.deepcopy(empty)
+expected['homebrew'].update(casks=['voxtype'], taps=['peteonrails/voxtype'], trustedCasks=['peteonrails/voxtype/voxtype'])
+success('trusted cask uses qualified trust name', expected, packages=cask, os='darwin')
+success('denied cask receives no trust', empty, packages=cask, os='darwin', denied=['voxtype'])
+success('cask on another platform receives no trust', empty, packages=cask)
+cask['voxtype']['install']['darwin']['trusted'] = False
+expected['homebrew']['trustedCasks'] = []
+success('explicitly untrusted cask receives no trust', expected, packages=cask, os='darwin')
+cask['voxtype']['install']['darwin'].update(cask='peteonrails/voxtype/voxtype', trusted=True)
+expected['homebrew'].update(casks=['peteonrails/voxtype/voxtype'], trustedCasks=['peteonrails/voxtype/voxtype'])
+success('qualified cask trust is not prefixed twice', expected, packages=cask, os='darwin')
+del cask['voxtype']['install']['darwin']['tap']
+expected['homebrew']['taps'] = []
+success('qualified cask trust needs no explicit tap', expected, packages=cask, os='darwin')
 taps = {'a': {'role': 'base', 'install': {'darwin': {'brew': 'a', 'tap': 'vendor/tap'}}}, 'b': {'role': 'base', 'install': {'darwin': {'cask': 'b', 'tap': 'vendor/tap'}}}}
 expected = copy.deepcopy(empty); expected['homebrew'].update(brews=['a'], casks=['b'], taps=['vendor/tap'])
 success('shared tap', expected, packages=taps, os='darwin')
@@ -130,6 +145,7 @@ invalid = [
     ('empty apt', 'packages.fd.install.linux.apt', {'packages': {'fd': {'role': 'base', 'install': {'linux': {'apt': []}}}}}),
     ('duplicate apt', 'packages.fd.install.linux.apt', {'packages': {'fd': {'role': 'base', 'install': {'linux': {'apt': ['fd', 'fd']}}}}}),
     ('invalid trust', 'packages.fd.install.darwin.trusted', {'packages': {'fd': {'role': 'base', 'install': {'darwin': {'brew': 'fd', 'trusted': 'true'}}}}}),
+    ('invalid cask trust', 'packages.fd.install.darwin.trusted', {'packages': {'fd': {'role': 'base', 'install': {'darwin': {'cask': 'fd', 'trusted': 'true'}}}}}),
     ('trust nonbrew', 'packages.fd.install.linux.trusted', {'packages': {'fd': {'role': 'base', 'install': {'linux': {'bun': 'fd', 'trusted': True}}}}}),
     ('tap apt', 'packages.fd.install.linux.tap', {'packages': {'fd': {'role': 'base', 'install': {'linux': {'apt': ['fd'], 'tap': 'x'}}}}}),
     ('tap bun', 'packages.fd.install.linux.tap', {'packages': {'fd': {'role': 'base', 'install': {'linux': {'bun': 'fd', 'tap': 'x'}}}}}),
@@ -150,7 +166,7 @@ invalid = [
 ]
 for name, path, params in invalid:
     failure(name, path, **params)
-# Production catalog parity is checked against the independent, immutable old-schema snapshot.
+# Preserve the immutable old-schema snapshot, with explicit expected trust additions.
 fixture = json.loads((source / 'tests/fixtures/packages/baseline.json').read_text())
 def normalized(plan):
     result = json.loads(json.dumps(plan))
@@ -169,6 +185,8 @@ for name, os, roles in [('darwin-base', 'darwin', ['base']),
     result = subprocess.run(['chezmoi', '--config', str(temp / 'empty.toml'), '--source', str(source),
                              'execute-template', '-f', str(wrapper)], text=True, capture_output=True)
     assert result.returncode == 0, (name, result.stderr)
-    assert normalized(json.loads(result.stdout)) == fixture[name], name
+    expected = copy.deepcopy(fixture[name])
+    expected['homebrew']['trustedCasks'] = ['peteonrails/voxtype/voxtype'] if os == 'darwin' else []
+    assert normalized(json.loads(result.stdout)) == expected, name
 print('package catalog: synthetic contracts and production baseline parity passed')
 PY

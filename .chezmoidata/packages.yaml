@@ -360,6 +360,7 @@ packages:
       darwin:
         cask: "voxtype"
         tap: "peteonrails/voxtype"
+        trusted: true
       linux:
         custom:
           executable: "voxtype"

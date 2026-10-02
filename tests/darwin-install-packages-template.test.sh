@@ -56,7 +56,7 @@ mkdir -p "$execution_source"
 cp -R "$source_dir/.chezmoitemplates" "$source_dir/.chezmoidata" "$execution_source/"
 cp "$source_dir/run_onchange_before_darwin-install-packages.sh.tmpl" "$execution_source/"
 cat >"$execution_source/.chezmoidata/packages.yaml" <<'JSON'
-{"machineRolePolicy":{"required":["base"],"platforms":{"linux":["base","gaming"],"darwin":["base"]}},"packages":{"hunk":{"role":"base","install":{"darwin":{"brew":"modem-dev/tap/hunk","trusted":true}}},"opencode":{"role":"base","install":{"darwin":{"brew":"anomalyco/tap/opencode","trusted":true}}},"ghostty":{"role":"base","install":{"darwin":{"cask":"ghostty"}}}},"packageRemovals":{"linux":{"apt":[]}}}
+{"machineRolePolicy":{"required":["base"],"platforms":{"linux":["base","gaming"],"darwin":["base"]}},"packages":{"hunk":{"role":"base","install":{"darwin":{"brew":"modem-dev/tap/hunk","trusted":true}}},"opencode":{"role":"base","install":{"darwin":{"brew":"anomalyco/tap/opencode","trusted":true}}},"ghostty":{"role":"base","install":{"darwin":{"cask":"ghostty"}}},"voxtype":{"role":"base","install":{"darwin":{"cask":"voxtype","tap":"peteonrails/voxtype","trusted":true}}}},"packageRemovals":{"linux":{"apt":[]}}}
 JSON
 render_execution() {
   local name=$1 override=$2
@@ -119,13 +119,24 @@ if ! grep -Fqx 'bundle install --file=/dev/stdin --force-cleanup' "$brew_calls";
   exit 1
 fi
 
+python3 - "$brew_calls" <<'PY'
+import pathlib, sys
+calls = pathlib.Path(sys.argv[1]).read_text().splitlines()
+bundle = calls.index('bundle install --file=/dev/stdin --force-cleanup')
+trust = 'trust --cask peteonrails/voxtype/voxtype'
+assert calls.count(trust) == 2, calls
+assert calls.index(trust) < bundle < len(calls) - 1 - calls[::-1].index(trust), calls
+assert not any(call.startswith('trust ') and '--formula ' not in call and '--cask ' not in call for call in calls), calls
+assert not any(call == 'trust --cask ghostty' for call in calls), calls
+PY
+
 python3 - "$brewfile_input" <<'PY'
 import json
 import sys
 
 with open(sys.argv[1], encoding="utf-8") as stream:
     declarations = [line.rstrip("\n") for line in stream]
-assert sorted(declarations) == sorted(['brew "modem-dev/tap/hunk"', 'brew "anomalyco/tap/opencode"', 'cask "ghostty"'])
+assert sorted(declarations) == sorted(['brew "modem-dev/tap/hunk"', 'brew "anomalyco/tap/opencode"', 'cask "ghostty"', 'cask "voxtype"', 'tap "peteonrails/voxtype"'])
 PY
 
 assert_render_failure \
@@ -133,7 +144,7 @@ assert_render_failure \
   '{"chezmoi":{"os":"darwin"},"machineRoles":["base","gaming"]}' \
   'machine role "gaming" is not supported on darwin'
 
-render_execution denied-tap '{"chezmoi":{"os":"darwin"},"machineRoles":["base"],"packagePolicy":{"deniedPrefixes":["modem-dev/tap"]}}'
+render_execution denied-tap '{"chezmoi":{"os":"darwin"},"machineRoles":["base"],"packagePolicy":{"deniedPrefixes":["modem-dev/tap","voxtype"]}}'
 denied_tap_calls="$test_dir/denied-tap-calls"
 denied_tap_brewfile="$test_dir/denied-tap-Brewfile"
 PATH="$fake_bin:/usr/bin:/bin" \
@@ -142,8 +153,9 @@ XDG_CONFIG_HOME="$test_dir/config" \
 BREW_CALLS="$denied_tap_calls" \
 BREWFILE_INPUT="$denied_tap_brewfile" \
   bash "$test_dir/denied-tap.sh"
-if grep -Fq 'trust --formula modem-dev/tap/hunk' "$denied_tap_calls"; then
-  echo "denied tap formula was still granted trust" >&2
+if grep -Fq 'trust --formula modem-dev/tap/hunk' "$denied_tap_calls" ||
+  grep -Fq 'trust --cask peteonrails/voxtype/voxtype' "$denied_tap_calls"; then
+  echo "denied package was still granted trust" >&2
   exit 1
 fi
 python3 - "$denied_tap_brewfile" <<'PY'
@@ -155,6 +167,8 @@ with open(sys.argv[1], encoding="utf-8") as stream:
 for declaration in [
     'tap "modem-dev/tap"',
     'brew "modem-dev/tap/hunk"',
+    'cask "voxtype"',
+    'tap "peteonrails/voxtype"',
 ]:
     assert declaration not in declarations, declaration
 PY

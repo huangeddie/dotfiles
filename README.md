@@ -83,9 +83,11 @@ packages:
 
 Declare each Bun global explicitly on both OSes when needed (`bun: prettier`);
 there is no platform inheritance. Custom `order` controls installer sequence on
-each OS. Third-party Homebrew formulae requiring trust use `trusted: true` on
-their `brew` recipe; this does not trust a whole tap. Apt retirement tombstones
-belong under `packageRemovals.linux.apt`, not under a package entry.
+each OS. Third-party Homebrew formulae and casks requiring trust use
+`trusted: true` on their `brew` or `cask` recipe; this does not trust a whole tap.
+Cask trust names are qualified with `tap` when the cask name is unqualified.
+Apt retirement tombstones belong under `packageRemovals.linux.apt`, not under a
+package entry.
 
 Consumers overriding old OS-first paths such as `packages.linux.apt.roles` or
 `packages.bun.global.roles` must migrate to logical entries in `packages` and

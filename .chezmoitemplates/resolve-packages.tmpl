@@ -2,7 +2,7 @@
 {{- includeTemplate "validate-package-catalog.tmpl" . -}}
 {{- $plan := dict
   "apt" (dict "install" (list) "remove" (list))
-  "homebrew" (dict "brews" (list) "casks" (list) "taps" (list) "trustedFormulae" (list))
+  "homebrew" (dict "brews" (list) "casks" (list) "taps" (list) "trustedFormulae" (list) "trustedCasks" (list))
   "bun" (list) "custom" (list) -}}
 {{- $os := .chezmoi.os -}}
 {{- $packagePolicy := get . "packagePolicy" | default dict -}}
@@ -40,6 +40,11 @@
           {{- if and (hasKey $recipe "trusted") $recipe.trusted -}}{{- $_ := set $plan.homebrew "trustedFormulae" (append $plan.homebrew.trustedFormulae $name) -}}{{- end -}}
         {{- else if eq $installer "cask" -}}
           {{- $_ := set $plan.homebrew "casks" (append $plan.homebrew.casks $name) -}}
+          {{- if and (hasKey $recipe "trusted") $recipe.trusted -}}
+            {{- $trustName := $name -}}
+            {{- if and (hasKey $recipe "tap") (not (contains "/" $name)) -}}{{- $trustName = printf "%s/%s" $recipe.tap $name -}}{{- end -}}
+            {{- $_ := set $plan.homebrew "trustedCasks" (append $plan.homebrew.trustedCasks $trustName) -}}
+          {{- end -}}
         {{- else if eq $installer "bun" -}}
           {{- $_ := set $plan "bun" (append $plan.bun $name) -}}
         {{- else -}}
