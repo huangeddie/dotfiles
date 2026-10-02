@@ -106,14 +106,6 @@ BREW_CALLS="$brew_calls" \
 BREWFILE_INPUT="$brewfile_input" \
   bash "$test_dir/execution.sh"
 
-for formula in modem-dev/tap/hunk anomalyco/tap/opencode; do
-  trust_call_count=$(grep -Fxc "trust --formula $formula" "$brew_calls" || true)
-  if [[ $trust_call_count -ne 2 ]]; then
-    echo "rendered installer did not restore trust for $formula around bundle cleanup" >&2
-    exit 1
-  fi
-done
-
 if ! grep -Fqx 'bundle install --file=/dev/stdin --force-cleanup' "$brew_calls"; then
   echo "rendered installer did not use strict brew bundle cleanup" >&2
   exit 1
@@ -122,12 +114,7 @@ fi
 python3 - "$brew_calls" <<'PY'
 import pathlib, sys
 calls = pathlib.Path(sys.argv[1]).read_text().splitlines()
-bundle = calls.index('bundle install --file=/dev/stdin --force-cleanup')
-trust = 'trust --cask peteonrails/voxtype/voxtype'
-assert calls.count(trust) == 2, calls
-assert calls.index(trust) < bundle < len(calls) - 1 - calls[::-1].index(trust), calls
 assert not any(call.startswith('trust ') and '--formula ' not in call and '--cask ' not in call for call in calls), calls
-assert not any(call == 'trust --cask ghostty' for call in calls), calls
 PY
 
 python3 - "$brewfile_input" <<'PY'
@@ -136,7 +123,15 @@ import sys
 
 with open(sys.argv[1], encoding="utf-8") as stream:
     declarations = [line.rstrip("\n") for line in stream]
-assert sorted(declarations) == sorted(['brew "modem-dev/tap/hunk"', 'brew "anomalyco/tap/opencode"', 'cask "ghostty"', 'cask "voxtype"', 'tap "peteonrails/voxtype"'])
+# Bundle replaces the trust store from these options BEFORE invoking cleanup.
+# Trust commands before/after bundle cannot preserve trust during that step.
+assert sorted(declarations) == sorted([
+    'brew "modem-dev/tap/hunk", trusted: true',
+    'brew "anomalyco/tap/opencode", trusted: true',
+    'cask "ghostty"',
+    'cask "peteonrails/voxtype/voxtype", trusted: true',
+    'tap "peteonrails/voxtype"',
+]), declarations
 PY
 
 assert_render_failure \
@@ -164,13 +159,10 @@ import sys
 with open(sys.argv[1], encoding="utf-8") as stream:
     declarations = {line.rstrip("\n") for line in stream}
 
-for declaration in [
-    'tap "modem-dev/tap"',
-    'brew "modem-dev/tap/hunk"',
-    'cask "voxtype"',
-    'tap "peteonrails/voxtype"',
-]:
-    assert declaration not in declarations, declaration
+assert declarations == {
+    'brew "anomalyco/tap/opencode", trusted: true',
+    'cask "ghostty"',
+}, declarations
 PY
 
 render_darwin new-denial '{"chezmoi":{"os":"darwin"},"machineRoles":["base"],"packagePolicy":{"deniedPrefixes":["git-delta","codex"]}}'

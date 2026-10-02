@@ -19,22 +19,8 @@ fi
 # match interactive shells -- otherwise the two read different files.
 export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 
-# Authorize individual third-party formulae and casks. Called twice: before
-# the bundle, which cannot load them otherwise, and again after, because
-# `brew bundle install --force-cleanup` prunes the allowlist and would leave
-# interactive brew commands untrusted.
-grant_tap_trust() {
-{{- range $formula := $selectedTrustedFormulae }}
-  brew trust --formula {{ $formula | quote }} >/dev/null
-{{- end }}
-{{- range $cask := $selectedTrustedCasks }}
-  brew trust --cask {{ $cask | quote }} >/dev/null
-{{- end }}
-  :
-}
-
-grant_tap_trust
-
+# Bundle replaces its trust store from Brewfile declarations before cleanup.
+# Declare scoped trust in the Brewfile so it survives throughout the bundle.
 # packages.yaml is authoritative: --force-cleanup uninstalls anything
 # installed that is not declared there.
 echo "==> Syncing Homebrew packages via brew bundle (strict)"
@@ -43,14 +29,16 @@ brew bundle install --file=/dev/stdin --force-cleanup <<EOF
 tap {{ $tap | quote }}
 {{- end }}
 {{- range $brew := $selectedBrews }}
-brew {{ $brew | quote }}
+brew {{ $brew | quote }}{{ if has $brew $selectedTrustedFormulae }}, trusted: true{{ end }}
 {{- end }}
 {{- range $cask := $selectedCasks }}
-cask {{ $cask | quote }}
+{{- $trustedName := "" -}}
+{{- range $name := $selectedTrustedCasks -}}
+  {{- if or (eq $cask $name) (eq $cask (last (splitList "/" $name))) -}}{{- $trustedName = $name -}}{{- end -}}
+{{- end }}
+cask {{ default $cask $trustedName | quote }}{{ if $trustedName }}, trusted: true{{ end }}
 {{- end }}
 EOF
-
-grant_tap_trust
 
 {{ template "install-custom-packages.sh.tmpl" $plan.custom }}
 
