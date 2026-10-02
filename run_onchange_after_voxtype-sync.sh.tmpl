@@ -1,3 +1,8 @@
+{{- $config := include "dot_config/voxtype/config.toml" | fromToml -}}
+{{- $engine := get $config "engine" | default "whisper" -}}
+{{- $section := get $config $engine -}}
+{{- $model := "" -}}
+{{- if kindIs "map" $section -}}{{- $model = get $section "model" | default "" -}}{{- end -}}
 #!/bin/bash
 
 # run_onchange_after_voxtype-sync.sh.tmpl
@@ -22,19 +27,7 @@ fi
 CONFIG_FILE="$HOME/.config/voxtype/config.toml"
 
 if [[ -n "$VOXTYPE_CMD" && -f "$CONFIG_FILE" ]]; then
-  model=$(python3 - "$CONFIG_FILE" <<'PY'
-import sys
-import tomllib
-
-with open(sys.argv[1], "rb") as f:
-    cfg = tomllib.load(f)
-
-engine = cfg.get("engine", "whisper")
-section = cfg.get(engine, {})
-if isinstance(section, dict) and section.get("model"):
-    print(section["model"])
-PY
-)
+  model={{ $model | replace "'" "'\\''" | printf "'%s'" }}
   if [[ -n "$model" ]]; then
     echo "🎙️ Ensuring Voxtype model '$model' is downloaded..."
     "$VOXTYPE_CMD" setup --download --model "$model" --no-post-install
