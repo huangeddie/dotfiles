@@ -2,11 +2,6 @@
 name: cyclomatic-complexity
 description:
   Measures the cyclomatic complexity distribution of all the functions within
-  the given directory.
+  the given directory, and report the top 5 most complext functions.
 disable-model-invocation: true
 ---
-
-Measure the cyclomatic complexity distribution of all the functions within the
-given directory.
-
-If the user did not provide a directory, ask for it.
