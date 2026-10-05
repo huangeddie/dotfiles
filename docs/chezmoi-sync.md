@@ -39,7 +39,8 @@ chezmoiLayers:
 
 Without `chezmoiLayers`, only the configured source is used. Each source checks
 and applies only the targets it manages (`chezmoi source-path`), layers first in
-declared order, then the configured source.
+declared order, then the configured source; later sources override earlier ones
+when both manage the same target path.
 
 Each layer is an upstream dependency: `git fetch` compares it with its tracking
 branch. Behind is stale; unpublished commits and missing upstreams are

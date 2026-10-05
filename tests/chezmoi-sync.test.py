@@ -280,6 +280,27 @@ class LayerTest(unittest.TestCase):
         self.assertEqual(calls, [['chezmoi', *args, *apply, '/h/.agents', '/h/.codex/AGENTS.md'],
                                  ['chezmoi', *apply, '/h/.agents']])
 
+    def test_later_source_overrides_pending_target_from_earlier_layer(self):
+        args = script['layer_args'](self.layer)
+        outputs = {
+            tuple(args): 'MM .agents/AGENTS.md\n M .agents/packages/coding/SKILL.md\n',
+            (): ' M .agents/hooks/hook.sh\n',
+        }
+        def run(command):
+            source = tuple(command[1:5]) if '--source' in command else ()
+            return outputs[source]
+        def managed(source, target):
+            if source == []:
+                return target in ('/h/.agents', '/h/.agents/AGENTS.md', '/h/.agents/hooks/hook.sh')
+            return True
+        stale, plugins = script['inspect'](
+            ['/h/.agents', '/h/.codex/AGENTS.md'], Path('/h/.codex'), Path('/h'),
+            sources=[args, []], codex_cli=False, run=run, managed=managed)
+        self.assertEqual(stale, [
+            'Unapplied: .agents/packages/coding/SKILL.md',
+            'Unapplied: .agents/hooks/hook.sh'])
+        self.assertEqual(plugins, [])
+
     def test_sync_fast_forwards_layers_before_applying(self):
         calls = []
         script['sync'](calls.append, ['/h/.agents'], [], restart=False,

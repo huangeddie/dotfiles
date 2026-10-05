@@ -95,6 +95,7 @@ with tempfile.TemporaryDirectory(prefix='chezmoi-sync-qa-') as temporary:
     git('-C', str(author), 'push', '-q', 'origin', 'HEAD:main')
     (work / 'dot_agents/hooks').mkdir(parents=True)
     (work / 'dot_agents/hooks/hook.sh').write_text('work hook\n')
+    (work / 'dot_agents/AGENTS.md.tmpl').write_text('{{ include "_personal/dot_agents/AGENTS.md" }}work override\n')
     (work / '.chezmoiignore').write_text('_personal/\n')
     git('clone', '-q', bare.as_uri(), str(work / '_personal'))
     (author / 'dot_agents/AGENTS.md').write_text('layer v2\n')
@@ -115,6 +116,7 @@ with tempfile.TemporaryDirectory(prefix='chezmoi-sync-qa-') as temporary:
         command = chezmoi_command(['chezmoi', *args, 'source-path', target])
         return subprocess.run(command, capture_output=True).returncode == 0
     layered_targets = [str(layered_home / '.agents'), str(layered_home / '.codex/AGENTS.md')]
+    layered_sources = [script['layer_args'](layer), []]
     assert script['managed_targets'](managed, [], layered_targets) == layered_targets[:1]
     status = script['inspect_layer'](layered_run, layer)
     assert script['layer_messages'](layer, status)[0] == ['Layer _personal behind origin/main by 1 commits'], status
@@ -122,16 +124,21 @@ with tempfile.TemporaryDirectory(prefix='chezmoi-sync-qa-') as temporary:
     dirty = script['inspect_layer'](layered_run, layer)
     try:
         script['sync'](layered_run, layered_targets, [], restart=False, layers=[(layer, dirty)],
-                       sources=[script['layer_args'](layer), []], managed=managed)
+                       sources=layered_sources, managed=managed)
         raise AssertionError('RED: dirty layer must abort sync')
     except ValueError as error:
         assert 'uncommitted' in str(error), error
     assert not (layered_home / '.agents').exists(), 'Dirty layer abort must precede apply'
     git('-C', str(work / '_personal'), 'checkout', '-q', '--', '.')
-    script['sync'](layered_run, layered_targets, [], restart=False,
+    def verify_layered():
+        stale, _ = script['inspect'](layered_targets, layered_home / '.codex', layered_home,
+                                     sources=layered_sources, codex_cli=False,
+                                     run=layered_run, managed=managed)
+        assert not stale, f'Layered verify failed: {stale}'
+    script['sync'](layered_run, layered_targets, [], restart=False, verify=verify_layered,
                    layers=[(layer, script['inspect_layer'](layered_run, layer))],
-                   sources=[script['layer_args'](layer), []], managed=managed)
-    assert (layered_home / '.agents/AGENTS.md').read_text() == 'layer v2\n'
+                   sources=layered_sources, managed=managed, codex_cli=False)
+    assert (layered_home / '.agents/AGENTS.md').read_text() == 'layer v2\nwork override\n'
     assert (layered_home / '.agents/hooks/hook.sh').read_text() == 'work hook\n'
     assert (layered_home / '.codex/AGENTS.md').is_symlink()
     assert script['layer_messages'](layer, script['inspect_layer'](layered_run, layer)) == ([], [])
