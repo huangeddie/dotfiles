@@ -4,6 +4,8 @@ source_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 test_root=$(mktemp -d)
 trap 'rm -rf "$test_root"' EXIT
 python3 - "$source_dir" "$test_root" <<'PY'
+import hashlib
+import json
 import os
 import pathlib
 import shutil
@@ -14,6 +16,8 @@ source, temp = map(pathlib.Path, sys.argv[1:])
 fixture = temp / 'source'
 fixture.mkdir()
 shutil.copy(source / 'run_onchange_after_voxtype-sync.sh.tmpl', fixture)
+(fixture / '.chezmoitemplates').mkdir()
+shutil.copy(source / '.chezmoitemplates/voxtype-sync.sh.tmpl', fixture / '.chezmoitemplates')
 config = fixture / 'dot_config/voxtype/config.toml'
 config.parent.mkdir(parents=True)
 units = fixture / 'dot_config/systemd/user'
@@ -75,4 +79,23 @@ check('model shell characters remain a literal argument',
       '''[whisper]\nmodel = "a'b $HOME $(exit 98) `exit 99`"\n''', "a'b $HOME $(exit 98) `exit 99`")
 check('Linux downloads model and restarts services without Python',
       '[whisper]\nmodel = "base.en"\n', 'base.en', platform='linux')
+
+
+def render_shared(trigger_contents):
+    wrapper = temp / 'shared-wrapper.tmpl'
+    wrapper.write_text(
+        '{{ template "voxtype-sync.sh.tmpl" (dict "config" "" "os" "darwin" '
+        '"triggers" (dict "input" ' + json.dumps(trigger_contents) + ')) }}')
+    rendered = subprocess.run([
+        'chezmoi', '--config', str(empty_config), '--source', str(fixture),
+        'execute-template', '-f', str(wrapper),
+    ], text=True, capture_output=True)
+    assert rendered.returncode == 0, rendered.stderr
+    return rendered.stdout
+
+
+baseline = render_shared('first')
+assert hashlib.sha256(b'first').hexdigest() in baseline, baseline
+assert render_shared('second') != baseline, 'trigger change must change the rendered script'
+print('PASS shared template hashes every trigger so run_onchange_ re-runs')
 PY
