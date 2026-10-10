@@ -4,6 +4,7 @@
   "defaultProvider": "openai-codex",
   "defaultModel": "gpt-6-astra",
   "defaultThinkingLevel": "medium",
+  "defaultTools": ["+codemode"],
   "packages": [
     {
       "source": "~/.agents/packages/superpowers"
