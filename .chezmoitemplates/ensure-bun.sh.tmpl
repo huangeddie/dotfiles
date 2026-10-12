@@ -1,0 +1,29 @@
+{{- /*
+Renders POSIX shell that puts Bun on PATH and upgrades it when it is older than
+the project's package.json engines.bun. Context: dict with "purpose" (used in
+messages) and "packageJson" (source-relative path). Only ">=X.Y.Z" ranges are
+supported so the comparison stays a plain version sort.
+*/ -}}
+{{- $range := (include .packageJson | fromJson).engines.bun -}}
+{{- $minimum := trimPrefix ">=" $range -}}
+{{- if or (not (hasPrefix ">=" $range)) (not (regexMatch "^[0-9]+\\.[0-9]+\\.[0-9]+$" $minimum)) -}}
+{{-   fail (printf "%s: engines.bun must be \">=X.Y.Z\", got %q" .packageJson $range) -}}
+{{- end -}}
+bun_install=${BUN_INSTALL:-$HOME/.bun}
+export BUN_INSTALL="$bun_install"
+export PATH="$BUN_INSTALL/bin:$PATH"
+if ! command -v bun >/dev/null 2>&1; then
+  echo 'Bun is required to install {{ .purpose }}' >&2
+  exit 1
+fi
+bun_satisfies_minimum() {
+  [ "$(printf '%s\n%s\n' {{ $minimum | squote }} "$(bun --version)" | sort -V | head -n 1)" = {{ $minimum | squote }} ]
+}
+if ! bun_satisfies_minimum; then
+  echo "Upgrading Bun $(bun --version) to satisfy {{ $range }} for {{ .purpose }}"
+  bun upgrade
+  if ! bun_satisfies_minimum; then
+    echo "Bun $(bun --version) does not satisfy {{ $range }} required by {{ .purpose }}" >&2
+    exit 1
+  fi
+fi

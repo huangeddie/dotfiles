@@ -17,12 +17,6 @@ set -eu
 {{ if gt (len $denied) 0 -}}
 echo 'Skipping Todoist form dependencies: package policy denies {{ $denied | uniq | join ", " }}.'
 {{- else -}}
-bun_install=${BUN_INSTALL:-$HOME/.bun}
-export BUN_INSTALL="$bun_install"
-export PATH="$BUN_INSTALL/bin:$PATH"
-if ! command -v bun >/dev/null 2>&1; then
-  echo 'Bun is required to install Todoist form dependencies' >&2
-  exit 1
-fi
+{{ template "ensure-bun.sh.tmpl" (dict "purpose" "Todoist form dependencies" "packageJson" "dot_config/todoist/package.json") -}}
 bun install --cwd "$HOME/.config/todoist" --frozen-lockfile
 {{- end }}

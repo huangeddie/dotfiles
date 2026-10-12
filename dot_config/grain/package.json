@@ -2,7 +2,7 @@
   "name": "grain",
   "private": true,
   "type": "module",
-  "engines": { "bun": ">=1.3.0" },
+  "engines": { "bun": ">=1.4.0" },
   "scripts": { "typecheck": "bun ./node_modules/typescript/bin/tsc --noEmit" },
   "dependencies": { "@opentui/core": "0.5.12" },
   "devDependencies": { "@types/bun": "1.4.2", "typescript": "5.9.3" }
