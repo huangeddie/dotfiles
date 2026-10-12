@@ -44,7 +44,7 @@ theme = "subtle"
 volume = 0.7
 
 [output]
-mode = "type"
+mode = "paste"
 driver_order = ["dotool", "clipboard"]
 fallback_to_clipboard = true
 type_delay_ms = 0
