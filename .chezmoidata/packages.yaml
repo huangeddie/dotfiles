@@ -291,6 +291,20 @@ packages:
     install:
       darwin:
         brew: "rust-analyzer"
+  scc:
+    role: base
+    install:
+      darwin:
+        brew: "scc"
+      linux:
+        custom:
+          executable: "scc"
+          setup: |-
+            export GOPATH="${GOPATH:-$HOME/.local/share/go}"
+            export PATH="$GOPATH/bin:$PATH"
+          install: |-
+            go install github.com/boyter/scc/v4@latest
+        order: 70
   steam:
     role: gaming
     install:

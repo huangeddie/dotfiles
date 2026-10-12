@@ -187,6 +187,17 @@ for name, os, roles in [('darwin-base', 'darwin', ['base']),
     assert result.returncode == 0, (name, result.stderr)
     expected = copy.deepcopy(fixture[name])
     expected['homebrew']['trustedCasks'] = ['peteonrails/voxtype/voxtype'] if os == 'darwin' else []
+    if os == 'darwin':
+        expected['homebrew']['brews'].append('scc')
+        expected['homebrew']['brews'].sort()
+    else:
+        index = next(i for i, recipe in enumerate(expected['custom']) if recipe['name'] == 'lazygit') + 1
+        expected['custom'].insert(index, {
+            'name': 'scc',
+            'executable': 'scc',
+            'setup': 'export GOPATH="${GOPATH:-$HOME/.local/share/go}"\nexport PATH="$GOPATH/bin:$PATH"',
+            'install': 'go install github.com/boyter/scc/v4@latest',
+        })
     assert normalized(json.loads(result.stdout)) == expected, name
 print('package catalog: synthetic contracts and production baseline parity passed')
 PY
