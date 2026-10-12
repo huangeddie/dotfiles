@@ -22,7 +22,7 @@ config = fixture / 'dot_config/voxtype/config.toml'
 config.parent.mkdir(parents=True)
 units = fixture / 'dot_config/systemd/user'
 units.mkdir(parents=True)
-for name in ('dotoold', 'voxtype'):
+for name in ('dotoold', 'ydotoold', 'voxtype'):
     (units / (name + '.service')).write_text('[Service]\n')
 empty_config = temp / 'empty.toml'
 empty_config.write_text('')
@@ -63,7 +63,7 @@ def check(name, toml, model, platform='darwin'):
     expected = ['setup', '--download', '--model', model, '--no-post-install'] if model else []
     assert calls.read_text().splitlines() == expected, (name, calls.read_text())
     expected_services = [
-        '--user daemon-reload', '--user enable --now dotoold.service voxtype.service',
+        '--user daemon-reload', '--user enable --now dotoold.service ydotoold.service voxtype.service',
         '--user restart voxtype.service',
     ] if platform == 'linux' else []
     assert services.read_text().splitlines() == expected_services, (name, services.read_text())

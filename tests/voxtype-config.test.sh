@@ -18,6 +18,7 @@ import tomllib
 source, temp = map(pathlib.Path, sys.argv[1:])
 config_file = source / "dot_config/voxtype/config.toml"
 dotoold_unit = source / "dot_config/systemd/user/dotoold.service"
+ydotoold_unit = source / "dot_config/systemd/user/ydotoold.service"
 voxtype_unit = source / "dot_config/systemd/user/voxtype.service"
 sync_tmpl = source / "run_onchange_after_voxtype-sync.sh.tmpl"
 packages_file = source / ".chezmoidata/packages.yaml"
@@ -61,7 +62,7 @@ def test_voxtype_config_selects_whisper_small_en():
     assert feedback.get("volume") == 0.7, feedback
 
     output = cfg.get("output", {})
-    assert output.get("mode") == "type", output
+    assert output.get("mode") == "paste", output
     assert output.get("driver_order") == ["dotool", "clipboard"], output
 
     osd = cfg.get("osd", {})
@@ -92,7 +93,7 @@ def test_voxtype_darwin_and_linux_packages_declared():
     assert "voxtype-deps" in pkgs, "voxtype-deps missing from packages"
     deps = pkgs["voxtype-deps"]
     assert deps.get("role") == "base"
-    assert sorted(deps["install"]["linux"]["apt"]) == ["libxkbcommon-dev", "pipewire-alsa", "wl-clipboard"]
+    assert sorted(deps["install"]["linux"]["apt"]) == ["libxkbcommon-dev", "pipewire-alsa", "wl-clipboard", "ydotool"]
 
 
 def test_voxtype_systemd_ignored_on_darwin():
@@ -136,6 +137,25 @@ def test_voxtype_sync_script_tracks_config_and_service_hashes():
     assert "setup --download --model" in rendered, rendered
     assert "systemctl --user daemon-reload" in rendered, rendered
     assert "systemctl --user restart voxtype.service" in rendered, rendered
+
+
+def test_voxtype_paste_mode_depends_on_user_ydotoold_socket():
+    assert ydotoold_unit.is_file(), f"Missing {ydotoold_unit}"
+
+    ydotoold_parser = configparser.ConfigParser(interpolation=None)
+    ydotoold_parser.read_string(ydotoold_unit.read_text())
+    assert ydotoold_parser.get("Service", "ExecStart") == "/usr/bin/ydotoold --socket-path=%t/.ydotool_socket"
+
+    voxtype_parser = configparser.ConfigParser(interpolation=None)
+    voxtype_parser.read_string(voxtype_unit.read_text())
+    assert "ydotoold.service" in voxtype_parser.get("Unit", "Requires")
+    assert "ydotoold.service" in voxtype_parser.get("Unit", "After")
+
+
+def test_voxtype_sync_script_enables_ydotoold_and_tracks_its_hash():
+    rendered = chezmoi("execute-template", "-f", str(sync_tmpl))
+    assert "ydotoold.service:" in rendered, rendered
+    assert "enable --now dotoold.service ydotoold.service voxtype.service" in rendered, rendered
 
 
 tests = [value for name, value in list(globals().items()) if name.startswith("test_")]

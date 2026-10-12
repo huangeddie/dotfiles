@@ -1,0 +1,12 @@
+[Unit]
+Description=ydotool daemon for Voxtype paste-mode keystrokes
+After=default.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/ydotoold --socket-path=%t/.ydotool_socket
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target

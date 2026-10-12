@@ -1,7 +1,7 @@
 [Unit]
 Description=Voxtype On-Device Voice Transcription Daemon
-Requires=dotoold.service
-After=default.target dotoold.service
+Requires=dotoold.service ydotoold.service
+After=default.target dotoold.service ydotoold.service
 
 [Service]
 Type=simple

@@ -2,6 +2,7 @@
 {{- $triggers := dict "config.toml" $config -}}
 {{- if eq .chezmoi.os "linux" -}}
 {{-   $_ := set $triggers "dotoold.service" (include "dot_config/systemd/user/dotoold.service") -}}
+{{-   $_ := set $triggers "ydotoold.service" (include "dot_config/systemd/user/ydotoold.service") -}}
 {{-   $_ := set $triggers "voxtype.service" (include "dot_config/systemd/user/voxtype.service") -}}
 {{- end -}}
 {{ template "voxtype-sync.sh.tmpl" (dict "config" $config "os" .chezmoi.os "triggers" $triggers) }}

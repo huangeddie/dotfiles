@@ -389,7 +389,7 @@ packages:
     role: base
     install:
       linux:
-        apt: ["libxkbcommon-dev", "pipewire-alsa", "wl-clipboard"]
+        apt: ["libxkbcommon-dev", "pipewire-alsa", "wl-clipboard", "ydotool"]
   zig:
     role: base
     install:

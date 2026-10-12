@@ -43,9 +43,9 @@ fi
 
 {{ if eq .os "linux" -}}
 if command -v systemctl >/dev/null 2>&1 && [[ -n "$VOXTYPE_CMD" && -x "$HOME/.local/bin/dotoold" ]]; then
-  echo "🔄 Reloading and restarting dotoold and voxtype user services..."
+  echo "🔄 Reloading and restarting dotoold, ydotoold and voxtype user services..."
   systemctl --user daemon-reload
-  systemctl --user enable --now dotoold.service voxtype.service
+  systemctl --user enable --now dotoold.service ydotoold.service voxtype.service
   systemctl --user restart voxtype.service
 fi
 {{ end -}}

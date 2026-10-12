@@ -99,7 +99,8 @@
         "openssh-server",
         "pipewire-alsa",
         "ripgrep",
-        "wl-clipboard"
+        "wl-clipboard",
+        "ydotool"
       ],
       "remove": [
         "lazygit",
@@ -192,7 +193,8 @@
         "ripgrep",
         "steam-devices",
         "steam-installer",
-        "wl-clipboard"
+        "wl-clipboard",
+        "ydotool"
       ],
       "remove": [
         "lazygit"
