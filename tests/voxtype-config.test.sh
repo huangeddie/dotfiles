@@ -63,6 +63,7 @@ def test_voxtype_config_selects_whisper_small_en():
 
     output = cfg.get("output", {})
     assert output.get("mode") == "paste", output
+    assert output.get("paste_keys") == "shift+insert", output
     assert output.get("driver_order") == ["dotool", "clipboard"], output
 
     osd = cfg.get("osd", {})

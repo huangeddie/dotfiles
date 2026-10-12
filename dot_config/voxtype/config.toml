@@ -45,6 +45,8 @@ volume = 0.7
 
 [output]
 mode = "paste"
+# Shift+Insert pastes the clipboard in GUI apps and, via its keybind, in Ghostty.
+paste_keys = "shift+insert"
 driver_order = ["dotool", "clipboard"]
 fallback_to_clipboard = true
 type_delay_ms = 0

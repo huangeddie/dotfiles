@@ -52,6 +52,8 @@ theme = dark:Apple System Colors,light:Apple System Colors Light
 
 keybind = alt+backspace=text:\x1b\x7f
 keybind = shift+enter=text:\x1b\r
+# Voxtype pastes with Shift+Insert; match GUI apps by pasting the clipboard.
+keybind = shift+insert=paste_from_clipboard
 
 keybind = alt+super+h=goto_split:left
 keybind = alt+super+j=goto_split:down
