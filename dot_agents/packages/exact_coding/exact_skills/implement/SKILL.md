@@ -1,6 +1,6 @@
 ---
 name: implement
-description: Do inline execution
+description: Do implement at your discretion
 disable-model-invocation: true
 ---
 
