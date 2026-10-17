@@ -13,3 +13,4 @@ Host mac
     User eddie
     RequestTTY yes
     SetEnv TERM=xterm-256color
+    LocalForward 3000 localhost:3000
