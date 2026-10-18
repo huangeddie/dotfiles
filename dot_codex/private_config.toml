@@ -28,3 +28,6 @@ enabled = true
 
 [plugins."superpowers@local-agents"]
 enabled = true
+
+[features]
+hooks = true
