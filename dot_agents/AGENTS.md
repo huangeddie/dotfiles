@@ -5,8 +5,8 @@ When presenting work or asking for decisions, always lead with these core
 components. Implementation details and concrete code should only be surfaced
 when necessary for a specific decision or when explicitly requested.
 
-Never consider the development cost; always prefer quality, simplicity,
-robustness, scalability, and long-term maintainability.
+Avoid reinventing wheels; strongly prefer leveraging first-party libraries and
+suggest third-party libraries when applicable.
 
 ### Naming
 
@@ -134,10 +134,12 @@ possible.
 
 ## UI
 
-Prefer icons over text, but never emojis. Minimize text descriptions and hints.
-It's preferable to start with a lacking of text information than to spam it on
-the UI. Prefer baking new UI into the background instead of creating nested
-views / divs / bordered buttons unless otherwise specified.
+- Prefer icons over text; and never emojis
+- Minimize text descriptions and hints; It's preferable to start with a lacking
+  of text information than to spam it on the UI.
+- Prefer baking new UI into the background instead of creating nested views /
+  divs / bordered buttons unless otherwise specified.
+- Leverage native components as much as possible.
 
 ## Flagging
 
