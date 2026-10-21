@@ -390,6 +390,11 @@ packages:
     install:
       linux:
         apt: ["libxkbcommon-dev", "pipewire-alsa", "wl-clipboard", "ydotool"]
+  xcodegen:
+    role: base
+    install:
+      darwin:
+        brew: "xcodegen"
   zig:
     role: base
     install:
