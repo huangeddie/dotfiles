@@ -19,12 +19,12 @@ fi
 # match interactive shells -- otherwise the two read different files.
 export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 
-# Bundle replaces its trust store from Brewfile declarations before cleanup.
-# Declare scoped trust in the Brewfile so it survives throughout the bundle.
-# packages.yaml is authoritative: --force-cleanup uninstalls anything
-# installed that is not declared there.
-echo "==> Syncing Homebrew packages via brew bundle (strict)"
-brew bundle install --file=/dev/stdin --force-cleanup <<EOF
+# Share declarations (including scoped trust) between install and cleanup.
+# Use a fresh Homebrew process for cleanup to avoid stale pre-upgrade dependency
+# caches. packages.yaml is authoritative; cleanup retains declared dependencies.
+brewfile=$(mktemp)
+trap 'rm -f "$brewfile"' EXIT
+cat >"$brewfile" <<'EOF'
 {{- range $tap := $selectedTaps }}
 tap {{ $tap | quote }}
 {{- end }}
@@ -39,6 +39,12 @@ brew {{ $brew | quote }}{{ if has $brew $selectedTrustedFormulae }}, trusted: tr
 cask {{ default $cask $trustedName | quote }}{{ if $trustedName }}, trusted: true{{ end }}
 {{- end }}
 EOF
+
+echo "==> Syncing Homebrew packages via brew bundle (strict)"
+brew bundle install --file="$brewfile" --verbose
+brew bundle cleanup --file="$brewfile" --force
+rm -f "$brewfile"
+trap - EXIT
 
 {{ template "install-custom-packages.sh.tmpl" $plan.custom }}
 

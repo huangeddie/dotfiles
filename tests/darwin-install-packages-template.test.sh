@@ -90,9 +90,18 @@ done
 cat >"$fake_bin/brew" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
-printf '%s\n' "$*" >>"$BREW_CALLS"
+printf '%q ' "$@" >>"$BREW_CALLS"
+printf '\n' >>"$BREW_CALLS"
 if [[ ${1-} == bundle ]]; then
-  cat >"$BREWFILE_INPUT"
+  for arg in "$@"; do
+    if [[ $arg == --file=* ]]; then
+      cat "${arg#--file=}" >"$BREWFILE_INPUT.$2"
+      cp "$BREWFILE_INPUT.$2" "$BREWFILE_INPUT"
+    fi
+  done
+  if [[ ${BREW_FAIL_STAGE-} == "$2" ]]; then
+    exit 42
+  fi
 fi
 EOF
 chmod +x "$fake_bin/brew"
@@ -106,10 +115,44 @@ BREW_CALLS="$brew_calls" \
 BREWFILE_INPUT="$brewfile_input" \
   bash "$test_dir/execution.sh"
 
-if ! grep -Fqx 'bundle install --file=/dev/stdin --force-cleanup' "$brew_calls"; then
-  echo "rendered installer did not use strict brew bundle cleanup" >&2
-  exit 1
-fi
+# Separate processes must consume the same declarations and release the temp file.
+python3 - "$brew_calls" "$brewfile_input" <<'PY'
+import pathlib, shlex, sys
+calls = [shlex.split(line) for line in pathlib.Path(sys.argv[1]).read_text().splitlines()]
+assert [call[:2] for call in calls] == [['bundle', 'install'], ['bundle', 'cleanup']], calls
+assert '--verbose' in calls[0] and '--force-cleanup' not in calls[0], calls
+assert '--force' in calls[1], calls
+files = [next(arg.removeprefix('--file=') for arg in call if arg.startswith('--file=')) for call in calls]
+assert files[0] == files[1] and files[0] != '/dev/stdin', files
+assert not pathlib.Path(files[0]).exists(), files
+assert pathlib.Path(sys.argv[2] + '.install').read_bytes() == pathlib.Path(sys.argv[2] + '.cleanup').read_bytes()
+PY
+
+# Installation failure skips cleanup; either failure propagates and removes the file.
+for stage in install cleanup; do
+  failure_calls="$test_dir/$stage-failure-calls"
+  status=0
+  PATH="$fake_bin:/usr/bin:/bin" \
+  HOME="$test_dir/home" \
+  XDG_CONFIG_HOME="$test_dir/config" \
+  BREW_CALLS="$failure_calls" \
+  BREWFILE_INPUT="$test_dir/$stage-failure-Brewfile" \
+  BREW_FAIL_STAGE="$stage" \
+    bash "$test_dir/execution.sh" || status=$?
+  if [[ $status != 42 ]]; then
+    echo "$stage failure did not propagate: $status" >&2
+    exit 1
+  fi
+  python3 - "$failure_calls" "$stage" <<'PY'
+import pathlib, shlex, sys
+calls = [shlex.split(line) for line in pathlib.Path(sys.argv[1]).read_text().splitlines()]
+expected = ['install'] if sys.argv[2] == 'install' else ['install', 'cleanup']
+assert [call[1] for call in calls] == expected, calls
+for call in calls:
+    path = next(arg.removeprefix('--file=') for arg in call if arg.startswith('--file='))
+    assert path != '/dev/stdin' and not pathlib.Path(path).exists(), path
+PY
+done
 
 python3 - "$brew_calls" <<'PY'
 import pathlib, sys
