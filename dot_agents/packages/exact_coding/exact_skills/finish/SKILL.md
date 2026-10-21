@@ -1,11 +1,8 @@
 ---
 name: finish
-description:
-  Completes the current working commit resolving any small issues along the way
-  if applicable.
+description: Do implement at your discretion
+disable-model-invocation: true
 ---
 
-Analyze the current working commit. See the diffs and FULL commit description
-(not just the first sentence) if available. Finish the working commit.
-
-Additional comments from the user: $@
+Once you finish with planning and self-reviewing, implement at your discretion
+with however you see fit e.g. inline-execution, or subagent-driven-development.
