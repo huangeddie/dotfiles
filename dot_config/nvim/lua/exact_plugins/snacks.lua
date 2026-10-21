@@ -1,6 +1,14 @@
 return {
 	"folke/snacks.nvim",
+	keys = {
+		{ "<leader><space>", LazyVim.pick("files", { root = false }), desc = "Find Files (cwd)" },
+	},
 	opts = function(_, opts)
+		opts.picker = vim.tbl_deep_extend("force", opts.picker or {}, {
+			sources = {
+				files = { hidden = true },
+			},
+		})
 		opts.image = opts.image or {}
 
 		-- Workaround for multiplexers (e.g. Herdr) where TIOCGWINSZ reports 0x0 pixel size
