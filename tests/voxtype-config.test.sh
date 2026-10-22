@@ -9,6 +9,7 @@ trap 'rm -rf "$test_root"' EXIT
 python3 - "$source_dir" "$test_root" <<'PY'
 import configparser
 import hashlib
+import json
 import pathlib
 import shutil
 import subprocess
@@ -16,7 +17,7 @@ import sys
 import tomllib
 
 source, temp = map(pathlib.Path, sys.argv[1:])
-config_file = source / "dot_config/voxtype/config.toml"
+config_file = source / "dot_config/voxtype/config.toml.tmpl"
 dotoold_unit = source / "dot_config/systemd/user/dotoold.service"
 ydotoold_unit = source / "dot_config/systemd/user/ydotoold.service"
 voxtype_unit = source / "dot_config/systemd/user/voxtype.service"
@@ -36,9 +37,26 @@ def chezmoi(*args, source_dir=source):
     return result.stdout
 
 
+def render_for_os(path, platform):
+    return chezmoi("--override-data", json.dumps({"chezmoi": {"os": platform}}),
+                   "execute-template", "-f", str(path))
+
+
+def test_voxtype_darwin_uses_native_output_and_preserves_shared_settings():
+    linux = tomllib.loads(render_for_os(config_file, "linux"))
+    darwin = tomllib.loads(render_for_os(config_file, "darwin"))
+    assert darwin["output"]["mode"] == "type", darwin["output"]
+    assert "paste_keys" not in darwin["output"], darwin["output"]
+    assert "driver_order" not in darwin["output"], darwin["output"]
+    linux["output"]["mode"] = "type"
+    del linux["output"]["paste_keys"]
+    del linux["output"]["driver_order"]
+    assert darwin == linux, "Only platform-specific output settings should differ"
+
+
 def test_voxtype_config_selects_whisper_small_en():
     assert config_file.is_file(), f"Missing {config_file}"
-    cfg = tomllib.loads(config_file.read_text())
+    cfg = tomllib.loads(render_for_os(config_file, "linux"))
 
     assert cfg.get("engine") == "whisper", cfg.get("engine")
     assert cfg.get("whisper", {}).get("model") == "small.en"
@@ -72,9 +90,8 @@ def test_voxtype_config_selects_whisper_small_en():
 
 def test_voxtype_darwin_and_linux_packages_declared():
     assert packages_file.is_file(), f"Missing {packages_file}"
-    import yaml
-    with open(packages_file, "r") as f:
-        data = yaml.safe_load(f)
+    data = json.loads(chezmoi("execute-template",
+        '{{ include ".chezmoidata/packages.yaml" | fromYaml | toJson }}'))
 
     pkgs = data.get("packages", {})
     assert "voxtype" in pkgs, "voxtype missing from packages"
@@ -130,7 +147,7 @@ def test_voxtype_systemd_units_wire_dotoold_and_local_bin_interfaces():
 
 def test_voxtype_sync_script_tracks_config_and_service_hashes():
     assert sync_tmpl.is_file(), f"Missing {sync_tmpl}"
-    rendered = chezmoi("execute-template", "-f", str(sync_tmpl))
+    rendered = render_for_os(sync_tmpl, "linux")
     rendered_script = temp / "voxtype-sync.sh"
     rendered_script.write_text(rendered)
     subprocess.run(["bash", "-n", str(rendered_script)], check=True)
@@ -154,7 +171,7 @@ def test_voxtype_paste_mode_depends_on_user_ydotoold_socket():
 
 
 def test_voxtype_sync_script_enables_ydotoold_and_tracks_its_hash():
-    rendered = chezmoi("execute-template", "-f", str(sync_tmpl))
+    rendered = render_for_os(sync_tmpl, "linux")
     assert "ydotoold.service:" in rendered, rendered
     assert "enable --now dotoold.service ydotoold.service voxtype.service" in rendered, rendered
 

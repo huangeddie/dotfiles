@@ -18,7 +18,7 @@ fixture.mkdir()
 shutil.copy(source / 'run_onchange_after_voxtype-sync.sh.tmpl', fixture)
 (fixture / '.chezmoitemplates').mkdir()
 shutil.copy(source / '.chezmoitemplates/voxtype-sync.sh.tmpl', fixture / '.chezmoitemplates')
-config = fixture / 'dot_config/voxtype/config.toml'
+config = fixture / 'dot_config/voxtype/config.toml.tmpl'
 config.parent.mkdir(parents=True)
 units = fixture / 'dot_config/systemd/user'
 units.mkdir(parents=True)

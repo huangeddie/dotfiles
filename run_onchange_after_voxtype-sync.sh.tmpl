@@ -1,4 +1,4 @@
-{{- $config := include "dot_config/voxtype/config.toml" -}}
+{{- $config := includeTemplate "dot_config/voxtype/config.toml.tmpl" . -}}
 {{- $triggers := dict "config.toml" $config -}}
 {{- if eq .chezmoi.os "linux" -}}
 {{-   $_ := set $triggers "dotoold.service" (include "dot_config/systemd/user/dotoold.service") -}}

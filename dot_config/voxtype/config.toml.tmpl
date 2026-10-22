@@ -44,10 +44,14 @@ theme = "subtle"
 volume = 0.7
 
 [output]
+{{ if eq .chezmoi.os "darwin" -}}
+mode = "type"
+{{ else -}}
 mode = "paste"
 # Shift+Insert pastes the clipboard in GUI apps and, via its keybind, in Ghostty.
 paste_keys = "shift+insert"
 driver_order = ["dotool", "clipboard"]
+{{ end -}}
 fallback_to_clipboard = true
 type_delay_ms = 0
 pre_type_delay_ms = 0
