@@ -157,19 +157,11 @@ function M.format_all_buffers(bufs, project_root, opts)
   return table.concat(paths, " ")
 end
 
---- Copy string to system clipboard with OSC 52 fallback.
+--- Copy through the clipboard provider selected in config/options.lua.
 ---@param text string
 function M.copy_to_os_clipboard(text)
   vim.fn.setreg("+", text)
   vim.fn.setreg("*", text)
-
-  if vim.env.SSH_TTY or vim.env.TMUX or vim.env.SSH_CONNECTION or vim.env.HERDR_ENV then
-    local ok, osc52 = pcall(require, "vim.ui.clipboard.osc52")
-    if ok and osc52 then
-      osc52.copy("*")({ text })
-      osc52.copy("+")({ text })
-    end
-  end
 end
 
 --- Orchestrates buffer reading, line range extraction, formatting, and clipboard copy.
