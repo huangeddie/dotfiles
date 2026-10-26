@@ -17,10 +17,10 @@ alias mm="mosh mac -- sh -c 'herdr; exec \"\$SHELL\" -l'"
 
 # Version control
 alias g='git'
+alias gd='git pull'
 alias gc='git add -u && git commit -m "chore: update $(git diff --cached --name-only | head -n1)"'
-alias gcp='git add -u && git commit -m "chore: update $(git diff --cached --name-only | head -n1)" && git push'
-alias gp='git push'
-alias gl='git pull'
+alias gu='git push'
+alias gcu='git add -u && git commit -m "chore: update $(git diff --cached --name-only | head -n1)" && git push'
 alias lg='lazygit'
 alias j='jj'
 alias ji='jjui'
