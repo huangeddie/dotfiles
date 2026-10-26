@@ -24,5 +24,6 @@
     "defaultModel": "gpt-6.1-sol",
     "defaultProvider": "openai-codex"
   },
-  "tuiMode": "regular"
+  "tuiMode": "regular",
+  "hideThinkingBlock": true
 }
