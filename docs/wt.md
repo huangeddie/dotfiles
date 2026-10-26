@@ -4,7 +4,7 @@ A Python 3.9+ / Git CLI for temporary worktrees, installed by chezmoi as
 `~/.local/bin/wt`. No third-party Python dependencies.
 
 ```sh
-cd "$(wt new feature)"            # from the current local branch's committed tip
+wt new feature                  # create from current branch and enter the sandbox
 wt new another --base release    # explicitly select a local base branch
 wt merge                         # merge current sandbox into its recorded base, then clean up
 wt remove                        # clean up only if merged into the recorded base
@@ -12,20 +12,28 @@ wt remove --force                # discard unmerged commits and uncommitted file
 ```
 
 `merge` and `remove` also accept a branch name, so they can be run from any
-checkout of the same repository. Prefer running cleanup from a surviving
-checkout; a CLI cannot change its parent shell's working directory:
+checkout of the same repository. The Bash/Zsh `wt` function automatically changes
+directory after successful creation. Reload it in an existing shell with
+`source ~/.bash_aliases`; new interactive shells load it automatically.
+
+Prefer running cleanup from a surviving checkout:
 
 ```sh
 wt new feature
-# Work and commit in the printed directory, then return to the base checkout.
+# Work and commit in the sandbox.
+cd -
 wt merge feature
 ```
 
 ## Contract
 
 - `new` creates a new local branch and a `wt-*/repo` directory under the system
-  temporary directory (`TMPDIR` is honored). Only the absolute path is printed
-  to stdout, for command substitution. Existing branches are rejected.
+  temporary directory (`TMPDIR` is honored). The shell wrapper enters that
+  directory only if creation succeeds. Help and other commands are forwarded
+  unchanged. Existing branches are rejected.
+- For scripting without changing directories, `command wt new feature` bypasses
+  the shell wrapper and prints only the absolute path to stdout. The executable
+  itself cannot change its parent shell's directory.
 - The current branch is the default base even in another sandbox. Detached HEAD
   requires `--base`. No special treatment of `main` or `master`; no fetch, pull,
   or push. Uncommitted changes in the starting checkout are not copied.
@@ -71,6 +79,8 @@ backed up. Worktrees share a Git repository; this is filesystem convenience,
 ## Verification
 
 ```sh
+bash tests/wt-shell.test.sh      # fake-backed shell navigation tests
+zsh tests/wt-shell.test.sh
 python3 tests/wt.test.py         # deterministic fake-backed unit tests
 python3 docs/qa/wt.py            # discretionary real-Git QA; never CI/pre-commit
 ```

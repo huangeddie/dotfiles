@@ -16,6 +16,24 @@ alias sm="ssh mac 'herdr; exec \"\$SHELL\" -l'"
 alias mm="mosh mac -- sh -c 'herdr; exec \"\$SHELL\" -l'"
 
 # Version control
+wt() {
+  if [ "${1:-}" != new ]; then
+    command wt "$@"
+    return $?
+  fi
+  local argument destination
+  for argument in "$@"; do
+    case "$argument" in
+      -h*|--h|--he|--hel|--help)
+        command wt "$@"
+        return $?
+        ;;
+    esac
+  done
+  destination=$(command wt "$@") || return $?
+  builtin cd -- "$destination"
+}
+
 alias g='git'
 alias gd='git pull'
 alias gc='git add -u && git commit -m "chore: update $(git diff --cached --name-only | head -n1)"'

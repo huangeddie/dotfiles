@@ -2,11 +2,14 @@
 """Discretionary real-Git QA. Run manually; never include in CI/unit test discovery."""
 import os
 from pathlib import Path
+import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
 
 CLI = Path(__file__).resolve().parents[2] / "dot_local/bin/executable_wt"
+ALIASES = Path(__file__).resolve().parents[2] / "dot_bash_aliases"
 ENV = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
 ENV.update(GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull,
            GIT_TERMINAL_PROMPT="0", GIT_EDITOR=":", GIT_MERGE_AUTOEDIT="no",
@@ -137,6 +140,44 @@ def verify_existing_branch_and_ignored_cleanup(root):
     assert not path.parent.exists()
 
 
+def verify_shell_navigation(root):
+    bin_dir = root / "bin"
+    bin_dir.mkdir()
+    launcher = bin_dir / "wt"
+    launcher.write_text("#!/bin/sh\nexec " + shlex.join([sys.executable, str(CLI)]) + ' "$@"\n')
+    launcher.chmod(0o755)
+    previous_path = ENV["PATH"]
+    ENV["PATH"] = str(bin_dir) + os.pathsep + previous_path
+    try:
+        for shell in ("bash", "zsh"):
+            executable = shutil.which(shell)
+            if not executable:
+                print(f"SKIP: {shell} is not installed")
+                continue
+            repo = setup(root, "shell-" + shell)
+            run(repo, executable, "-c", '''
+set -eu
+. "$1"
+original=$PWD
+wt new feature
+[ "$PWD" != "$original" ]
+[ "$(git symbolic-ref --short HEAD)" = feature ]
+sandbox=$PWD
+if wt new feature; then exit 1; fi
+[ "$PWD" = "$sandbox" ]
+for flag in --help -h --h --he --hel -hh; do
+  wt new "$flag" >/dev/null
+  [ "$PWD" = "$sandbox" ]
+done
+builtin cd "$original"
+wt merge feature
+[ ! -d "$sandbox" ]
+[ ! -d "$(dirname "$sandbox")" ]
+''', "wt-qa", str(ALIASES))
+    finally:
+        ENV["PATH"] = previous_path
+
+
 def main():
     with tempfile.TemporaryDirectory(prefix="wt-qa-") as directory:
         root = Path(directory).resolve()
@@ -145,7 +186,8 @@ def main():
         ENV["TMPDIR"] = str(sandbox_root)
         for verify in (verify_merge_commit_and_cleanup, verify_bases_detached_and_nested,
                        verify_force_and_dirty_protection, verify_conflict_recovery,
-                       verify_unmanaged_and_dirty_base, verify_existing_branch_and_ignored_cleanup):
+                       verify_unmanaged_and_dirty_base, verify_existing_branch_and_ignored_cleanup,
+                       verify_shell_navigation):
             verify(root)
             print(f"PASS: {verify.__name__}")
         assert list(sandbox_root.iterdir()) == [], "Leftover sandbox directories"
