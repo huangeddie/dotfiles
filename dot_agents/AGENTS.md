@@ -46,11 +46,11 @@ free from construction details.
 Prefer to design schema in Third Normal Form (3NF). Only consider deviating from
 data normalization for significant performance optimizations.
 
-### Scoping work
+### Feature development
 
-When collaborating with the user, scope the simplest most incremental work
-required. Rely on the user to explicitly expand the scope. Incremental changes
-are the most effective way of concentrating our attention and focus.
+Prefer to scope the simplest most incremental spec changes. Rely on the user to
+explicitly expand the scope. Incremental spec changes are the most effective way
+of concentrating our attention, focus, and understanding.
 
 ## Test Driven Development
 
@@ -143,8 +143,7 @@ possible.
 
 ## Flagging
 
-Flag any code smells you discover that misalign with our preferences stated
-above.
+- Any code smells you discover that misalign with our preferences stated above.
 
 ## Terminology
 
