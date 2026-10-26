@@ -1,0 +1,243 @@
+#!/usr/bin/env python3
+"""Temporary Git worktrees. See docs/wt.md in the chezmoi source."""
+import argparse
+from dataclasses import dataclass
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+
+
+@dataclass
+class Checkout:
+    path: str
+    branch: str = ""
+    locked: bool = False
+    prunable: bool = False
+
+
+class Worktrees:
+    def __init__(self, repository):
+        self.repo = repository
+
+    def new(self, branch, base=None):
+        base = base if base is not None else self.repo.current_branch()
+        if not base:
+            raise ValueError("Detached HEAD: supply --base with a local branch.")
+        if not self.repo.valid_branch(branch) or self.repo.has_branch(branch):
+            raise ValueError("Choose a valid, new branch name.")
+        if not self.repo.has_branch(base):
+            raise ValueError(f"Missing local base branch: {base}")
+        return self.repo.create(branch, base)
+
+    def managed(self, branch):
+        branch = branch or self.repo.current_branch()
+        records = self.repo.records()
+        record = records.get(branch)
+        if (not isinstance(record, dict) or set(record) != {"base", "path"}
+                or not all(isinstance(v, str) and v for v in record.values())
+                or record["base"] == branch):
+            raise ValueError(f"Not a valid wt-managed branch: {branch or '(detached)'}")
+        checkouts = self.repo.worktrees()
+        matches = [c for c in checkouts if c.branch == branch]
+        if len(matches) != 1 or matches[0] == checkouts[0]:
+            raise ValueError("Only a managed linked worktree can be removed.")
+        checkout = matches[0]
+        path = Path(record["path"])
+        if (checkout.path != str(path) or not path.is_absolute()
+                or path.name != "repo" or not path.parent.name.startswith("wt-")
+                or ".." in path.parts or checkout.locked or checkout.prunable):
+            raise ValueError("Sandbox path mismatch, locked, or missing worktree; repair it manually.")
+        children = [name for name, value in records.items()
+                    if isinstance(value, dict) and value.get("base") == branch]
+        if children:
+            raise ValueError(f"Branch is still a base for: {', '.join(children)}")
+        return branch, record, checkout
+
+    def clean(self, checkout):
+        if self.repo.dirty(checkout.path) or self.repo.busy(checkout.path):
+            raise ValueError(f"A clean checkout with no operation in progress is required: {checkout.path}")
+
+    def merge(self, branch=None):
+        branch, record, source = self.managed(branch)
+        self.clean(source)
+        base = record["base"]
+        if not self.repo.has_branch(base):
+            raise ValueError(f"Missing local base branch: {base}")
+        targets = [c for c in self.repo.worktrees() if c.branch == base and not c.prunable]
+        if len(targets) != 1:
+            raise ValueError(f"Base branch must be checked out exactly once: {base}")
+        target = targets[0]
+        self.clean(target)
+        self.repo.merge(target.path, branch)
+        # Recheck merge ancestry and source state before destructive cleanup.
+        self.remove(branch)
+        return target.path
+
+    def remove(self, branch=None, force=False):
+        branch, record, checkout = self.managed(branch)
+        if not force:
+            if not self.repo.has_branch(record["base"]):
+                raise ValueError(f"Missing local base branch: {record['base']}")
+            if not self.repo.is_ancestor(branch, record["base"]):
+                raise ValueError(f"{branch} is not merged into {record['base']}; use --force to discard it.")
+            self.clean(checkout)
+        self.repo.delete(branch, checkout.path, force)
+
+
+def parse_worktrees(output):
+    checkouts = []
+    for block in output.split("\0\0"):
+        if not block:
+            continue
+        fields = dict(field.partition(" ")[::2] for field in block.split("\0") if field)
+        checkouts.append(Checkout(
+            fields["worktree"], fields.get("branch", "").removeprefix("refs/heads/"),
+            "locked" in fields, "prunable" in fields))
+    return checkouts
+
+
+class GitRepository:
+    """Effect boundary: subprocesses, local Git metadata, and sandbox directories."""
+
+    def __init__(self):
+        self.anchor = os.getcwd()
+        self.invocation = self.anchor
+        # Keep Git commands usable even after deleting the invoking worktree.
+        checkouts = self.worktrees()
+        if not checkouts or not Path(checkouts[0].path).is_dir():
+            raise ValueError("The original repository checkout must exist.")
+        self.anchor = checkouts[0].path
+
+    def git(self, *args, path=None, allowed=(0,)):
+        result = subprocess.run(["git", *args], cwd=path or self.anchor,
+                                text=True, capture_output=True)
+        if result.returncode not in allowed:
+            detail = result.stderr.strip() or result.stdout.strip()
+            raise RuntimeError(f"git {' '.join(args)} failed ({result.returncode}):\n{detail}")
+        return result
+
+    def current_branch(self):
+        result = self.git("symbolic-ref", "--quiet", "HEAD", path=self.invocation, allowed=(0, 1))
+        return result.stdout.rstrip("\n").removeprefix("refs/heads/")
+
+    def valid_branch(self, branch):
+        result = self.git("check-ref-format", "--branch", branch, allowed=(0, 128))
+        return result.returncode == 0 and result.stdout.rstrip("\n") == branch
+
+    def has_branch(self, branch):
+        return self.git("show-ref", "--verify", "--quiet", f"refs/heads/{branch}",
+                        allowed=(0, 1)).returncode == 0
+
+    def worktrees(self):
+        return parse_worktrees(self.git("worktree", "list", "--porcelain", "-z").stdout)
+
+    def records(self):
+        result = self.git("config", "--local", "--null", "--get-regexp", r"^branch\..*\.wt$",
+                          allowed=(0, 1))
+        records = {}
+        for item in result.stdout.split("\0"):
+            if item:
+                key, value = item.split("\n", 1)
+                branch = key[len("branch."):-len(".wt")]
+                if branch in records:
+                    raise ValueError(f"Duplicate wt metadata for {branch}; repair local Git config.")
+                records[branch] = json.loads(value)
+        return records
+
+    def dirty(self, path):
+        return bool(self.git("status", "--porcelain", "--untracked-files=all",
+                             "--ignore-submodules=none", path=path).stdout)
+
+    def busy(self, path):
+        for name in ("MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD", "rebase-merge",
+                     "rebase-apply", "sequencer", "BISECT_START"):
+            value = self.git("rev-parse", "--git-path", name, path=path).stdout.rstrip("\n")
+            if (Path(path) / value).exists():
+                return True
+        return False
+
+    def is_ancestor(self, branch, base):
+        return self.git("merge-base", "--is-ancestor", f"refs/heads/{branch}",
+                        f"refs/heads/{base}", allowed=(0, 1)).returncode == 0
+
+    def create(self, branch, base):
+        root = Path(tempfile.mkdtemp(prefix="wt-")).resolve()
+        path = root / "repo"
+        try:
+            self.git("worktree", "add", "--quiet", "-b", branch, str(path), f"refs/heads/{base}")
+        except Exception:
+            # Never recursively delete after partial Git/hook failure.
+            if not any(root.iterdir()):
+                root.rmdir()
+            raise
+        record = json.dumps({"base": base, "path": str(path)})
+        try:
+            self.git("config", "--local", f"branch.{branch}.wt", record)
+        except Exception as error:
+            raise RuntimeError(f"Created {path}, but could not record its base. "
+                               "Worktree retained; inspect it and repair local Git config.") from error
+        return str(path)
+
+    def merge(self, path, branch):
+        try:
+            result = self.git("merge", "--no-ff", "--no-edit", "-m", f"chore: merge {branch}",
+                              f"refs/heads/{branch}", path=path)
+        except RuntimeError as error:
+            raise RuntimeError(f"{error}\nNothing was cleaned up. Resolve and commit in {path}, "
+                               f"then run wt remove {branch}; or abort the merge there.") from error
+        if result.stdout:
+            print(result.stdout.rstrip(), file=sys.stderr)
+
+    def delete(self, branch, path, force):
+        checkout = Path(path)
+        if checkout.resolve() != checkout or checkout.parent.is_symlink():
+            raise ValueError("Sandbox path now resolves elsewhere; refusing deletion.")
+        # Git refuses locked worktrees/submodules even with one --force.
+        self.git("worktree", "remove", *(["--force"] if force else []), path)
+        try:
+            # Policy already checked ancestry against the recorded base, not Git's upstream.
+            self.git("branch", "-D", "--", branch)
+        except RuntimeError as error:
+            raise RuntimeError(f"{error}\nWorktree removed; branch retained. "
+                               f"Inspect it and delete it manually; empty sandbox: {checkout.parent}") from error
+        try:
+            checkout.parent.rmdir()  # Remove only the empty container, never unrelated contents.
+        except OSError as error:
+            print(f"Branch/worktree removed; retained sandbox container {checkout.parent}: {error}",
+                  file=sys.stderr)
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="Create, merge, and remove temporary Git worktrees.")
+    commands = parser.add_subparsers(dest="command", required=True)
+    new = commands.add_parser("new", help="create a sandbox from the current local branch")
+    new.add_argument("branch")
+    new.add_argument("--base", help="use another local branch instead")
+    merge = commands.add_parser("merge", help="merge into recorded base, then remove sandbox and branch")
+    merge.add_argument("branch", nargs="?", help="defaults to the current branch")
+    remove = commands.add_parser("remove", help="remove a sandbox whose branch is merged into its base")
+    remove.add_argument("branch", nargs="?", help="defaults to the current branch")
+    remove.add_argument("--force", action="store_true", help="discard unmerged commits and uncommitted files")
+    args = parser.parse_args(argv)
+    repository = GitRepository()
+    worktrees = Worktrees(repository)
+    if args.command == "new":
+        print(worktrees.new(args.branch, args.base))
+    elif args.command == "merge":
+        target = worktrees.merge(args.branch)
+        print(f"Merged and cleaned up. Base checkout: {target}", file=sys.stderr)
+    else:
+        worktrees.remove(args.branch, args.force)
+        print(f"Removed sandbox and branch. Original checkout: {repository.anchor}", file=sys.stderr)
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except (OSError, ValueError, RuntimeError) as error:
+        print(f"wt: {error}", file=sys.stderr)
+        sys.exit(1)
