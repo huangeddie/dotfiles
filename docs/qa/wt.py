@@ -10,7 +10,7 @@ import tempfile
 
 CLI = Path(__file__).resolve().parents[2] / "dot_local/bin/executable_wt"
 ALIASES = Path(__file__).resolve().parents[2] / "dot_bash_aliases"
-ENV = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+ENV = {k: v for k, v in os.environ.items() if not k.startswith(("GIT_", "REX_", "HERDR_"))}
 ENV.update(GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull,
            GIT_TERMINAL_PROMPT="0", GIT_EDITOR=":", GIT_MERGE_AUTOEDIT="no",
            GIT_AUTHOR_DATE="2026-01-01T00:00:00Z", GIT_COMMITTER_DATE="2026-01-01T00:00:00Z")
@@ -140,6 +140,33 @@ def verify_existing_branch_and_ignored_cleanup(root):
     assert not path.parent.exists()
 
 
+def verify_listing_and_existing_checkouts(root):
+    repo = setup(root, "listing")
+    manual = root / "manual worktree"
+    detached = root / "detached worktree"
+    git(repo, "worktree", "add", "-qb", "feature/a", str(manual))
+    git(repo, "worktree", "add", "-q", "--detach", str(detached))
+    git(repo, "branch", "unoccupied")
+    assert set(wt(manual, "list").splitlines()) == {
+        f"trunk\t{repo}", f"feature/a\t{manual}", f"(detached)\t{detached}"}
+    assert wt(manual, "cd", "trunk") == str(repo)
+    (manual / "untracked").write_text("keep\n")
+    git(repo, "worktree", "lock", str(manual))
+    assert wt(repo, "cd", "feature/a") == str(manual)
+    for branch, message in (("unoccupied", "not checked out"), ("unknown", "No local branch")):
+        result = subprocess.run([sys.executable, str(CLI), "cd", branch],
+                                cwd=repo, env=ENV, text=True, capture_output=True)
+        assert result.returncode != 0 and not result.stdout
+        assert branch in result.stderr and message in result.stderr, result.stderr
+    assert len(git(repo, "worktree", "list", "--porcelain").split("worktree ")) == 4
+    carriage = root / "carriage\r\n"
+    (root / "carriage\n").mkdir()  # Wrong normalized destination also exists.
+    git(repo, "worktree", "add", "-qb", "carriage", str(carriage))
+    result = subprocess.run([sys.executable, str(CLI), "cd", "carriage"],
+                            cwd=repo, env=ENV, capture_output=True, check=True)
+    assert result.stdout == os.fsencode(carriage) + b"\n", "CRLF path was normalized"
+
+
 def verify_shell_navigation(root):
     bin_dir = root / "bin"
     bin_dir.mkdir()
@@ -169,8 +196,29 @@ for flag in --help -h --h --he --hel -hh; do
   wt new "$flag" >/dev/null
   [ "$PWD" = "$sandbox" ]
 done
-builtin cd "$original"
+wt cd trunk
+[ "$PWD" = "$original" ]
+wt cd feature
+[ "$PWD" = "$sandbox" ]
+git branch unoccupied
+if wt cd unoccupied; then exit 1; fi
+[ "$PWD" = "$sandbox" ]
+for flag in --help -h --h --he --hel -hh; do
+  wt cd "$flag" >/dev/null
+  [ "$PWD" = "$sandbox" ]
+done
+wt list >/dev/null
+[ "$PWD" = "$sandbox" ]
+wt cd trunk
 wt merge feature
+# A manually created checkout can have whitespace, even a trailing newline.
+unusual="$original/manual checkout
+"
+git worktree add -qb manual "$unusual"
+wt cd manual
+[ "$PWD" = "$unusual" ]
+wt cd trunk
+git worktree remove "$unusual"
 [ ! -d "$sandbox" ]
 [ ! -d "$(dirname "$sandbox")" ]
 ''', "wt-qa", str(ALIASES))
@@ -187,7 +235,7 @@ def main():
         for verify in (verify_merge_commit_and_cleanup, verify_bases_detached_and_nested,
                        verify_force_and_dirty_protection, verify_conflict_recovery,
                        verify_unmanaged_and_dirty_base, verify_existing_branch_and_ignored_cleanup,
-                       verify_shell_navigation):
+                       verify_listing_and_existing_checkouts, verify_shell_navigation):
             verify(root)
             print(f"PASS: {verify.__name__}")
         assert list(sandbox_root.iterdir()) == [], "Leftover sandbox directories"

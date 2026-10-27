@@ -17,7 +17,7 @@ alias mm="mosh mac -- sh -c 'herdr; exec \"\$SHELL\" -l'"
 
 # Version control
 wt() {
-  if [ "${1:-}" != new ]; then
+  if [ "${1:-}" != new ] && [ "${1:-}" != cd ]; then
     command wt "$@"
     return $?
   fi
@@ -30,8 +30,15 @@ wt() {
         ;;
     esac
   done
-  destination=$(command wt "$@") || return $?
-  builtin cd -- "$destination"
+  # Preserve trailing newlines in existing checkout paths during command substitution.
+  destination=$(command wt "$@" && printf '.') || return $?
+  destination=${destination%.}
+  destination=${destination%$'\n'}
+  builtin cd -- "$destination" || return $?
+  if [ "${HERDR_ENV:-}" = 1 ] || [ -n "${REX_SESSION:-}" ]; then
+    command wt _rename-tab >/dev/null 2>&1 || :
+  fi
+  return 0
 }
 
 alias g='git'

@@ -22,6 +22,22 @@ class Worktrees:
     def __init__(self, repository):
         self.repo = repository
 
+    def list(self):
+        return "\n".join(f"{c.branch or '(detached)'}\t{c.path}" for c in self.repo.worktrees())
+
+    def path(self, branch):
+        if not branch or not self.repo.has_branch(branch):
+            raise ValueError(f"No local branch named {branch!r}.")
+        matches = [c for c in self.repo.worktrees() if c.branch == branch]
+        if not matches:
+            raise ValueError(f"Branch {branch!r} is not checked out in any worktree.")
+        if len(matches) != 1:
+            raise ValueError(f"Branch {branch!r} is checked out in multiple worktrees; navigate by path.")
+        checkout = matches[0]
+        if checkout.prunable or not self.repo.is_directory(checkout.path):
+            raise ValueError(f"Worktree for {branch!r} is missing or unavailable: {checkout.path}")
+        return checkout.path
+
     def new(self, branch, base=None):
         base = base if base is not None else self.repo.current_branch()
         if not base:
@@ -112,8 +128,10 @@ class GitRepository:
         self.anchor = checkouts[0].path
 
     def git(self, *args, path=None, allowed=(0,)):
-        result = subprocess.run(["git", *args], cwd=path or self.anchor,
-                                text=True, capture_output=True)
+        result = subprocess.run(["git", *args], cwd=path or self.anchor, capture_output=True)
+        # Git paths are filesystem bytes: text=True would normalize CR/CRLF to LF.
+        result.stdout = os.fsdecode(result.stdout)
+        result.stderr = os.fsdecode(result.stderr)
         if result.returncode not in allowed:
             detail = result.stderr.strip() or result.stdout.strip()
             raise RuntimeError(f"git {' '.join(args)} failed ({result.returncode}):\n{detail}")
@@ -133,6 +151,9 @@ class GitRepository:
 
     def worktrees(self):
         return parse_worktrees(self.git("worktree", "list", "--porcelain", "-z").stdout)
+
+    def is_directory(self, path):
+        return Path(path).is_dir()
 
     def records(self):
         result = self.git("config", "--local", "--null", "--get-regexp", r"^branch\..*\.wt$",
@@ -210,12 +231,53 @@ class GitRepository:
                   file=sys.stderr)
 
 
+def rename_tab(branch, environment, run):
+    """Resolve the caller's live tab, never the UI-focused tab. Effects are injected."""
+    if not branch:
+        return
+    try:
+        if environment.get("HERDR_ENV") == "1":
+            # Herdr can resolve inherited pane IDs after a move; inherited tab IDs go stale.
+            if not environment.get("HERDR_PANE_ID"):
+                return
+            response = json.loads(run(["herdr", "pane", "current", "--current"]))
+            target = response["result"]["pane"]["tab_id"]
+            command = ["herdr", "tab", "rename", "--", target, branch]
+        else:
+            session, block = environment.get("REX_SESSION"), environment.get("REX_BLOCK")
+            if not session or not block:
+                return
+            prefix = ["rex", "--autostart=false", "--timeout", "2s"]
+            response = json.loads(run([*prefix, "block", "inspect", "-s", session, block, "--json"]))
+            if response["session_id"] != session or response["block"]["block_id"] != block:
+                raise ValueError("Rex returned a different caller; tab not renamed.")
+            target = response["block"]["window_id"]
+            command = [*prefix, "window", "rename", "-s", session, "--", target, branch]
+    except (KeyError, TypeError, json.JSONDecodeError) as error:
+        raise ValueError("Could not resolve the calling pane's tab.") from error
+    if not isinstance(target, str) or not target:
+        raise ValueError("Multiplexer returned no valid tab ID.")
+    run(command)
+
+
+def run_tab_command(command):
+    return subprocess.run(command, check=True, text=True, capture_output=True, timeout=2).stdout
+
+
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="Create, merge, and remove temporary Git worktrees.")
+    argv = list(sys.argv[1:] if argv is None else argv)
+    # Private shell hook: called only after builtin cd succeeds.
+    if argv == ["_rename-tab"]:
+        rename_tab(GitRepository().current_branch(), os.environ, run_tab_command)
+        return 0
+    parser = argparse.ArgumentParser(description="Create, list, navigate, merge, and remove Git worktrees.")
     commands = parser.add_subparsers(dest="command", required=True)
     new = commands.add_parser("new", help="create a sandbox from the current local branch")
     new.add_argument("branch")
     new.add_argument("--base", help="use another local branch instead")
+    commands.add_parser("list", help="list all worktrees in this repository by branch and path")
+    cd = commands.add_parser("cd", help="enter an existing branch checkout (print its path without shell integration)")
+    cd.add_argument("branch", help="exact local branch name; must already have a worktree")
     merge = commands.add_parser("merge", help="merge into recorded base, then remove sandbox and branch")
     merge.add_argument("branch", nargs="?", help="defaults to the current branch")
     remove = commands.add_parser("remove", help="remove a sandbox whose branch is merged into its base")
@@ -226,6 +288,10 @@ def main(argv=None):
     worktrees = Worktrees(repository)
     if args.command == "new":
         print(worktrees.new(args.branch, args.base))
+    elif args.command == "list":
+        print(worktrees.list())
+    elif args.command == "cd":
+        print(worktrees.path(args.branch))
     elif args.command == "merge":
         target = worktrees.merge(args.branch)
         print(f"Merged and cleaned up. Base checkout: {target}", file=sys.stderr)
@@ -238,6 +304,6 @@ def main(argv=None):
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except (OSError, ValueError, RuntimeError) as error:
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
         print(f"wt: {error}", file=sys.stderr)
         sys.exit(1)
