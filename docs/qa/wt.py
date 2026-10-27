@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Discretionary real-Git QA. Run manually; never include in CI/unit test discovery."""
+import json
 import os
 from pathlib import Path
 import shlex
@@ -44,6 +45,92 @@ def setup(root, name):
     git(repo, "config", "user.email", "wt-qa@example.invalid")
     commit(repo, "shared.txt", "initial\n")
     return repo
+
+
+def verify_stable_private_cache_root(root):
+    repo = setup(root, "stable-root")
+    cache = Path(ENV["XDG_CACHE_HOME"]) / "wt"
+    first = Path(wt(repo, "new", "first"))
+    assert first.parent.parent == cache, first
+    assert cache.stat().st_mode & 0o777 == 0o700
+    wt(repo, "remove", "first")
+    assert cache.is_dir() and not first.parent.exists()
+    second = Path(wt(repo, "new", "second"))
+    assert second.parent.parent == cache and first != second
+    wt(repo, "remove", "second")
+    cache.chmod(0o755)
+    try:
+        wt(repo, "new", "unsafe", ok=False)
+        git(repo, "show-ref", "--verify", "refs/heads/unsafe", ok=False)
+    finally:
+        cache.chmod(0o700)
+    saved = cache.with_name("saved-wt")
+    cache.rename(saved)
+    cache.symlink_to(saved, target_is_directory=True)
+    try:
+        wt(repo, "new", "redirected", ok=False)
+        git(repo, "show-ref", "--verify", "refs/heads/redirected", ok=False)
+    finally:
+        cache.unlink()
+        saved.rename(cache)
+
+
+def verify_clear_preflight_and_repository_scope(root):
+    repo = setup(root, "clear")
+    other = setup(root, "other-repository")
+    first = Path(wt(repo, "new", "a-clean"))
+    last = Path(wt(repo, "new", "z-unmerged"))
+    commit(last, "new.txt", "unmerged\n")
+    (last / "untracked").write_text("uncommitted\n")
+    untouched = Path(wt(other, "new", "a-clean"))
+    manual = root / "unmanaged-clear"
+    git(repo, "worktree", "add", "-qb", "manual", str(manual))
+    git(repo, "branch", "unoccupied")
+    # Legacy sandboxes remain manageable even outside the new cache root.
+    legacy = Path(tempfile.mkdtemp(prefix="wt-", dir=ENV["TMPDIR"])) / "repo"
+    git(repo, "worktree", "add", "-qb", "legacy", str(legacy))
+    git(repo, "config", "--local", "branch.legacy.wt", json.dumps({"base": "trunk", "path": str(legacy)}))
+    wt(repo, "clear", ok=False)
+    assert all(p.is_dir() for p in (first, last, legacy, untouched, manual))
+    git(repo, "worktree", "lock", str(last))
+    wt(repo, "clear", "--force", ok=False)
+    assert first.is_dir() and legacy.is_dir()
+    git(repo, "worktree", "unlock", str(last))
+    wt(repo, "clear", "--force")
+    assert all(not p.parent.exists() for p in (first, last, legacy))
+    assert untouched.is_dir() and manual.is_dir() and repo.is_dir()
+    assert set(git(repo, "branch", "--format=%(refname:short)").splitlines()) == {"trunk", "manual", "unoccupied"}
+    git(repo, "config", "--local", "--get-regexp", r"^branch\..*\.wt$", ok=False)
+    wt(repo, "clear")  # Empty clear is a successful no-op.
+    wt(other, "clear")
+    assert not untouched.parent.exists()
+
+
+def verify_clear_preflights_initialized_submodules(root):
+    repo = setup(root, "submodule-clear")
+    module = setup(root, "submodule-source")
+    first = Path(wt(repo, "new", "a-clean"))
+    git(repo, "-c", "protocol.file.allow=always", "submodule", "add", "-q", str(module), "module")
+    git(repo, "commit", "-qm", "test: add submodule")
+    last = Path(wt(repo, "new", "z-submodule"))
+    git(last, "-c", "protocol.file.allow=always", "submodule", "update", "--init", "-q")
+    wt(repo, "clear", ok=False)
+    assert first.is_dir() and last.is_dir(), "Submodules must be detected before any deletion"
+    wt(repo, "clear", "--force")
+    assert not first.parent.exists() and not last.parent.exists()
+
+
+def verify_nested_clear_from_a_sandbox(root):
+    repo = setup(root, "nested-clear")
+    parent = Path(wt(repo, "new", "parent"))
+    child = Path(wt(parent, "new", "child"))
+    commit(child, "nested.txt", "merged\n")
+    git(parent, "merge", "--no-ff", "--no-edit", "child")
+    git(repo, "merge", "--no-ff", "--no-edit", "parent")
+    wt(child, "clear")
+    assert not child.parent.exists() and not parent.parent.exists()
+    assert (repo / "nested.txt").read_text() == "merged\n"
+    assert git(repo, "branch", "--format=%(refname:short)") == "trunk"
 
 
 def verify_merge_commit_and_cleanup(root):
@@ -232,13 +319,18 @@ def main():
         sandbox_root = root / "sandboxes"
         sandbox_root.mkdir()
         ENV["TMPDIR"] = str(sandbox_root)
-        for verify in (verify_merge_commit_and_cleanup, verify_bases_detached_and_nested,
+        ENV["XDG_CACHE_HOME"] = str(root / "cache")
+        for verify in (verify_stable_private_cache_root, verify_clear_preflight_and_repository_scope,
+                       verify_clear_preflights_initialized_submodules, verify_nested_clear_from_a_sandbox,
+                       verify_merge_commit_and_cleanup, verify_bases_detached_and_nested,
                        verify_force_and_dirty_protection, verify_conflict_recovery,
                        verify_unmanaged_and_dirty_base, verify_existing_branch_and_ignored_cleanup,
                        verify_listing_and_existing_checkouts, verify_shell_navigation):
             verify(root)
             print(f"PASS: {verify.__name__}")
-        assert list(sandbox_root.iterdir()) == [], "Leftover sandbox directories"
+        assert list(sandbox_root.iterdir()) == [], "Leftover legacy sandbox directories"
+        cache = Path(ENV["XDG_CACHE_HOME"]) / "wt"
+        assert cache.is_dir() and list(cache.iterdir()) == [], "Cache root must survive empty"
 
 
 if __name__ == "__main__":

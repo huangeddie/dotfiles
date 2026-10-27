@@ -17,6 +17,9 @@ class Repository:
         self.dirty_paths = set()
         self.busy_paths = set()
         self.missing_paths = set()
+        self.unsafe_paths = set()
+        self.submodule_paths = set()
+        self.delete_failure = None
         self.ancestors = set()
         self.events = []
         self.merge_fails = False
@@ -36,6 +39,10 @@ class Repository:
     def is_directory(self, path):
         return path not in self.missing_paths
 
+    def validate_sandbox(self, path):
+        if path in self.missing_paths or path in self.unsafe_paths:
+            raise ValueError("Sandbox path is missing or redirected")
+
     def records(self):
         return self.metadata
 
@@ -44,6 +51,9 @@ class Repository:
 
     def busy(self, path):
         return path in self.busy_paths
+
+    def has_initialized_submodules(self, path):
+        return path in self.submodule_paths
 
     def is_ancestor(self, branch, base):
         return (branch, base) in self.ancestors
@@ -64,6 +74,8 @@ class Repository:
         self.ancestors.add((branch, base))
 
     def delete(self, branch, path, force):
+        if branch == self.delete_failure:
+            raise RuntimeError("removal failed")
         self.events.append(("delete", branch, path, force))
         self.checkouts = [c for c in self.checkouts if c.path != path]
         self.branches.remove(branch)
@@ -220,6 +232,144 @@ class LifecycleTest(unittest.TestCase):
             with self.subTest(record=record), self.assertRaises(ValueError):
                 self.wt.remove(force=True)
         self.assertEqual(self.repo.events, [])
+
+
+class ClearTest(unittest.TestCase):
+    def setUp(self):
+        self.repo = Repository()
+        self.wt = Worktrees(self.repo)
+
+    def add(self, branch, base="trunk", merged=True):
+        path = f"/cache/wt-{branch}/repo"
+        self.repo.branches.add(branch)
+        self.repo.checkouts.append(Checkout(path, branch))
+        self.repo.metadata[branch] = {"base": base, "path": path}
+        if merged:
+            self.repo.ancestors.add((branch, base))
+        return path
+
+    def test_clear_removes_managed_checkouts_but_preserves_original_and_unmanaged(self):
+        self.add("one")
+        self.add("two")
+        self.repo.branches.add("manual")
+        self.repo.checkouts.append(Checkout("/manual", "manual"))
+        self.assertEqual(self.wt.clear(), 2)
+        self.assertEqual(self.repo.branches, {"trunk", "release", "manual"})
+        self.assertEqual(self.repo.checkouts, [Checkout("/project", "trunk"), Checkout("/manual", "manual")])
+        self.assertEqual(self.repo.metadata, {})
+
+    def test_clear_without_sandboxes_is_a_noop(self):
+        self.assertEqual(self.wt.clear(), 0)
+        self.assertEqual(self.repo.events, [])
+
+    def test_clear_checks_every_branch_before_deleting_anything(self):
+        self.add("a-clean")
+        self.add("z-unmerged", merged=False)
+        with self.assertRaisesRegex(ValueError, "not merged"):
+            self.wt.clear()
+        self.assertEqual(self.repo.events, [])
+
+    def test_clear_checks_every_dirty_or_busy_worktree_before_deleting_anything(self):
+        self.add("a-clean")
+        path = self.add("z-dirty")
+        for paths in (self.repo.dirty_paths, self.repo.busy_paths):
+            paths.add(path)
+            with self.assertRaisesRegex(ValueError, "clean"):
+                self.wt.clear()
+            self.assertEqual(self.repo.events, [])
+            paths.clear()
+
+    def test_force_clear_discards_unmerged_dirty_worktrees(self):
+        path = self.add("dirty", merged=False)
+        self.repo.dirty_paths.add(path)
+        self.assertEqual(self.wt.clear(force=True), 1)
+        self.assertEqual(self.repo.events, [("delete", "dirty", path, True)])
+
+    def test_clear_removes_children_before_their_parents(self):
+        self.add("a-parent")
+        self.add("b-child", "a-parent")
+        self.add("c-grandchild", "b-child")
+        self.assertEqual(self.wt.clear(), 3)
+        self.assertEqual([event[1] for event in self.repo.events], ["c-grandchild", "b-child", "a-parent"])
+
+    def test_force_clear_rejects_cycles_before_deleting_anything(self):
+        self.add("a", "b")
+        self.add("b", "a")
+        with self.assertRaisesRegex(ValueError, "cycle|cyclic"):
+            self.wt.clear(force=True)
+        self.assertEqual(self.repo.events, [])
+
+    def test_force_clear_rejects_original_checkout_and_corrupt_records(self):
+        self.add("a-clean")
+        for record in ({"base": "release", "path": "/project"}, {}, "broken"):
+            self.repo.metadata["trunk"] = record
+            with self.subTest(record=record), self.assertRaises(ValueError):
+                self.wt.clear(force=True)
+            self.assertEqual(self.repo.events, [])
+
+    def test_force_clear_checks_locked_prunable_and_mismatched_worktrees_before_deleting(self):
+        self.add("a-clean")
+        self.add("z-protected")
+        target = self.repo.checkouts[-1]
+        for field in ("locked", "prunable"):
+            setattr(target, field, True)
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                self.wt.clear(force=True)
+            self.assertEqual(self.repo.events, [])
+            setattr(target, field, False)
+        self.repo.metadata["z-protected"]["path"] = "/unrelated"
+        with self.assertRaises(ValueError):
+            self.wt.clear(force=True)
+        self.assertEqual(self.repo.events, [])
+
+    def test_clear_checks_physical_path_safety_before_deleting_anything(self):
+        self.add("a-clean")
+        path = self.add("z-unsafe")
+        self.repo.unsafe_paths.add(path)
+        with self.assertRaisesRegex(ValueError, "redirected"):
+            self.wt.clear(force=True)
+        self.assertEqual(self.repo.events, [])
+
+    def test_force_clear_allows_missing_base_but_normal_clear_refuses(self):
+        self.add("topic", "deleted-base", merged=False)
+        with self.assertRaisesRegex(ValueError, "base"):
+            self.wt.clear()
+        self.assertEqual(self.repo.events, [])
+        self.assertEqual(self.wt.clear(force=True), 1)
+
+    def test_clear_preflights_initialized_submodules_but_force_can_discard_them(self):
+        self.add("a-clean")
+        path = self.add("z-submodule")
+        self.repo.submodule_paths.add(path)
+        with self.assertRaisesRegex(ValueError, "submodules"):
+            self.wt.clear()
+        self.assertEqual(self.repo.events, [])
+        self.assertEqual(self.wt.clear(force=True), 2)
+
+    def test_clear_stops_at_runtime_failure_and_preserves_remaining_worktrees(self):
+        self.add("a")
+        self.add("b")
+        self.add("c")
+        self.repo.delete_failure = "b"
+        with self.assertRaisesRegex(RuntimeError, "removal failed"):
+            self.wt.clear()
+        self.assertEqual(set(self.repo.metadata), {"b", "c"})
+        self.assertEqual([event[1] for event in self.repo.events], ["a"])
+
+
+class SandboxRootTest(unittest.TestCase):
+    def test_default_root_is_stable_beneath_home_cache(self):
+        self.assertEqual(script["sandbox_root"](Path("/home/user"), {}), Path("/home/user/.cache/wt"))
+
+    def test_absolute_xdg_cache_home_overrides_default_root(self):
+        self.assertEqual(script["sandbox_root"](Path("/home/user"), {"XDG_CACHE_HOME": "/private cache"}),
+                         Path("/private cache/wt"))
+
+    def test_relative_or_empty_xdg_cache_home_uses_default_root(self):
+        for value in ("relative", ""):
+            with self.subTest(value=value):
+                self.assertEqual(script["sandbox_root"](Path("/home/user"), {"XDG_CACHE_HOME": value}),
+                                 Path("/home/user/.cache/wt"))
 
 
 class NavigationTest(unittest.TestCase):

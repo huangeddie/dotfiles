@@ -11,6 +11,8 @@ wt new another --base release    # explicitly select a local base branch
 wt merge                         # merge current sandbox into its recorded base, then clean up
 wt remove                        # clean up only if merged into the recorded base
 wt remove --force                # discard unmerged commits and uncommitted files
+wt clear                         # remove all merged, clean managed sandboxes in this repository
+wt clear --force                 # discard all this repository's managed sandboxes
 ```
 
 `merge` and `remove` also accept a branch name, so they can be run from any
@@ -29,9 +31,12 @@ wt merge feature
 
 ## Contract
 
-- `new` creates a new local branch and a `wt-*/repo` directory under the system
-  temporary directory (`TMPDIR` is honored). The shell wrapper enters that
-  directory only if creation succeeds. Existing branches are rejected.
+- `new` creates a new local branch and a unique `wt-*/repo` directory beneath
+  `~/.cache/wt`, or `$XDG_CACHE_HOME/wt` when `XDG_CACHE_HOME` is absolute. The
+  shared root is created with mode 700; an existing non-private, foreign-owned,
+  or symlink root is rejected. The shell wrapper enters the new directory only
+  if creation succeeds. Existing branches are rejected. `TMPDIR` no longer
+  controls sandbox placement.
 - `list` prints branch and path columns separated by a tab. It includes the
   original checkout, unmanaged worktrees, and detached worktrees (labeled
   `(detached)`). It lists worktrees, not branches without checkouts.
@@ -67,11 +72,40 @@ wt merge feature
   normal Git worktree removal behavior.
 - `--force` bypasses ancestry and dirty-state checks, including a missing base.
   It does not permit deleting the original checkout, unmanaged worktrees,
-  locked/missing worktrees, mismatched paths, or branches still recorded as the
-  base of another sandbox. Clean up children before their parents.
+  locked/missing worktrees, or mismatched paths. Single removal also refuses
+  branches still recorded as the base of another sandbox; remove children first.
+- `clear` operates only on this repository's locally recorded `wt` sandboxes.
+  The original checkout, unmanaged branches/worktrees, and other repositories'
+  sandboxes are untouched. Every candidate is checked before any deletion;
+  nested bases are cleared children-first. Unmerged/dirty candidates and
+  initialized submodules abort the whole preflight unless `--force` is supplied.
+  Force also discards initialized submodules and their local work. Cyclic metadata
+  is always refused.
+  An empty batch succeeds. If an unexpected Git/filesystem failure occurs during
+  deletion, clear stops; already-completed deletions are not rolled back.
 - Cleanup removes the registered worktree, its local branch and branch config,
   then its empty sandbox container. Unexpected files outside `repo` are retained
-  rather than recursively deleted.
+  rather than recursively deleted. The shared cache root itself is retained.
+  Existing sandboxes outside the cache remain manageable; they are not relocated.
+
+## One-time Pi trust
+
+After creating your first cache-backed worktree, start Pi from the shared root:
+
+```sh
+cd "${XDG_CACHE_HOME:-$HOME/.cache}/wt"
+pi
+```
+
+Run `/trust` and select **Trust** for that root. Pi's parent-directory trust then
+covers future worktrees below it. Trusting a random `wt-*/repo` directory or its
+immediate `wt-*` parent still only covers that sandbox. If `XDG_CACHE_HOME` is
+relative, use `~/.cache/wt` instead.
+
+This trusts project resources from **every repository placed under that root**.
+Only use it for code you intend to trust. `wt` does not modify Pi's trust store,
+change global trust defaults, or trust the system temporary directory. Legacy
+sandboxes outside this root do not inherit this decision.
 
 ## Recovery and limits
 
@@ -87,11 +121,13 @@ whatever has not yet been removed and reports the error.
 Do not rename or move managed branches/worktrees without updating their local
 Git metadata. A missing or stale record fails closed; repair it explicitly.
 Do not run simultaneous lifecycle operations against the same sandbox or edit it
-while it is being removed. Initialized submodules can require manual cleanup.
+while it is being removed. Normal removal refuses initialized submodules;
+inspect their work before choosing force removal.
 
-Temporary storage can be purged by the OS. Keep valuable work committed and
-backed up. Worktrees share a Git repository; this is filesystem convenience,
-**not a security sandbox**.
+There is no automatic TTL: `wt` removes sandboxes only through explicit merge,
+remove, or clear commands. External cache cleaners can still remove cache data,
+so keep valuable work committed and backed up. Worktrees share a Git repository;
+this is filesystem convenience, **not a security sandbox**.
 
 ## Verification
 

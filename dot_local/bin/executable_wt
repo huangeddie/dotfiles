@@ -2,6 +2,7 @@
 """Temporary Git worktrees. See docs/wt.md in the chezmoi source."""
 import argparse
 from dataclasses import dataclass
+from graphlib import CycleError, TopologicalSorter
 import json
 import os
 from pathlib import Path
@@ -48,7 +49,7 @@ class Worktrees:
             raise ValueError(f"Missing local base branch: {base}")
         return self.repo.create(branch, base)
 
-    def managed(self, branch):
+    def managed(self, branch, clearing=()):
         branch = branch or self.repo.current_branch()
         records = self.repo.records()
         record = records.get(branch)
@@ -67,9 +68,10 @@ class Worktrees:
                 or ".." in path.parts or checkout.locked or checkout.prunable):
             raise ValueError("Sandbox path mismatch, locked, or missing worktree; repair it manually.")
         children = [name for name, value in records.items()
-                    if isinstance(value, dict) and value.get("base") == branch]
+                    if name not in clearing and isinstance(value, dict) and value.get("base") == branch]
         if children:
             raise ValueError(f"Branch is still a base for: {', '.join(children)}")
+        self.repo.validate_sandbox(checkout.path)
         return branch, record, checkout
 
     def clean(self, checkout):
@@ -92,15 +94,42 @@ class Worktrees:
         self.remove(branch)
         return target.path
 
-    def remove(self, branch=None, force=False):
-        branch, record, checkout = self.managed(branch)
+    def clear(self, force=False):
+        names = set(self.repo.records())
+        # Preflight every candidate before any deletion, including children in this batch.
+        candidates = {name: self.validate_removal(name, force, clearing=names) for name in sorted(names)}
+        dependencies = {name: [] for name in candidates}
+        for name, (_, record, _) in candidates.items():
+            if record["base"] in dependencies:
+                dependencies[record["base"]].append(name)
+        try:
+            order = tuple(TopologicalSorter(dependencies).static_order())
+        except CycleError as error:
+            raise ValueError("Cannot clear cyclic sandbox base relationships; repair metadata first.") from error
+        for name in order:
+            self.remove(name, force)  # Recheck immediately before each deletion.
+        return len(order)
+
+    def validate_removal(self, branch, force, clearing=()):
+        branch, record, checkout = self.managed(branch, clearing)
         if not force:
             if not self.repo.has_branch(record["base"]):
                 raise ValueError(f"Missing local base branch: {record['base']}")
             if not self.repo.is_ancestor(branch, record["base"]):
                 raise ValueError(f"{branch} is not merged into {record['base']}; use --force to discard it.")
             self.clean(checkout)
+            if self.repo.has_initialized_submodules(checkout.path):
+                raise ValueError(f"Worktree has initialized submodules; use --force to discard them: {checkout.path}")
+        return branch, record, checkout
+
+    def remove(self, branch=None, force=False):
+        branch, _, checkout = self.validate_removal(branch, force)
         self.repo.delete(branch, checkout.path, force)
+
+
+def sandbox_root(home, environment):
+    cache = Path(environment.get("XDG_CACHE_HOME", ""))
+    return (cache if cache.is_absolute() else home / ".cache") / "wt"
 
 
 def parse_worktrees(output):
@@ -172,6 +201,10 @@ class GitRepository:
         return bool(self.git("status", "--porcelain", "--untracked-files=all",
                              "--ignore-submodules=none", path=path).stdout)
 
+    def has_initialized_submodules(self, path):
+        status = self.git("submodule", "status", path=path).stdout
+        return any(line and not line.startswith("-") for line in status.splitlines())
+
     def busy(self, path):
         for name in ("MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD", "rebase-merge",
                      "rebase-apply", "sequencer", "BISECT_START"):
@@ -185,7 +218,12 @@ class GitRepository:
                         f"refs/heads/{base}", allowed=(0, 1)).returncode == 0
 
     def create(self, branch, base):
-        root = Path(tempfile.mkdtemp(prefix="wt-")).resolve()
+        cache = sandbox_root(Path.home(), os.environ)
+        cache.mkdir(mode=0o700, parents=True, exist_ok=True)
+        info = cache.stat()
+        if cache.is_symlink() or info.st_uid != os.getuid() or info.st_mode & 0o077:
+            raise ValueError(f"Sandbox root must be a private, user-owned directory (mode 700), not a symlink: {cache}")
+        root = Path(tempfile.mkdtemp(prefix="wt-", dir=cache)).resolve()
         path = root / "repo"
         try:
             self.git("worktree", "add", "--quiet", "-b", branch, str(path), f"refs/heads/{base}")
@@ -212,11 +250,15 @@ class GitRepository:
         if result.stdout:
             print(result.stdout.rstrip(), file=sys.stderr)
 
-    def delete(self, branch, path, force):
+    def validate_sandbox(self, path):
         checkout = Path(path)
-        if checkout.resolve() != checkout or checkout.parent.is_symlink():
-            raise ValueError("Sandbox path now resolves elsewhere; refusing deletion.")
-        # Git refuses locked worktrees/submodules even with one --force.
+        if not checkout.is_dir() or checkout.resolve() != checkout or checkout.parent.is_symlink():
+            raise ValueError(f"Sandbox path is missing or resolves elsewhere; refusing deletion: {path}")
+
+    def delete(self, branch, path, force):
+        self.validate_sandbox(path)
+        checkout = Path(path)
+        # Git independently checks locks and dirty state during removal.
         self.git("worktree", "remove", *(["--force"] if force else []), path)
         try:
             # Policy already checked ancestry against the recorded base, not Git's upstream.
@@ -283,6 +325,8 @@ def main(argv=None):
     remove = commands.add_parser("remove", help="remove a sandbox whose branch is merged into its base")
     remove.add_argument("branch", nargs="?", help="defaults to the current branch")
     remove.add_argument("--force", action="store_true", help="discard unmerged commits and uncommitted files")
+    clear = commands.add_parser("clear", help="remove all managed sandboxes in this repository after preflight")
+    clear.add_argument("--force", action="store_true", help="discard unmerged commits and uncommitted files")
     args = parser.parse_args(argv)
     repository = GitRepository()
     worktrees = Worktrees(repository)
@@ -292,6 +336,9 @@ def main(argv=None):
         print(worktrees.list())
     elif args.command == "cd":
         print(worktrees.path(args.branch))
+    elif args.command == "clear":
+        count = worktrees.clear(args.force)
+        print(f"Cleared {count} managed sandboxes. Original checkout: {repository.anchor}", file=sys.stderr)
     elif args.command == "merge":
         target = worktrees.merge(args.branch)
         print(f"Merged and cleaned up. Base checkout: {target}", file=sys.stderr)
