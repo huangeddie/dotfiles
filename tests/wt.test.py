@@ -58,11 +58,13 @@ class Repository:
     def is_ancestor(self, branch, base):
         return (branch, base) in self.ancestors
 
-    def create(self, branch, base):
+    def create(self, branch, base, name=None):
         path = "/tmp/wt-fixed/repo"
         self.branches.add(branch)
         self.checkouts.append(Checkout(path, branch))
         self.metadata[branch] = {"base": base, "path": path}
+        if name is not None:
+            self.metadata[branch]["name"] = name
         self.events.append(("create", branch, base))
         return path
 
@@ -96,6 +98,58 @@ class LifecycleTest(unittest.TestCase):
     def test_new_uses_current_branch_instead_of_main_or_master(self):
         self.assertEqual(self.wt.new("feature/a"), "/tmp/wt-fixed/repo")
         self.assertEqual(self.repo.metadata["feature/a"]["base"], "trunk")
+
+    def test_new_normalizes_branch_but_preserves_display_name(self):
+        for name, branch in (("Foo Bar", "foo-bar"), ("  Foo \t Bar  ", "foo-bar"),
+                             ("Feature/API", "feature/api"), ("FOO-BAR", "foo-bar")):
+            with self.subTest(name=name):
+                repo = Repository()
+                self.assertEqual(Worktrees(repo).new(name), "/tmp/wt-fixed/repo")
+                self.assertIn(branch, repo.branches)
+                self.assertEqual(repo.metadata[branch], {
+                    "base": "trunk", "path": "/tmp/wt-fixed/repo", "name": name})
+
+    def test_normalized_name_collision_rejects_before_creation(self):
+        self.repo.branches.add("foo-bar")
+        with self.assertRaisesRegex(ValueError, "new branch"):
+            self.wt.new("Foo Bar")
+        self.assertEqual(self.repo.events, [])
+
+    def test_whitespace_only_name_rejects_before_creation(self):
+        with self.assertRaises(ValueError):
+            self.wt.new(" \t ")
+        self.assertEqual(self.repo.events, [])
+
+    def test_flat_sandbox_removal_preserves_original_checkout(self):
+        self.sandbox()
+        self.repo.metadata["topic"]["path"] = "/cache/wt/wt-flat"
+        self.repo.checkouts[1].path = "/cache/wt/wt-flat"
+        self.wt.remove(force=True)
+        self.assertEqual(self.repo.events, [("delete", "topic", "/cache/wt/wt-flat", True)])
+        self.assertEqual(self.repo.checkouts, [Checkout("/project", "trunk")])
+
+    def test_shared_cache_and_non_sandbox_paths_cannot_be_removed(self):
+        self.sandbox()
+        for path in ("/cache/wt", "/cache/wt/unrelated", "/cache/wt/wt-flat/../wt-other"):
+            self.repo.metadata["topic"]["path"] = path
+            self.repo.checkouts[1].path = path
+            with self.subTest(path=path), self.assertRaises(ValueError):
+                self.wt.remove(force=True)
+        self.assertEqual(self.repo.events, [])
+
+    def test_named_metadata_remains_removable(self):
+        self.sandbox()
+        self.repo.metadata["topic"]["name"] = "Topic"
+        self.wt.remove(force=True)
+        self.assertNotIn("topic", self.repo.branches)
+
+    def test_invalid_name_metadata_never_permits_force_deletion(self):
+        self.sandbox()
+        for name in (None, 42, ""):
+            self.repo.metadata["topic"]["name"] = name
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                self.wt.remove(force=True)
+        self.assertEqual(self.repo.events, [])
 
     def test_explicit_base_overrides_current_branch(self):
         self.wt.new("topic", "release")
@@ -449,6 +503,32 @@ class TabTitleTest(unittest.TestCase):
 
     def rename(self, environment):
         script["rename_tab"]("feature/a", environment, self.execute)
+
+    def test_saved_display_name_is_passed_intact_to_each_multiplexer(self):
+        repo = Repository()
+        repo.create("foo-bar", "trunk", "Foo Bar")
+        repo.current = "foo-bar"
+        for environment in (self.rex, self.herdr):
+            with self.subTest(environment=environment):
+                self.calls.clear()
+                script["rename_tab"](Worktrees(repo).title(), environment, self.execute)
+                self.assertTrue(self.calls)
+                self.assertEqual(self.calls[-1][-1], "Foo Bar")
+
+    def test_legacy_unmanaged_and_detached_checkouts_fall_back_to_branch(self):
+        repo = Repository()
+        repo.create("legacy", "trunk")
+        for branch in ("legacy", "trunk", ""):
+            repo.current = branch
+            with self.subTest(branch=branch):
+                self.assertEqual(Worktrees(repo).title(), branch)
+
+    def test_unusable_display_name_falls_back_to_branch(self):
+        repo = Repository()
+        for record in (None, "bad", {"name": None}, {"name": 42}, {"name": ""}):
+            repo.metadata["trunk"] = record
+            with self.subTest(record=record):
+                self.assertEqual(Worktrees(repo).title(), "trunk")
 
     def test_no_multiplexer_environment_does_not_run_commands(self):
         self.rename({})

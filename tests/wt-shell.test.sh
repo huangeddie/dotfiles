@@ -43,6 +43,14 @@ test_new_enters_the_returned_path_without_splitting_spaces() {
   [ "$entered" = '/tmp/work tree/repo' ] && [ "$cd_calls" = 1 ] || fail 'new did not enter sandbox'
 }
 
+test_new_preserves_quoted_display_name_as_one_argument() {
+  reset
+  REX_SESSION=session
+  expected_arguments='<wt><new><Foo Bar>'
+  wt new "Foo Bar"
+  [ "$cd_calls" = 1 ] && [ "$title_calls" = 1 ] || fail 'named sandbox was not entered and titled'
+}
+
 test_cd_enters_existing_checkout_without_splitting_spaces() {
   reset
   expected_arguments='<wt><cd><feature/a>'
@@ -174,6 +182,7 @@ test_no_arguments_are_forwarded_without_attempting_cd() {
 }
 
 test_new_enters_the_returned_path_without_splitting_spaces
+test_new_preserves_quoted_display_name_as_one_argument
 test_cd_enters_existing_checkout_without_splitting_spaces
 test_cd_preserves_trailing_newlines_in_checkout_paths
 test_missing_checkout_preserves_directory_and_exit_status

@@ -47,16 +47,31 @@ def setup(root, name):
     return repo
 
 
+def verify_display_names_and_normalized_branches(root):
+    repo = setup(root, "display-names")
+    path = Path(wt(repo, "new", "Foo Bar"))
+    assert git(path, "symbolic-ref", "--short", "HEAD") == "foo-bar"
+    record = json.loads(git(repo, "config", "--local", "--get", "branch.foo-bar.wt"))
+    assert record == {"base": "trunk", "path": str(path), "name": "Foo Bar"}
+    assert wt(repo, "cd", "foo-bar") == str(path)
+    wt(repo, "new", "FOO BAR", ok=False)
+    for name in ("   ", "Bad..Name", "Bad~Name", "Bad:Name"):
+        wt(repo, "new", name, ok=False)
+    wt(repo, "merge", "foo-bar")
+    assert not path.exists() and path.parent.is_dir()
+    git(repo, "config", "--local", "--get", "branch.foo-bar.wt", ok=False)
+
+
 def verify_stable_private_cache_root(root):
     repo = setup(root, "stable-root")
     cache = Path(ENV["XDG_CACHE_HOME"]) / "wt"
     first = Path(wt(repo, "new", "first"))
-    assert first.parent.parent == cache, first
+    assert first.parent == cache and first.name.startswith("wt-"), first
     assert cache.stat().st_mode & 0o777 == 0o700
     wt(repo, "remove", "first")
-    assert cache.is_dir() and not first.parent.exists()
+    assert cache.is_dir() and not first.exists()
     second = Path(wt(repo, "new", "second"))
-    assert second.parent.parent == cache and first != second
+    assert second.parent == cache and first != second
     wt(repo, "remove", "second")
     cache.chmod(0o755)
     try:
@@ -97,13 +112,13 @@ def verify_clear_preflight_and_repository_scope(root):
     assert first.is_dir() and legacy.is_dir()
     git(repo, "worktree", "unlock", str(last))
     wt(repo, "clear", "--force")
-    assert all(not p.parent.exists() for p in (first, last, legacy))
+    assert not first.exists() and not last.exists() and not legacy.parent.exists()
     assert untouched.is_dir() and manual.is_dir() and repo.is_dir()
     assert set(git(repo, "branch", "--format=%(refname:short)").splitlines()) == {"trunk", "manual", "unoccupied"}
     git(repo, "config", "--local", "--get-regexp", r"^branch\..*\.wt$", ok=False)
     wt(repo, "clear")  # Empty clear is a successful no-op.
     wt(other, "clear")
-    assert not untouched.parent.exists()
+    assert not untouched.exists() and untouched.parent.is_dir()
 
 
 def verify_clear_preflights_initialized_submodules(root):
@@ -117,7 +132,7 @@ def verify_clear_preflights_initialized_submodules(root):
     wt(repo, "clear", ok=False)
     assert first.is_dir() and last.is_dir(), "Submodules must be detected before any deletion"
     wt(repo, "clear", "--force")
-    assert not first.parent.exists() and not last.parent.exists()
+    assert not first.exists() and not last.exists()
 
 
 def verify_nested_clear_from_a_sandbox(root):
@@ -128,7 +143,7 @@ def verify_nested_clear_from_a_sandbox(root):
     git(parent, "merge", "--no-ff", "--no-edit", "child")
     git(repo, "merge", "--no-ff", "--no-edit", "parent")
     wt(child, "clear")
-    assert not child.parent.exists() and not parent.parent.exists()
+    assert not child.exists() and not parent.exists()
     assert (repo / "nested.txt").read_text() == "merged\n"
     assert git(repo, "branch", "--format=%(refname:short)") == "trunk"
 
@@ -145,7 +160,7 @@ def verify_merge_commit_and_cleanup(root):
     # Run from inside the sandbox to exercise deleting the process's cwd.
     wt(path, "merge")
     assert git(repo, "show", "-s", "--format=%P", "HEAD").split() == [initial, tip]
-    assert not path.parent.exists()
+    assert not path.exists()
     git(repo, "show-ref", "--verify", "refs/heads/feature/slash", ok=False)
     git(repo, "config", "--get", "branch.feature/slash.wt", ok=False)
 
@@ -164,9 +179,9 @@ def verify_bases_detached_and_nested(root):
     wt(repo, "remove", "parent", "--force", ok=False)
     commit(child, "child.txt", "nested\n")
     wt(path, "merge", "child")
-    assert (path / "child.txt").exists() and not child.parent.exists()
+    assert (path / "child.txt").exists() and not child.exists()
     wt(repo, "remove", "parent", "--force")
-    assert not path.parent.exists()
+    assert not path.exists()
 
 
 def verify_force_and_dirty_protection(root):
@@ -180,7 +195,7 @@ def verify_force_and_dirty_protection(root):
     wt(repo, "remove", "topic", "--force", ok=False)
     git(repo, "worktree", "unlock", str(path))
     wt(repo, "remove", "topic", "--force")
-    assert not path.parent.exists()
+    assert not path.exists()
     wt(repo, "remove", "trunk", "--force", ok=False)
     assert repo.exists()
 
@@ -196,7 +211,7 @@ def verify_conflict_recovery(root):
     wt(path, "merge", ok=False)
     commit(repo, "shared.txt", "resolved\n")
     wt(repo, "remove", "topic")
-    assert not path.parent.exists()
+    assert not path.exists()
 
 
 def verify_unmanaged_and_dirty_base(root):
@@ -211,7 +226,7 @@ def verify_unmanaged_and_dirty_base(root):
     assert path.exists()
     (repo / "local.txt").unlink()
     wt(repo, "merge", "topic")  # Already merged is a successful no-op plus cleanup.
-    assert not path.parent.exists()
+    assert not path.exists()
 
 
 def verify_existing_branch_and_ignored_cleanup(root):
@@ -224,7 +239,7 @@ def verify_existing_branch_and_ignored_cleanup(root):
     (path / "cache").mkdir()
     (path / "cache/build").write_text("disposable\n")
     wt(repo, "remove", "topic")
-    assert not path.parent.exists()
+    assert not path.exists()
 
 
 def verify_listing_and_existing_checkouts(root):
@@ -273,11 +288,11 @@ def verify_shell_navigation(root):
 set -eu
 . "$1"
 original=$PWD
-wt new feature
+wt new "Foo Bar"
 [ "$PWD" != "$original" ]
-[ "$(git symbolic-ref --short HEAD)" = feature ]
+[ "$(git symbolic-ref --short HEAD)" = foo-bar ]
 sandbox=$PWD
-if wt new feature; then exit 1; fi
+if wt new "FOO BAR"; then exit 1; fi
 [ "$PWD" = "$sandbox" ]
 for flag in --help -h --h --he --hel -hh; do
   wt new "$flag" >/dev/null
@@ -285,7 +300,7 @@ for flag in --help -h --h --he --hel -hh; do
 done
 wt cd trunk
 [ "$PWD" = "$original" ]
-wt cd feature
+wt cd foo-bar
 [ "$PWD" = "$sandbox" ]
 git branch unoccupied
 if wt cd unoccupied; then exit 1; fi
@@ -297,7 +312,7 @@ done
 wt list >/dev/null
 [ "$PWD" = "$sandbox" ]
 wt cd trunk
-wt merge feature
+wt merge foo-bar
 # A manually created checkout can have whitespace, even a trailing newline.
 unusual="$original/manual checkout
 "
@@ -307,7 +322,7 @@ wt cd manual
 wt cd trunk
 git worktree remove "$unusual"
 [ ! -d "$sandbox" ]
-[ ! -d "$(dirname "$sandbox")" ]
+[ -d "$(dirname "$sandbox")" ]
 ''', "wt-qa", str(ALIASES))
     finally:
         ENV["PATH"] = previous_path
@@ -320,7 +335,8 @@ def main():
         sandbox_root.mkdir()
         ENV["TMPDIR"] = str(sandbox_root)
         ENV["XDG_CACHE_HOME"] = str(root / "cache")
-        for verify in (verify_stable_private_cache_root, verify_clear_preflight_and_repository_scope,
+        for verify in (verify_display_names_and_normalized_branches,
+                       verify_stable_private_cache_root, verify_clear_preflight_and_repository_scope,
                        verify_clear_preflights_initialized_submodules, verify_nested_clear_from_a_sandbox,
                        verify_merge_commit_and_cleanup, verify_bases_detached_and_nested,
                        verify_force_and_dirty_protection, verify_conflict_recovery,

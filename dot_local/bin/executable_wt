@@ -39,7 +39,14 @@ class Worktrees:
             raise ValueError(f"Worktree for {branch!r} is missing or unavailable: {checkout.path}")
         return checkout.path
 
-    def new(self, branch, base=None):
+    def title(self):
+        branch = self.repo.current_branch()
+        record = self.repo.records().get(branch)
+        name = record.get("name") if isinstance(record, dict) else None
+        return name if isinstance(name, str) and name else branch
+
+    def new(self, name, base=None):
+        branch = "-".join(name.lower().split())
         base = base if base is not None else self.repo.current_branch()
         if not base:
             raise ValueError("Detached HEAD: supply --base with a local branch.")
@@ -47,13 +54,13 @@ class Worktrees:
             raise ValueError("Choose a valid, new branch name.")
         if not self.repo.has_branch(base):
             raise ValueError(f"Missing local base branch: {base}")
-        return self.repo.create(branch, base)
+        return self.repo.create(branch, base, name)
 
     def managed(self, branch, clearing=()):
         branch = branch or self.repo.current_branch()
         records = self.repo.records()
         record = records.get(branch)
-        if (not isinstance(record, dict) or set(record) != {"base", "path"}
+        if (not isinstance(record, dict) or set(record) not in ({"base", "path"}, {"base", "path", "name"})
                 or not all(isinstance(v, str) and v for v in record.values())
                 or record["base"] == branch):
             raise ValueError(f"Not a valid wt-managed branch: {branch or '(detached)'}")
@@ -64,7 +71,8 @@ class Worktrees:
         checkout = matches[0]
         path = Path(record["path"])
         if (checkout.path != str(path) or not path.is_absolute()
-                or path.name != "repo" or not path.parent.name.startswith("wt-")
+                or not (path.name.startswith("wt-")
+                        or (path.name == "repo" and path.parent.name.startswith("wt-")))
                 or ".." in path.parts or checkout.locked or checkout.prunable):
             raise ValueError("Sandbox path mismatch, locked, or missing worktree; repair it manually.")
         children = [name for name, value in records.items()
@@ -217,22 +225,21 @@ class GitRepository:
         return self.git("merge-base", "--is-ancestor", f"refs/heads/{branch}",
                         f"refs/heads/{base}", allowed=(0, 1)).returncode == 0
 
-    def create(self, branch, base):
+    def create(self, branch, base, name):
         cache = sandbox_root(Path.home(), os.environ)
         cache.mkdir(mode=0o700, parents=True, exist_ok=True)
         info = cache.stat()
         if cache.is_symlink() or info.st_uid != os.getuid() or info.st_mode & 0o077:
             raise ValueError(f"Sandbox root must be a private, user-owned directory (mode 700), not a symlink: {cache}")
-        root = Path(tempfile.mkdtemp(prefix="wt-", dir=cache)).resolve()
-        path = root / "repo"
+        path = Path(tempfile.mkdtemp(prefix="wt-", dir=cache)).resolve()
         try:
             self.git("worktree", "add", "--quiet", "-b", branch, str(path), f"refs/heads/{base}")
         except Exception:
             # Never recursively delete after partial Git/hook failure.
-            if not any(root.iterdir()):
-                root.rmdir()
+            if path.is_dir() and not any(path.iterdir()):
+                path.rmdir()
             raise
-        record = json.dumps({"base": base, "path": str(path)})
+        record = json.dumps({"base": base, "path": str(path), "name": name})
         try:
             self.git("config", "--local", f"branch.{branch}.wt", record)
         except Exception as error:
@@ -265,17 +272,19 @@ class GitRepository:
             self.git("branch", "-D", "--", branch)
         except RuntimeError as error:
             raise RuntimeError(f"{error}\nWorktree removed; branch retained. "
-                               f"Inspect it and delete it manually; empty sandbox: {checkout.parent}") from error
+                               f"Inspect it and delete it manually; removed checkout: {checkout}") from error
+        if checkout.name != "repo":
+            return  # Flat layout: the parent is the shared cache, not a sandbox container.
         try:
-            checkout.parent.rmdir()  # Remove only the empty container, never unrelated contents.
+            checkout.parent.rmdir()  # Legacy layout: remove only the empty container.
         except OSError as error:
             print(f"Branch/worktree removed; retained sandbox container {checkout.parent}: {error}",
                   file=sys.stderr)
 
 
-def rename_tab(branch, environment, run):
+def rename_tab(title, environment, run):
     """Resolve the caller's live tab, never the UI-focused tab. Effects are injected."""
-    if not branch:
+    if not title:
         return
     try:
         if environment.get("HERDR_ENV") == "1":
@@ -284,7 +293,7 @@ def rename_tab(branch, environment, run):
                 return
             response = json.loads(run(["herdr", "pane", "current", "--current"]))
             target = response["result"]["pane"]["tab_id"]
-            command = ["herdr", "tab", "rename", "--", target, branch]
+            command = ["herdr", "tab", "rename", "--", target, title]
         else:
             session, block = environment.get("REX_SESSION"), environment.get("REX_BLOCK")
             if not session or not block:
@@ -294,7 +303,7 @@ def rename_tab(branch, environment, run):
             if response["session_id"] != session or response["block"]["block_id"] != block:
                 raise ValueError("Rex returned a different caller; tab not renamed.")
             target = response["block"]["window_id"]
-            command = [*prefix, "window", "rename", "-s", session, "--", target, branch]
+            command = [*prefix, "window", "rename", "-s", session, "--", target, title]
     except (KeyError, TypeError, json.JSONDecodeError) as error:
         raise ValueError("Could not resolve the calling pane's tab.") from error
     if not isinstance(target, str) or not target:
@@ -310,12 +319,12 @@ def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     # Private shell hook: called only after builtin cd succeeds.
     if argv == ["_rename-tab"]:
-        rename_tab(GitRepository().current_branch(), os.environ, run_tab_command)
+        rename_tab(Worktrees(GitRepository()).title(), os.environ, run_tab_command)
         return 0
     parser = argparse.ArgumentParser(description="Create, list, navigate, merge, and remove Git worktrees.")
     commands = parser.add_subparsers(dest="command", required=True)
     new = commands.add_parser("new", help="create a sandbox from the current local branch")
-    new.add_argument("branch")
+    new.add_argument("name", help="display name; branch is lowercased with whitespace replaced by hyphens")
     new.add_argument("--base", help="use another local branch instead")
     commands.add_parser("list", help="list all worktrees in this repository by branch and path")
     cd = commands.add_parser("cd", help="enter an existing branch checkout (print its path without shell integration)")
@@ -331,7 +340,7 @@ def main(argv=None):
     repository = GitRepository()
     worktrees = Worktrees(repository)
     if args.command == "new":
-        print(worktrees.new(args.branch, args.base))
+        print(worktrees.new(args.name, args.base))
     elif args.command == "list":
         print(worktrees.list())
     elif args.command == "cd":
