@@ -58,6 +58,13 @@ All commit messages MUST follow the
 [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/)
 specification.
 
+Commit and change descriptions should explain why a change was made, not only
+what changed. When a change has a notable effect on users, teammates, or
+systems, add an `Impact:` trailer summarizing that effect in one line, citing
+evidence when known (a metric, a launch, a team unblocked). Omit it for routine
+changes. A repository's own conventions take precedence where they define a
+different trailer or disallow custom ones.
+
 During implementation, classify changes into two tracks but put them under one
 commit:
 
