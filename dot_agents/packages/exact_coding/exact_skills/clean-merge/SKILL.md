@@ -36,6 +36,23 @@ For a linked worktree in a multiplexer pane:
 
    For Herdr, replace the final line with `herdr pane close "$HERDR_PANE_ID"`.
 
+### `wt` sandboxes
+
+If `git config --get "branch.$FEATURE_BRANCH.wt"` succeeds, the branch is a `wt`
+sandbox. Merge into its recorded `base`, not main or master, and let `wt` merge
+and clean up in one step. Because `wt merge` also removes the sandbox, verify
+the sandbox before merging. Capture `MAIN_ROOT` with `command wt cd "$BASE"`.
+The final call is:
+
+```sh
+cd "$MAIN_ROOT" &&
+wt merge "$FEATURE_BRANCH" &&
+rex block close -s "$REX_SESSION" "$REX_BLOCK"
+```
+
+If `wt merge` refuses or conflicts, follow the recovery steps in its error and
+in `docs/wt.md`; do not fall back to manual removal.
+
 Shell variables do not persist between tool calls. Supply their values in that
 final call. Do not split removal and pane closure across calls or schedule any
 further tools after removal. Do not force removal if Git refuses cleanup.
@@ -50,8 +67,7 @@ If you're on a multiplexer, close your pane / shell.
 
 - **Rex:** When `REX_SESSION` and `REX_BLOCK` are set, run
   `rex block close -s "$REX_SESSION" "$REX_BLOCK"`.
-- **Herdr:** When `HERDR_ENV=1`, run
-  `herdr pane close "$HERDR_PANE_ID"`.
+- **Herdr:** When `HERDR_ENV=1`, run `herdr pane close "$HERDR_PANE_ID"`.
 
 Close only your own pane, as the final operation after worktree and branch
 cleanup. When removing the active worktree, include this command in the same
