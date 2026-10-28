@@ -97,7 +97,10 @@ def verify_clear_preflight_and_repository_scope(root):
     last = Path(wt(repo, "new", "z-unmerged"))
     commit(last, "new.txt", "unmerged\n")
     (last / "untracked").write_text("uncommitted\n")
-    untouched = Path(wt(other, "new", "a-clean"))
+    wt(other, "new", "a-clean", ok=False)
+    assert first.is_dir()
+    git(other, "show-ref", "--verify", "refs/heads/a-clean", ok=False)
+    untouched = Path(wt(other, "new", "other-clean"))
     manual = root / "unmanaged-clear"
     git(repo, "worktree", "add", "-qb", "manual", str(manual))
     git(repo, "branch", "unoccupied")
@@ -151,7 +154,9 @@ def verify_nested_clear_from_a_sandbox(root):
 def verify_merge_commit_and_cleanup(root):
     repo = setup(root, "merge with spaces")
     path = Path(wt(repo, "new", "feature/slash"))
-    assert path.is_absolute() and path.is_dir(), path
+    assert path == Path(ENV["XDG_CACHE_HOME"]) / "wt" / "wt-feature-slash" and path.is_dir(), path
+    wt(repo, "new", "feature-slash", ok=False)
+    git(repo, "show-ref", "--verify", "refs/heads/feature-slash", ok=False)
     initial = git(repo, "rev-parse", "HEAD")
     assert git(path, "rev-parse", "HEAD") == initial
     commit(path, "feature.txt", "feature\n")

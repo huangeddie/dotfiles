@@ -573,6 +573,11 @@ class TabTitleTest(unittest.TestCase):
         self.assertEqual(len(self.calls), 1)
 
 
+class SandboxNameTest(unittest.TestCase):
+    def test_branch_slashes_become_hyphens_in_directory_name(self):
+        self.assertEqual(script["sandbox_name"]("feature/login"), "wt-feature-login")
+
+
 class ParsingTest(unittest.TestCase):
     def test_nul_delimited_paths_preserve_spaces_and_newlines(self):
         output = ("worktree /my project\0HEAD abc\0branch refs/heads/trunk\0\0"

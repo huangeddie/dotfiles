@@ -8,7 +8,6 @@ import os
 from pathlib import Path
 import subprocess
 import sys
-import tempfile
 
 
 @dataclass
@@ -135,6 +134,10 @@ class Worktrees:
         self.repo.delete(branch, checkout.path, force)
 
 
+def sandbox_name(branch):
+    return "wt-" + branch.replace("/", "-")
+
+
 def sandbox_root(home, environment):
     cache = Path(environment.get("XDG_CACHE_HOME", ""))
     return (cache if cache.is_absolute() else home / ".cache") / "wt"
@@ -231,7 +234,12 @@ class GitRepository:
         info = cache.stat()
         if cache.is_symlink() or info.st_uid != os.getuid() or info.st_mode & 0o077:
             raise ValueError(f"Sandbox root must be a private, user-owned directory (mode 700), not a symlink: {cache}")
-        path = Path(tempfile.mkdtemp(prefix="wt-", dir=cache)).resolve()
+        path = cache / sandbox_name(branch)
+        try:
+            path.mkdir(mode=0o700)
+        except FileExistsError as error:
+            raise ValueError(f"Sandbox path already exists: {path}") from error
+        path = path.resolve()
         try:
             self.git("worktree", "add", "--quiet", "-b", branch, str(path), f"refs/heads/{base}")
         except Exception:

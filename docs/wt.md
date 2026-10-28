@@ -32,8 +32,10 @@ wt merge feature
 
 ## Contract
 
-- `new` creates a new local branch and a unique `wt-*` checkout directly beneath
-  `~/.cache/wt`, or `$XDG_CACHE_HOME/wt` when `XDG_CACHE_HOME` is absolute. The
+- `new` creates a new local branch and a `wt-<branch>` checkout directly beneath
+  `~/.cache/wt`, or `$XDG_CACHE_HOME/wt` when `XDG_CACHE_HOME` is absolute. Slashes
+  in the branch name become hyphens in the directory name. If the path already
+  exists, creation is rejected, including collisions with other repositories. The
   shared root is created with mode 700; an existing non-private, foreign-owned,
   or symlink root is rejected. The shell wrapper enters the new directory only
   if creation succeeds. Existing branches are rejected. `TMPDIR` no longer
