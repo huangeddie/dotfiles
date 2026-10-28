@@ -315,6 +315,17 @@ packages:
     install:
       darwin:
         brew: "stylua"
+  superfile:
+    role: base
+    install:
+      darwin:
+        brew: "superfile"
+      linux:
+        custom:
+          executable: "spf"
+          install: |-
+            curl -fsSL https://superfile.dev/install.sh | bash
+        order: 100
   swiftformat:
     role: base
     install:
