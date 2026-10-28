@@ -44,7 +44,8 @@ wt merge feature
   The original name is saved for the tab/window title. Empty or invalid branch
   names and collisions after normalization are rejected; other Git-valid
   characters such as `/` are preserved. `cd`, `merge`, `remove`, and `--base`
-  still use exact branch names.
+  still use exact branch names. Git hooks run by `git worktree add` (such as
+  `post-checkout`) stream their output to stderr as they run.
 - `list` prints branch and path columns separated by a tab. It includes the
   original checkout, unmanaged worktrees, and detached worktrees (labeled
   `(detached)`). It lists worktrees, not branches without checkouts.
