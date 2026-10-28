@@ -66,13 +66,18 @@ def verify_stable_private_cache_root(root):
     repo = setup(root, "stable-root")
     cache = Path(ENV["XDG_CACHE_HOME"]) / "wt"
     first = Path(wt(repo, "new", "first"))
-    assert first.parent == cache and first.name.startswith("wt-"), first
+    assert first == cache / "first", first
     assert cache.stat().st_mode & 0o777 == 0o700
     wt(repo, "remove", "first")
     assert cache.is_dir() and not first.exists()
     second = Path(wt(repo, "new", "second"))
     assert second.parent == cache and first != second
     wt(repo, "remove", "second")
+    for branch in ("repo", "wt"):
+        path = Path(wt(repo, "new", branch))
+        assert path == cache / branch
+        wt(repo, "remove", branch)
+        assert cache.is_dir() and not path.exists()
     cache.chmod(0o755)
     try:
         wt(repo, "new", "unsafe", ok=False)
@@ -154,7 +159,7 @@ def verify_nested_clear_from_a_sandbox(root):
 def verify_merge_commit_and_cleanup(root):
     repo = setup(root, "merge with spaces")
     path = Path(wt(repo, "new", "feature/slash"))
-    assert path == Path(ENV["XDG_CACHE_HOME"]) / "wt" / "wt-feature-slash" and path.is_dir(), path
+    assert path == Path(ENV["XDG_CACHE_HOME"]) / "wt" / "feature-slash" and path.is_dir(), path
     wt(repo, "new", "feature-slash", ok=False)
     git(repo, "show-ref", "--verify", "refs/heads/feature-slash", ok=False)
     initial = git(repo, "rev-parse", "HEAD")

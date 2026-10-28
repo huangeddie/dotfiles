@@ -32,7 +32,7 @@ wt merge feature
 
 ## Contract
 
-- `new` creates a new local branch and a `wt-<branch>` checkout directly beneath
+- `new` creates a new local branch and a `<branch>` checkout directly beneath
   `~/.cache/wt`, or `$XDG_CACHE_HOME/wt` when `XDG_CACHE_HOME` is absolute. Slashes
   in the branch name become hyphens in the directory name. If the path already
   exists, creation is rejected, including collisions with other repositories. The
@@ -94,7 +94,8 @@ wt merge feature
   An empty batch succeeds. If an unexpected Git/filesystem failure occurs during
   deletion, clear stops; already-completed deletions are not rolled back.
 - Cleanup removes the registered worktree, its local branch and branch config.
-  The shared cache root itself is always retained. Legacy `wt-*/repo` sandboxes
+  The shared cache root itself is always retained. Existing `wt-<branch>` checkouts
+  remain manageable and are not renamed. Legacy `wt-*/repo` sandboxes
   remain manageable, including those outside the cache; they are not relocated.
   Only their empty `wt-*` container is removed afterward; unexpected files
   outside `repo` are retained rather than recursively deleted.

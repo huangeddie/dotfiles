@@ -128,9 +128,24 @@ class LifecycleTest(unittest.TestCase):
         self.assertEqual(self.repo.events, [("delete", "topic", "/cache/wt/wt-flat", True)])
         self.assertEqual(self.repo.checkouts, [Checkout("/project", "trunk")])
 
+    def test_unprefixed_sandbox_removal_preserves_original_checkout(self):
+        for branch, path in (("topic", "/cache/wt/topic"),
+                             ("feature/a", "/cache/wt/feature-a"),
+                             ("repo", "/cache/wt/repo"),
+                             ("wt", "/cache/wt/wt")):
+            with self.subTest(branch=branch):
+                repo = Repository()
+                repo.create(branch, "trunk")
+                repo.metadata[branch]["path"] = path
+                repo.checkouts[1].path = path
+                repo.events.clear()
+                Worktrees(repo).remove(branch, force=True)
+                self.assertEqual(repo.events, [("delete", branch, path, True)])
+                self.assertEqual(repo.checkouts, [Checkout("/project", "trunk")])
+
     def test_shared_cache_and_non_sandbox_paths_cannot_be_removed(self):
         self.sandbox()
-        for path in ("/cache/wt", "/cache/wt/unrelated", "/cache/wt/wt-flat/../wt-other"):
+        for path in ("/cache/wt", "/cache/wt/unrelated", "/elsewhere/topic", "/cache/wt/wt-flat/../wt-other"):
             self.repo.metadata["topic"]["path"] = path
             self.repo.checkouts[1].path = path
             with self.subTest(path=path), self.assertRaises(ValueError):
@@ -575,7 +590,11 @@ class TabTitleTest(unittest.TestCase):
 
 class SandboxNameTest(unittest.TestCase):
     def test_branch_slashes_become_hyphens_in_directory_name(self):
-        self.assertEqual(script["sandbox_name"]("feature/login"), "wt-feature-login")
+        self.assertEqual(script["sandbox_name"]("feature/login"), "feature-login")
+
+    def test_branch_directory_name_has_no_added_prefix(self):
+        self.assertEqual(script["sandbox_name"]("term-breakdowns"), "term-breakdowns")
+        self.assertEqual(script["sandbox_name"]("wt-topic"), "wt-topic")
 
 
 class ParsingTest(unittest.TestCase):

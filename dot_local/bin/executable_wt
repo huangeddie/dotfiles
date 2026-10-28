@@ -70,7 +70,8 @@ class Worktrees:
         checkout = matches[0]
         path = Path(record["path"])
         if (checkout.path != str(path) or not path.is_absolute()
-                or not (path.name.startswith("wt-")
+                or not ((path.parent.name == "wt" and path.name == sandbox_name(branch))
+                        or path.name.startswith("wt-")
                         or (path.name == "repo" and path.parent.name.startswith("wt-")))
                 or ".." in path.parts or checkout.locked or checkout.prunable):
             raise ValueError("Sandbox path mismatch, locked, or missing worktree; repair it manually.")
@@ -135,7 +136,7 @@ class Worktrees:
 
 
 def sandbox_name(branch):
-    return "wt-" + branch.replace("/", "-")
+    return branch.replace("/", "-")
 
 
 def sandbox_root(home, environment):
@@ -281,7 +282,7 @@ class GitRepository:
         except RuntimeError as error:
             raise RuntimeError(f"{error}\nWorktree removed; branch retained. "
                                f"Inspect it and delete it manually; removed checkout: {checkout}") from error
-        if checkout.name != "repo":
+        if checkout.name != "repo" or not checkout.parent.name.startswith("wt-"):
             return  # Flat layout: the parent is the shared cache, not a sandbox container.
         try:
             checkout.parent.rmdir()  # Legacy layout: remove only the empty container.
