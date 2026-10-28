@@ -17,6 +17,9 @@ export PAGER=bat
 # Without this, macOS lazygit reads ~/Library/Application Support/lazygit instead.
 export XDG_CONFIG_HOME="$HOME/.config"
 
+# Restore Homebrew ahead of system paths after macOS path_helper reorders PATH.
+[ -x /opt/homebrew/bin/brew ] && eval "$(/opt/homebrew/bin/brew shellenv)"
+
 export GOPATH="$HOME/.local/share/go"
 export PATH="$HOME/.local/bin:$PATH"
 export PATH="$HOME/.cargo/bin:$PATH"
