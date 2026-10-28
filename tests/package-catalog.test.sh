@@ -188,7 +188,7 @@ for name, os, roles in [('darwin-base', 'darwin', ['base']),
     expected = copy.deepcopy(fixture[name])
     expected['homebrew']['trustedCasks'] = ['peteonrails/voxtype/voxtype'] if os == 'darwin' else []
     if os == 'darwin':
-        expected['homebrew']['brews'].append('scc')
+        expected['homebrew']['brews'].extend(['scc', 'xcodegen'])
         expected['homebrew']['brews'].sort()
     else:
         index = next(i for i, recipe in enumerate(expected['custom']) if recipe['name'] == 'lazygit') + 1
