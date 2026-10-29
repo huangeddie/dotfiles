@@ -6,15 +6,15 @@ description:
 ---
 
 Close the multiplexer pane you are running in. Closing it ends your session, so
-finish any reporting first and make the close command your final tool call.
+finish any reporting first and make `close` your final tool call:
 
-Resolve the pane from your own environment, never from UI focus:
+```sh
+close
+```
 
-- **Herdr:** When `HERDR_ENV=1`, run `herdr pane close "$HERDR_PANE_ID"`. This
-  takes precedence when Herdr is nested in Rex; close only the Herdr pane.
-- **Rex:** Otherwise, when `REX_SESSION` and `REX_BLOCK` are set, run
-  `rex block close -s "$REX_SESSION" "$REX_BLOCK"`.
-- **Neither:** Report that you are not in a supported multiplexer pane.
+`close` resolves your pane from the inherited Rex or Herdr environment, never
+from UI focus, and prefers Herdr when it is nested in Rex. If it reports that
+you are not in a Rex or Herdr pane, relay that instead of closing anything.
 
-To close after removing your worktree, append the command to the removal in the
+To close after removing your worktree, append `close` to the removal in the
 same Bash call; see the `clean-merge` skill.

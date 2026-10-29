@@ -20,9 +20,9 @@ their commands start.
 For a linked worktree in a multiplexer pane:
 
 1. Complete the merge and verify the merged result before cleanup.
-2. Capture the absolute canonical checkout and worktree paths, feature branch,
-   and multiplexer session / pane IDs while the worktree exists. Confirm the
-   canonical checkout is outside the worktree being removed.
+2. Capture the absolute canonical checkout and worktree paths and the feature
+   branch while the worktree exists. Confirm the canonical checkout is outside
+   the worktree being removed.
 3. Report verification results and announce cleanup; do not claim cleanup has
    succeeded yet.
 4. In **one final Bash tool call**, set the captured values and execute:
@@ -31,10 +31,10 @@ For a linked worktree in a multiplexer pane:
    cd "$MAIN_ROOT" &&
    git worktree remove "$WORKTREE_PATH" &&
    git branch -d "$FEATURE_BRANCH" &&
-   rex block close -s "$REX_SESSION" "$REX_BLOCK"
+   close
    ```
 
-   For Herdr, replace the final line with `herdr pane close "$HERDR_PANE_ID"`.
+   `close` closes your Rex or Herdr pane; see the `close` skill.
 
 ### `wt` sandboxes
 
@@ -47,7 +47,7 @@ The final call is:
 ```sh
 cd "$MAIN_ROOT" &&
 wt merge "$FEATURE_BRANCH" &&
-rex block close -s "$REX_SESSION" "$REX_BLOCK"
+close
 ```
 
 If `wt merge` refuses or conflicts, follow the recovery steps in its error and

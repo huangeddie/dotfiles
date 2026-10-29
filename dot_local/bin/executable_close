@@ -1,0 +1,29 @@
+#!/usr/bin/env python3
+"""Close the multiplexer pane this process runs in."""
+import os
+import sys
+
+
+def close_command(environment):
+    # Herdr nested in Rex owns the inner pane, so it takes precedence.
+    if environment.get("HERDR_ENV") == "1":
+        pane = environment.get("HERDR_PANE_ID")
+        return ["herdr", "pane", "close", "--", pane] if pane else None
+    session, block = environment.get("REX_SESSION"), environment.get("REX_BLOCK")
+    if not session or not block:
+        return None
+    return ["rex", "--autostart=false", "--timeout", "2s", "block", "close", "-s", session, "--", block]
+
+
+def main(environment=os.environ, execute=os.execvp):
+    command = close_command(environment)
+    if command is None:
+        print("close: not in a Rex or Herdr pane", file=sys.stderr)
+        return 1
+    # Closing the pane ends this process, so hand it over to the multiplexer.
+    execute(command[0], command)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
