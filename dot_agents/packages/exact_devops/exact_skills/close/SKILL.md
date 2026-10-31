@@ -1,20 +1,29 @@
 ---
 name: close
 description:
-  Closes the multiplexer pane the agent is running in. Use when asked to close
-  your pane, tab, or terminal.
+  Use when asked to close the agent's pane, tab, terminal, or multiplexer session.
 ---
 
-Close the multiplexer pane you are running in. Closing it ends your session, so
-finish any reporting first and make `close` your final tool call:
+In Rex, close the entire session identified by `REX_SESSION`, including all its
+windows and panes—not just the agent's window or pane. In Herdr, close only the
+agent's pane; Herdr takes precedence when nested in Rex.
+
+Finish any reporting first, then make these commands your final tool call:
 
 ```sh
-close
+if [ "${HERDR_ENV:-}" = 1 ]; then
+  close
+elif [ -n "${REX_SESSION:-}" ]; then
+  rex --autostart=false --timeout 2s kill -- "$REX_SESSION"
+else
+  printf '%s\n' 'Not in a Rex session or Herdr pane; nothing closed.' >&2
+  exit 1
+fi
 ```
 
-`close` resolves your pane from the inherited Rex or Herdr environment, never
-from UI focus, and prefers Herdr when it is nested in Rex. If it reports that
-you are not in a Rex or Herdr pane, relay that instead of closing anything.
+Use inherited context, never UI focus. If context is missing or the command
+fails, report the error instead of selecting another target. The standalone
+`close` helper closes only a pane, so use it only for the Herdr branch above.
 
-To close after removing your worktree, append `close` to the removal in the
-same Bash call; see the `clean-merge` skill.
+To close after removing your worktree, run the closing commands above after
+successful removal in the same Bash call.
