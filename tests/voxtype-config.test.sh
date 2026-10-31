@@ -42,13 +42,13 @@ def render_for_os(path, platform):
                    "execute-template", "-f", str(path))
 
 
-def test_voxtype_darwin_uses_native_output_and_preserves_shared_settings():
+def test_voxtype_darwin_uses_clipboard_and_preserves_shared_settings():
     linux = tomllib.loads(render_for_os(config_file, "linux"))
     darwin = tomllib.loads(render_for_os(config_file, "darwin"))
-    assert darwin["output"]["mode"] == "type", darwin["output"]
+    assert darwin["output"]["mode"] == "clipboard", darwin["output"]
     assert "paste_keys" not in darwin["output"], darwin["output"]
     assert "driver_order" not in darwin["output"], darwin["output"]
-    linux["output"]["mode"] = "type"
+    linux["output"]["mode"] = "clipboard"
     del linux["output"]["paste_keys"]
     del linux["output"]["driver_order"]
     assert darwin == linux, "Only platform-specific output settings should differ"
