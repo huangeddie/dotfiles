@@ -1,0 +1,15 @@
+{{- $trustedFormulae := .trustedFormulae -}}
+{{- $trustedCasks := .trustedCasks -}}
+{{- range $tap := .taps }}
+tap {{ $tap | quote }}
+{{- end }}
+{{- range $brew := .brews }}
+brew {{ $brew | quote }}{{ if has $brew $trustedFormulae }}, trusted: true{{ end }}
+{{- end }}
+{{- range $cask := .casks }}
+{{- $trustedName := "" -}}
+{{- range $name := $trustedCasks -}}
+  {{- if or (eq $cask $name) (eq $cask (last (splitList "/" $name))) -}}{{- $trustedName = $name -}}{{- end -}}
+{{- end }}
+cask {{ default $cask $trustedName | quote }}{{ if $trustedName }}, trusted: true{{ end }}
+{{- end -}}

@@ -56,12 +56,34 @@ if [[ -f "$global_manifest" ]]; then
   done <<<"$current_package_output"
 fi
 
-desired_specs=()
+is_current_package() {
+  local candidate=$1
+  local package
+
+  if (( ${#current_packages[@]} == 0 )); then
+    return 1
+  fi
+
+  for package in "${current_packages[@]}"; do
+    if [[ "$candidate" == "$package" ]]; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+missing_specs=()
 if (( ${#desired_packages[@]} > 0 )); then
   for package in "${desired_packages[@]}"; do
-    desired_specs+=("$package@latest")
+    if ! is_current_package "$package"; then
+      missing_specs+=("$package@latest")
+    fi
   done
-  bun add --global "${desired_specs[@]}"
+fi
+
+if (( ${#missing_specs[@]} > 0 )); then
+  bun add --global "${missing_specs[@]}"
 fi
 
 packages_to_remove=()

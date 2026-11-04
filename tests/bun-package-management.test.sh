@@ -107,11 +107,17 @@ case "${1:-}" in
     printf '\t%s' "$@" >>"$BUN_INVOCATION_LOG"
     printf '\n' >>"$BUN_INVOCATION_LOG"
     mkdir -p "$BUN_INSTALL/bin"
-    cat >"$BUN_INSTALL/bin/prettier" <<'PRETTIER'
+    for arg in "$@"; do
+      if [[ "$arg" != --* ]]; then
+        bin_name="${arg%@latest}"
+        bin_name="${bin_name##*/}"
+        cat >"$BUN_INSTALL/bin/$bin_name" <<'STUB'
 #!/usr/bin/env bash
-printf '%s\n' 3.9.6
-PRETTIER
-    chmod +x "$BUN_INSTALL/bin/prettier"
+printf '%s\n' 1.0.0
+STUB
+        chmod +x "$BUN_INSTALL/bin/$bin_name"
+      fi
+    done
     ;;
   remove)
     printf 'remove' >>"$BUN_INVOCATION_LOG"
@@ -144,18 +150,22 @@ JSON
 
 run_reconciliation_case "$test_root/execution.sh" "$test_root/declared-case" \
   'is-number prettier'
-printf 'add\t--global\thunkdiff@latest\tprettier@latest\nremove\t--global\tis-number\n' \
+printf 'add\t--global\thunkdiff@latest\nremove\t--global\tis-number\n' \
   >"$test_root/expected-declared-invocations.log"
 diff -u \
   "$test_root/expected-declared-invocations.log" \
   "$test_root/declared-case/bun-invocation.log"
-test -x "$test_root/declared-case/bun-home/bin/prettier"
-PATH="$test_root/declared-case/bun-home/bin:$PATH" prettier --version >/dev/null
+test -x "$test_root/declared-case/bun-home/bin/hunkdiff"
+PATH="$test_root/declared-case/bun-home/bin:$PATH" hunkdiff --version >/dev/null
+
+run_reconciliation_case "$test_root/execution.sh" "$test_root/already-installed-case" \
+  'hunkdiff prettier'
+test ! -e "$test_root/already-installed-case/bun-invocation.log"
 
 render_execution denied-hunkdiff '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"packagePolicy":{"deniedPrefixes":["hunkdiff"]}}'
 run_reconciliation_case "$test_root/denied-hunkdiff.sh" "$test_root/denied-case" \
   'hunkdiff is-number prettier'
-printf 'add\t--global\tprettier@latest\nremove\t--global\thunkdiff\tis-number\n' \
+printf 'remove\t--global\thunkdiff\tis-number\n' \
   >"$test_root/expected-denied-invocations.log"
 diff -u \
   "$test_root/expected-denied-invocations.log" \
@@ -164,7 +174,7 @@ diff -u \
 render_execution legacy-denied-hunkdiff '{"chezmoi":{"os":"linux"},"machineRoles":["base"],"blocked_prefixes":["hunkdiff"]}'
 run_reconciliation_case "$test_root/legacy-denied-hunkdiff.sh" "$test_root/legacy-denied-case" \
   'hunkdiff is-number prettier'
-printf 'add\t--global\tprettier@latest\nremove\t--global\thunkdiff\tis-number\n' \
+printf 'remove\t--global\thunkdiff\tis-number\n' \
   >"$test_root/expected-legacy-denied-invocations.log"
 diff -u \
   "$test_root/expected-legacy-denied-invocations.log" \

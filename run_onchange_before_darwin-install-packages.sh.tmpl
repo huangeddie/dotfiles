@@ -1,10 +1,5 @@
 {{- if eq .chezmoi.os "darwin" -}}
 {{- $plan := includeTemplate "resolve-packages.tmpl" . | fromJson -}}
-{{- $selectedTaps := $plan.homebrew.taps -}}
-{{- $selectedTrustedFormulae := $plan.homebrew.trustedFormulae -}}
-{{- $selectedTrustedCasks := $plan.homebrew.trustedCasks -}}
-{{- $selectedBrews := $plan.homebrew.brews -}}
-{{- $selectedCasks := $plan.homebrew.casks -}}
 #!/bin/bash
 set -euo pipefail
 
@@ -25,23 +20,11 @@ export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 brewfile=$(mktemp)
 trap 'rm -f "$brewfile"' EXIT
 cat >"$brewfile" <<'EOF'
-{{- range $tap := $selectedTaps }}
-tap {{ $tap | quote }}
-{{- end }}
-{{- range $brew := $selectedBrews }}
-brew {{ $brew | quote }}{{ if has $brew $selectedTrustedFormulae }}, trusted: true{{ end }}
-{{- end }}
-{{- range $cask := $selectedCasks }}
-{{- $trustedName := "" -}}
-{{- range $name := $selectedTrustedCasks -}}
-  {{- if or (eq $cask $name) (eq $cask (last (splitList "/" $name))) -}}{{- $trustedName = $name -}}{{- end -}}
-{{- end }}
-cask {{ default $cask $trustedName | quote }}{{ if $trustedName }}, trusted: true{{ end }}
-{{- end }}
+{{- template "brewfile.tmpl" $plan.homebrew }}
 EOF
 
 echo "==> Syncing Homebrew packages via brew bundle (strict)"
-brew bundle install --file="$brewfile" --verbose
+brew bundle install --file="$brewfile" --no-upgrade --verbose
 brew bundle cleanup --file="$brewfile" --force
 rm -f "$brewfile"
 trap - EXIT

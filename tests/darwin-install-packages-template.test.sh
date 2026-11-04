@@ -120,7 +120,7 @@ python3 - "$brew_calls" "$brewfile_input" <<'PY'
 import pathlib, shlex, sys
 calls = [shlex.split(line) for line in pathlib.Path(sys.argv[1]).read_text().splitlines()]
 assert [call[:2] for call in calls] == [['bundle', 'install'], ['bundle', 'cleanup']], calls
-assert '--verbose' in calls[0] and '--force-cleanup' not in calls[0], calls
+assert '--no-upgrade' in calls[0] and '--verbose' in calls[0] and '--force-cleanup' not in calls[0], calls
 assert '--force' in calls[1], calls
 files = [next(arg.removeprefix('--file=') for arg in call if arg.startswith('--file=')) for call in calls]
 assert files[0] == files[1] and files[0] != '/dev/stdin', files
