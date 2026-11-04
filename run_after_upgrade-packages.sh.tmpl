@@ -1,0 +1,12 @@
+{{- $upgrade := false -}}
+{{- if hasKey . "upgradePackages" -}}
+{{-   $raw := get . "upgradePackages" -}}
+{{-   if not (kindIs "bool" $raw) -}}{{ fail "upgradePackages must be a boolean" }}{{- end -}}
+{{-   $upgrade = $raw -}}
+{{- end -}}
+{{- if $upgrade -}}
+{{- $plan := includeTemplate "resolve-packages.tmpl" . | fromJson -}}
+#!/bin/bash
+set -euo pipefail
+{{ template "upgrade-packages.sh.tmpl" (dict "os" .chezmoi.os "plan" $plan) }}
+{{- end -}}

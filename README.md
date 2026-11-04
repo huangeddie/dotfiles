@@ -132,9 +132,13 @@ chezmoi data | jq '{machineRoles, packagePolicy}'
 chezmoi diff
 ```
 
-Inspect all removals in `chezmoi diff` before `chezmoi apply`. Do not add
-network or production-package QA to automated CI; run any real package changes
-manually on the intended machine.
+Inspect all removals in `chezmoi diff` before `chezmoi apply`. Default `chezmoi apply` (`cza`) installs missing declared packages and removes retired/undesired ones without upgrading already-installed packages. To explicitly upgrade installed Homebrew, Bun global, and declared Linux `apt` packages, pass `--override-data '{"upgradePackages":true}'` (or use the `czau` alias):
+
+```bash
+chezmoi apply --override-data '{"upgradePackages":true}'
+```
+
+Do not add network or production-package QA to automated CI; run any real package changes manually on the intended machine.
 
 ## Chezmoi sync
 

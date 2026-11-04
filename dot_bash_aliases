@@ -80,5 +80,6 @@ alias la='ls -a'
 alias cz='chezmoi'
 alias czd='cd $(chezmoi source-path)'
 alias cza='chezmoi apply --force'
+alias czau='chezmoi apply --force --override-data '\''{"upgradePackages":true}'\'''
 alias czs='chezmoi status'
 

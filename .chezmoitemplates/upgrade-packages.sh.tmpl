@@ -1,0 +1,149 @@
+{{- if and (eq .os "darwin") (or (gt (len .plan.homebrew.taps) 0) (gt (len .plan.homebrew.brews) 0) (gt (len .plan.homebrew.casks) 0)) }}
+(
+  if ! command -v brew >/dev/null 2>&1; then
+    echo "brew not found; run chezmoi apply first to install Homebrew" >&2
+    exit 1
+  fi
+
+  export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+  brewfile=$(mktemp)
+  trap 'rm -f "$brewfile"' EXIT
+  cat >"$brewfile" <<'EOF'
+{{- template "brewfile.tmpl" .plan.homebrew }}
+EOF
+
+  echo "==> Upgrading Homebrew packages via brew bundle"
+  brew bundle install --file="$brewfile" --verbose
+)
+{{- end }}
+{{- if and (eq .os "linux") (gt (len .plan.apt.install) 0) }}
+apt_install_packages=(
+{{- range .plan.apt.install }}
+  {{ . | quote }}
+{{- end }}
+)
+apt_remove_packages=(
+{{- range .plan.apt.remove }}
+  {{ . | quote }}
+{{- end }}
+)
+
+query_dpkg_state() {
+  dpkg-query -W -f='${Status}' "$1" 2>/dev/null
+}
+
+is_installed() {
+  local raw_state want error state
+  raw_state=$(query_dpkg_state "$1") || return 1
+  read -r want error state <<<"$raw_state"
+  [[ "$state" == "installed" ]]
+}
+
+simulate_apt() {
+  local result_variable=$1
+  local operation=$2
+  local output
+  shift 2
+
+  if ! output=$(LC_ALL=C apt-get --simulate "$@" 2>&1); then
+    echo "apt $operation simulation failed:" >&2
+    printf '%s\n' "$output" >&2
+    return 1
+  fi
+
+  printf -v "$result_variable" '%s' "$output"
+}
+
+assert_safe_removal_plan() {
+  local operation=$1
+  local output=$2
+  local package base_package summary removal_count
+  local -a planned=()
+  local -a unexpected=()
+  shift 2
+  declare -A allowed=()
+
+  for package in "$@"; do
+    allowed["$package"]=1
+  done
+
+  summary=$(grep -Eo '[0-9]+ to remove' <<<"$output" | tail -n 1 || true)
+  if [[ -z "$summary" ]]; then
+    echo "cannot validate apt $operation simulation; removal summary not recognized:" >&2
+    printf '%s\n' "$output" >&2
+    return 1
+  fi
+  removal_count=${summary%% *}
+
+  mapfile -t planned < <(
+    awk '$1 == "Remv" || $1 == "Purg" { print $2 }' <<<"$output"
+  )
+
+  if (( ${#planned[@]} != removal_count )); then
+    echo "cannot validate apt $operation simulation; expected $removal_count removal actions but parsed ${#planned[@]}:" >&2
+    printf '%s\n' "$output" >&2
+    return 1
+  fi
+
+  for package in "${planned[@]}"; do
+    base_package="${package%%:*}"
+    if [[ -z "${allowed[$package]+present}" && -z "${allowed[$base_package]+present}" ]]; then
+      unexpected+=("$package")
+    fi
+  done
+
+  if (( ${#unexpected[@]} > 0 )); then
+    echo "apt $operation simulation proposed removals outside apt.remove" >&2
+    echo "allowed removals: ${*:-<none>}" >&2
+    echo "planned removals: ${planned[*]}" >&2
+    echo "unexpected removals: ${unexpected[*]}" >&2
+    return 1
+  fi
+}
+
+upgrade_apt_packages() {
+  local package apt_upgrade_plan
+  local -a installed_packages=()
+
+  for package in "${apt_install_packages[@]}"; do
+    if is_installed "$package"; then
+      installed_packages+=("$package")
+    fi
+  done
+
+  if (( ${#installed_packages[@]} == 0 )); then
+    return 0
+  fi
+
+  sudo apt-get update
+  echo "==> Simulating apt package upgrade: ${installed_packages[*]}"
+  simulate_apt apt_upgrade_plan "upgrade" install --only-upgrade -- "${installed_packages[@]}"
+  assert_safe_removal_plan "upgrade" "$apt_upgrade_plan" "${apt_remove_packages[@]}"
+
+  echo "==> Upgrading apt packages: ${installed_packages[*]}"
+  sudo apt-get install --only-upgrade -y -- "${installed_packages[@]}"
+}
+
+if ! command -v apt-get >/dev/null 2>&1; then
+  echo "apt-get not found; skipping apt package upgrades" >&2
+else
+  upgrade_apt_packages
+fi
+{{- end }}
+{{- if gt (len .plan.bun) 0 }}
+bun_install=${BUN_INSTALL:-$HOME/.bun}
+export BUN_INSTALL="$bun_install"
+export PATH="$BUN_INSTALL/bin:$PATH"
+
+if ! command -v bun >/dev/null 2>&1; then
+  echo "bun not found; cannot upgrade global Bun packages" >&2
+  exit 1
+fi
+
+bun_upgrade_specs=(
+{{- range .plan.bun }}
+  {{ printf "%s@latest" . | quote }}
+{{- end }}
+)
+bun add --global "${bun_upgrade_specs[@]}"
+{{- end }}
