@@ -375,14 +375,24 @@ def test_linux_upgrade_allows_multiarch_planned_removals_and_aborts_on_unexpecte
     assert "unexpected removals: critical-pkg:amd64" in res.stderr, res.stderr
 
 
-def test_bash_aliases_defines_czau_shorthand():
+def _alias(name):
     res = subprocess.run(
-        ["/bin/bash", "-c", 'shopt -s expand_aliases; . "$1"; alias czau', "--", str(source / "dot_bash_aliases")],
+        ["/bin/bash", "-c", f'shopt -s expand_aliases; . "$1"; alias {name}', "--", str(source / "dot_bash_aliases")],
         text=True,
         capture_output=True,
     )
     assert res.returncode == 0, res.stderr
-    assert res.stdout.strip() == """alias czau='chezmoi apply --force --override-data '\\''{"upgradePackages":true}'\\'''""", res.stdout
+    return res.stdout.strip()
+
+
+def test_bash_aliases_cza_keeps_applying_configs_after_script_failure():
+    assert _alias("cza") == "alias cza='chezmoi apply --force --keep-going'", _alias("cza")
+
+
+def test_bash_aliases_czau_upgrades_and_keeps_applying_configs_after_script_failure():
+    assert _alias("czau") == (
+        """alias czau='chezmoi apply --force --keep-going --override-data '\\''{"upgradePackages":true}'\\'''"""
+    ), _alias("czau")
 
 
 tests = [value for name, value in list(globals().items()) if name.startswith("test_")]
