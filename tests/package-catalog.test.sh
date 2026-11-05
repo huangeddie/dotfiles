@@ -186,7 +186,7 @@ for name, os, roles in [('darwin-base', 'darwin', ['base']),
                              'execute-template', '-f', str(wrapper)], text=True, capture_output=True)
     assert result.returncode == 0, (name, result.stderr)
     expected = copy.deepcopy(fixture[name])
-    expected['homebrew']['trustedCasks'] = ['peteonrails/voxtype/voxtype'] if os == 'darwin' else []
+    expected['homebrew']['trustedCasks'] = ['anomalyco/tap/hex', 'peteonrails/voxtype/voxtype'] if os == 'darwin' else []
     if os == 'darwin':
         expected['homebrew']['brews'].extend(['scc', 'superfile', 'xcodegen'])
         expected['homebrew']['brews'].sort()

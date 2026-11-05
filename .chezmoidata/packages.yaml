@@ -174,6 +174,19 @@ packages:
           install: |-
             curl -fsSL https://herdr.dev/install.sh | sh
         order: 30
+  hex:
+    role: base
+    install:
+      darwin:
+        cask: "hex"
+        tap: "anomalyco/tap"
+        trusted: true
+      linux:
+        custom:
+          executable: "hex"
+          install: |-
+            curl -fsSL https://anoma.ly/hex/install-linux.sh | sh
+        order: 90
   hunk:
     role: base
     install:
@@ -197,6 +210,11 @@ packages:
     install:
       darwin:
         brew: "jjui"
+  jq:
+    role: base
+    install:
+      linux:
+        apt: ["jq"]
   lazygit:
     role: base
     install:
