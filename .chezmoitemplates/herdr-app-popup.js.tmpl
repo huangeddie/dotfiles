@@ -6,50 +6,53 @@ const POPUP = {{ toJson . }};
 export default class Popup extends View {
   init(_props, cx) {
     cx.spawn(async () => {
-      const activeSpace = spaces().find(s => s.active);
-      const machine = activeSpace?.machine ?? null;
-      const cwd = focused()?.cwd ?? null;
-      let argv = [...POPUP.argv];
-      
-      if (POPUP.target === "local" && POPUP.machineEnv !== null && machine !== null) {
-        argv = ["env", `${POPUP.machineEnv}=${machine}`, ...argv];
-      }
-
-      const hcArgs = ["run", "--bg", "--json", "--no-parent", "--rm"];
-      if (POPUP.target === "space" && machine !== null) {
-        hcArgs.push("--on", machine);
-      }
-      if (POPUP.target === "space" && cwd !== null) {
-        hcArgs.push("--cwd", cwd);
-      }
-      hcArgs.push("--", ...argv);
-      
-      const res = await hc(hcArgs);
-      
-      let address;
       try {
-        if (res.code === 0) {
-          const payload = JSON.parse(res.stdout);
-          address = payload.address;
+        const activeSpace = spaces().find(s => s.active);
+        const machine = activeSpace?.machine ?? null;
+        const cwd = focused()?.cwd ?? null;
+        let argv = [...POPUP.argv];
+        
+        if (POPUP.target === "local" && POPUP.machineEnv !== null && machine !== null) {
+          argv = ["env", `${POPUP.machineEnv}=${machine}`, ...argv];
         }
-      } catch (e) {
-        // failed to parse
-      }
 
-      if (res.code !== 0 || !address) {
-        notify({ title: `Error running ${POPUP.argv.join(" ")}`, body: (res.stderr || res.stdout || `Failed to launch ${POPUP.argv.join(" ")}`).trim(), level: "error" });
+        const hcArgs = ["run", "--bg", "--json", "--no-parent", "--rm"];
+        if (POPUP.target === "space" && machine !== null) {
+          hcArgs.push("--on", machine);
+        }
+        if (POPUP.target === "space" && cwd !== null) {
+          hcArgs.push("--cwd", cwd);
+        }
+        hcArgs.push("--", ...argv);
+        
+        const res = await hc(hcArgs).catch(err => ({ code: 1, stdout: "", stderr: String(err?.message || err) }));
+        
+        let address;
+        try {
+          if (res.code === 0) {
+            const payload = JSON.parse(res.stdout);
+            address = payload.address;
+          }
+        } catch (e) {
+          // failed to parse
+        }
+
+        if (res.code !== 0 || !address) {
+          notify({ title: `Error running ${POPUP.argv.join(" ")}`, body: (res.stderr || res.stdout || `Failed to launch ${POPUP.argv.join(" ")}`).trim(), level: "error" });
+          return;
+        }
+        
+        openOverlay({ 
+          kind: "dialog", 
+          width: 1, 
+          height: 1, 
+          layout: { type: "block", content: { terminal: address } } 
+        });
+      } catch (err) {
+        notify({ title: `Error running ${POPUP.argv.join(" ")}`, body: String(err?.message || err), level: "error" });
+      } finally {
         if (props()?.overlay) closeOverlay(props().overlay);
-        return;
       }
-      
-      openOverlay({ 
-        kind: "dialog", 
-        width: 1, 
-        height: 1, 
-        layout: { type: "block", content: { terminal: address } } 
-      });
-      
-      if (props()?.overlay) closeOverlay(props().overlay);
     });
   }
 
