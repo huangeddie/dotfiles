@@ -1,5 +1,9 @@
 {
   "global": {
+{{- if eq .chezmoi.os "darwin" }}
+    "cmd-t": "tab.new",
+    "cmd-w": "tab.close",
+{{- end }}
     "alt-1": "space.select:1",
     "alt-2": "space.select:2",
     "alt-3": "space.select:3",
@@ -74,6 +78,11 @@
     "ctrl-alt-t": { "command": "terminal.open", "args": { "argv": ["tv", "todoist"], "name": "todoist" } }
   },
   "terminal": {
+{{- if eq .chezmoi.os "darwin" }}
+    "cmd-c": "terminal.copy",
+    "cmd-v": "terminal.paste",
+    "cmd-f": "terminal.search",
+{{- end }}
     "ctrl-backspace": "send:\u0017",
     "ctrl-left": "send:\u001bb",
     "ctrl-right": "send:\u001bf",
