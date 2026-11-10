@@ -31,11 +31,11 @@ def execute_template(path):
 
 # Check mods
 expected_configs = {
-    "vcs": {"argv": ["vcsui"], "target": "space", "machineEnv": None},
-    "diff": {"argv": ["hunk", "show"], "target": "space", "machineEnv": None},
-    "todoist": {"argv": ["tv", "todoist"], "target": "space", "machineEnv": None}
+    "vcs": {"argv": ["vcsui"], "target": "space", "machineEnv": None, "show": "tab", "name": "vcs"},
+    "diff": {"argv": ["hunk", "show"], "target": "space", "machineEnv": None, "show": "tab", "name": "diff"},
+    "todoist": {"argv": ["tv", "todoist"], "target": "space", "machineEnv": None, "show": "tab", "name": "todoist"}
 }
-expected_mod_json = { "place": "none", "overlay": { "kind": "dialog", "width": 1, "height": 1 } }
+expected_mod_json = { "place": "none", "overlay": { "kind": "popup", "width": 2, "height": 2, "frame": "none" } }
 
 for mod_name, expected_config in expected_configs.items():
     # 1. Check mod.json

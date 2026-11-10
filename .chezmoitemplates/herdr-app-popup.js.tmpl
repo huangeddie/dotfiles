@@ -1,11 +1,11 @@
 import { View, div } from "gpui-kit";
-import { spaces, hc, openOverlay, closeOverlay, notify, props, focused } from "herdr";
+import { spaces, hc, openOverlay, closeOverlay, notify, props, focused, run } from "herdr";
 
 const POPUP = {{ toJson . }};
 
 export default class Popup extends View {
   init(_props, cx) {
-    cx.spawn(async () => {
+    cx.spawn(async (taskCx) => {
       try {
         const activeSpace = spaces().find(s => s.active);
         const machine = activeSpace?.machine ?? null;
@@ -23,6 +23,25 @@ export default class Popup extends View {
         if (POPUP.target === "space" && cwd !== null) {
           hcArgs.push("--cwd", cwd);
         }
+
+        let tabId = null;
+        let spaceLabel = null;
+        if (POPUP.show === "tab") {
+          if (!activeSpace) {
+            notify({ title: "No active space", body: "Cannot open tab popup without an active space.", level: "error" });
+            return;
+          }
+          const hex = "0123456789abcdef";
+          let rand = "";
+          for (let i = 0; i < 32; i++) rand += hex[Math.floor(Math.random() * 16)];
+          tabId = "tb" + rand;
+          spaceLabel = activeSpace.id;
+          if (machine && spaceLabel.startsWith(`${machine}/`)) {
+            spaceLabel = spaceLabel.slice(machine.length + 1);
+          }
+          hcArgs.push("--label", `herdr.space=${spaceLabel}`, "--label", `herdr.tab=${tabId}`);
+        }
+
         hcArgs.push("--", ...argv);
         
         const res = await hc(hcArgs).catch(err => ({ code: 1, stdout: "", stderr: String(err?.message || err) }));
@@ -42,12 +61,33 @@ export default class Popup extends View {
           return;
         }
         
-        openOverlay({ 
-          kind: "dialog", 
-          width: 1, 
-          height: 1, 
-          layout: { type: "block", content: { terminal: address } } 
-        });
+        if (POPUP.show === "tab") {
+          let foundTab = false;
+          const expectedTabId = machine ? `${machine}/${tabId}` : tabId;
+          for (let i = 0; i < 60; i++) {
+            const currentSpaces = spaces();
+            const theTab = currentSpaces.flatMap(s => s.tabs || []).find(t => t.id === expectedTabId);
+            if (theTab) {
+              foundTab = true;
+              break;
+            }
+            await taskCx.sleep(50);
+          }
+          if (foundTab) {
+            run("tab.rename", { id: expectedTabId, name: POPUP.name });
+            run("tab.select", { id: expectedTabId });
+            run("pane.focus", { terminal: address });
+          } else {
+            notify({ title: `Error running ${POPUP.argv.join(" ")}`, body: "Timed out waiting for tab to appear", level: "error" });
+          }
+        } else {
+          openOverlay({ 
+            kind: "dialog", 
+            width: 1, 
+            height: 1, 
+            layout: { type: "block", content: { terminal: address } } 
+          });
+        }
       } catch (err) {
         notify({ title: `Error running ${POPUP.argv.join(" ")}`, body: String(err?.message || err), level: "error" });
       } finally {
