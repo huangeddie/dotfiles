@@ -73,9 +73,9 @@
     "ctrl-alt-z": "pane.zoom",
     "ctrl-alt-\\": "pane.split:right",
     "ctrl-alt--": "pane.split:down",
-    "ctrl-alt-v": { "command": "terminal.open", "args": { "argv": ["vcsui"], "name": "vcs" } },
-    "ctrl-alt-d": { "command": "terminal.open", "args": { "argv": ["hunk", "show"], "name": "diff" } },
-    "ctrl-alt-t": { "command": "terminal.open", "args": { "argv": ["tv", "todoist"], "name": "todoist" } }
+    "ctrl-alt-v": "mod.open:vcs",
+    "ctrl-alt-d": "mod.open:diff",
+    "ctrl-alt-t": "mod.open:todoist"
   },
   "terminal": {
 {{- if eq .chezmoi.os "darwin" }}
