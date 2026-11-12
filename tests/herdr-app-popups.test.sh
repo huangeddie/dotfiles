@@ -66,6 +66,10 @@ for mod_name, expected_config in expected_configs.items():
     except json.JSONDecodeError as error:
         fail(f"Invalid JSON in {mod_name} POPUP config: {error}")
 
+    # herdr-core's PATH lacks ~/.bashrc additions, so argv must resolve in bash -i
+    if """["bash", "-ic", 'exec "$@"', POPUP.name, ...argv]""" not in rendered_js:
+        fail(f"{mod_name} popup should run argv via an interactive bash")
+
 # Check keys
 keys_template = source / "dot_config/herdr-app/keys.json.tmpl"
 def render_keys(os_name):

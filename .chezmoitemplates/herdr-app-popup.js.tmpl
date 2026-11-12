@@ -15,6 +15,9 @@ export default class Popup extends View {
         if (POPUP.target === "local" && POPUP.machineEnv !== null && machine !== null) {
           argv = ["env", `${POPUP.machineEnv}=${machine}`, ...argv];
         }
+        // herdr-core inherits the desktop session PATH, which lacks dirs that
+        // ~/.bashrc adds (e.g. $GOPATH/bin). Resolve argv in an interactive shell.
+        argv = ["bash", "-ic", 'exec "$@"', POPUP.name, ...argv];
 
         const hcArgs = ["run", "--bg", "--json", "--no-parent", "--rm"];
         if (POPUP.target === "space" && machine !== null) {
