@@ -28,7 +28,13 @@ def close_command(environment):
     return None
 
 
-def main(environment=os.environ, execute=os.execvp):
+def main(environment=os.environ, execute=os.execvp, argv=()):
+    if tuple(argv) in (("-h",), ("--help",)):
+        print("Usage: close\n\n" + (__doc__ or "").strip())
+        return 0
+    if argv:
+        print("close: takes no arguments (Usage: close)", file=sys.stderr)
+        return 2
     command = close_command(environment)
     if command is None:
         print(
@@ -42,4 +48,4 @@ def main(environment=os.environ, execute=os.execvp):
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(argv=sys.argv[1:]))

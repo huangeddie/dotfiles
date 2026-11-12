@@ -2,7 +2,7 @@
 import io
 import runpy
 import unittest
-from contextlib import redirect_stderr
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
 script = runpy.run_path(str(Path(__file__).parents[1] / "dot_local/bin/executable_close"))
@@ -91,6 +91,20 @@ class MainTest(unittest.TestCase):
         self.assertIn(
             "Rex session, Herdr App terminal, or Herdr pane", stderr.getvalue()
         )
+
+    def test_main_help_prints_usage_and_exits_zero_without_exec(self):
+        calls = []
+        with redirect_stdout(io.StringIO()) as stdout:
+            status = main(REX, lambda file, argv: calls.append(argv), ["--help"])
+        self.assertEqual((status, calls), (0, []))
+        self.assertIn("Usage: close", stdout.getvalue())
+
+    def test_main_unexpected_arguments_fail_closed_without_exec(self):
+        calls = []
+        with redirect_stderr(io.StringIO()) as stderr:
+            status = main(REX, lambda file, argv: calls.append(argv), ["pane-3"])
+        self.assertEqual((status, calls), (2, []))
+        self.assertIn("takes no arguments", stderr.getvalue())
 
 
 if __name__ == "__main__":
