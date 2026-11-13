@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Close the multiplexer session, terminal, or pane this process runs in."""
+"""Close the multiplexer pane or terminal this process runs in."""
 import os
 import sys
 
@@ -7,11 +7,16 @@ import sys
 def close_command(environment):
     # Priority: Rex -> Herdr App (herdr-core) -> legacy Herdr.
     # Each active family fails closed if its required target ID is missing.
-    session = environment.get("REX_SESSION")
-    if session or environment.get("REX_BLOCK"):
-        if not session:
+    # Close only this pane's block; killing REX_SESSION would take down every
+    # sibling tab (e.g. other worktrees) sharing the session.
+    session, block = environment.get("REX_SESSION"), environment.get("REX_BLOCK")
+    if session or block:
+        if not session or not block:
             return None
-        return ["rex", "--autostart=false", "--timeout", "2s", "kill", "--", session]
+        return [
+            "rex", "--autostart=false", "--timeout", "2s",
+            "block", "close", "-s", session, "--", block,
+        ]
 
     terminal = environment.get("HC_TERMINAL_ID")
     if (

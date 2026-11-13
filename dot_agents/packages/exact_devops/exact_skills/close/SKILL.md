@@ -4,11 +4,12 @@ description:
   Use when asked to close the agent's pane, tab, terminal, or multiplexer session.
 ---
 
-Close your session, terminal, or pane using the `close` helper, which resolves
-your inherited environment in priority order—never UI focus:
+Close your own pane or terminal using the `close` helper, which resolves your
+inherited environment in priority order—never UI focus. It never closes sibling
+panes, tabs, or the whole session:
 
-1. **Rex (`REX_SESSION`):** Ends the entire Rex session, including all its
-   windows and panes.
+1. **Rex (`REX_SESSION` + `REX_BLOCK`):** Closes only your `REX_BLOCK` pane; its
+   tab closes when that was its last pane.
 2. **Herdr App (`HC_TERMINAL_ID`):** Ends your `herdr-core` terminal via `hc`,
    closing its Herdr App pane and any child sub-agents.
 3. **Herdr (`HERDR_ENV=1`):** Closes only your `HERDR_PANE_ID` pane.

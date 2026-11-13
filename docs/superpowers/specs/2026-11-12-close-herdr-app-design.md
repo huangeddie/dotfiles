@@ -18,6 +18,7 @@ Support the new Herdr app stack (`herdr-app` + `herdr-core`) when closing an age
 ## Approaches
 
 1. **Unified `close` binary (Chosen):** `dot_local/bin/executable_close` resolves `Rex → Herdr App → Herdr` (killing the whole `REX_SESSION` for Rex), and `close/SKILL.md` delegates directly to `close`. Consolidates duplicated shell/Python logic and fixes helper drift; trades off pane-only Rex block closing in `clean-merge`.
+   - **Revised 2026-11-13:** Rex now closes only `REX_BLOCK` (`rex block close -s REX_SESSION -- REX_BLOCK`, requiring both IDs). Killing the session closed every sibling worktree tab sharing it when `clean-merge` ran `close`.
 2. **Pane-only `close` binary + `SKILL.md` shell wrapper:** Keep `executable_close` pane-scoped (`rex block close` → `hc kill` → `herdr pane close`) while `close/SKILL.md` overrides Rex to `rex kill`. Preserves `REX_BLOCK` closing in `clean-merge` at the cost of split precedence logic.
 
 ## Interface & Resolution Contract (`close_command(environment)`)
@@ -26,7 +27,7 @@ Evaluated in order; first matching environment family wins and fails closed (`No
 
 | Priority | Family | Match predicate | Target required | Command |
 | -------- | ------ | --------------- | --------------- | ------- |
-| 1 | Rex | `REX_SESSION` or `REX_BLOCK` non-empty | `REX_SESSION` | `["rex", "--autostart=false", "--timeout", "2s", "kill", "--", REX_SESSION]` |
+| 1 | Rex | `REX_SESSION` or `REX_BLOCK` non-empty | `REX_SESSION` and `REX_BLOCK` | `["rex", "--autostart=false", "--timeout", "2s", "block", "close", "-s", REX_SESSION, "--", REX_BLOCK]` |
 | 2 | Herdr App (`hc`) | `HC_TERMINAL_ID`, `HC_TERMINAL_SOCKET`, or `HC_SCOPE` non-empty | `HC_TERMINAL_ID` | `["hc", "kill", "--", HC_TERMINAL_ID]` |
 | 3 | Legacy Herdr | `HERDR_ENV == "1"` | `HERDR_PANE_ID` | `["herdr", "pane", "close", "--", HERDR_PANE_ID]` |
 
@@ -37,4 +38,4 @@ If none match or a matched family lacks its required target ID, `close` prints `
 - `_personal/dot_local/bin/executable_close`: implement `close_command` contract above.
 - `_personal/dot_agents/packages/exact_devops/exact_skills/close/SKILL.md`: document the three-way behavior/precedence and invoke `close` directly (including post-worktree-removal usage).
 - `_personal/dot_agents/packages/exact_coding/exact_skills/clean-merge/SKILL.md` *(builder call)*: update the one-line description of `close` to match.
-- `_personal/tests/close.test.py`: unit tests with fake `environment` and `execute` covering each backend alone, pairwise/three-way precedence (`Rex > Herdr App > Herdr`), fail-closed partial environments (`REX_BLOCK` without `REX_SESSION`, `HC_TERMINAL_SOCKET`/`HC_SCOPE` without `HC_TERMINAL_ID`, `HERDR_ENV=1` without `HERDR_PANE_ID`), and `main()` exit/exec behavior.
+- `_personal/tests/close.test.py`: unit tests with fake `environment` and `execute` covering each backend alone, pairwise/three-way precedence (`Rex > Herdr App > Herdr`), fail-closed partial environments (`REX_BLOCK` without `REX_SESSION` or vice versa, `HC_TERMINAL_SOCKET`/`HC_SCOPE` without `HC_TERMINAL_ID`, `HERDR_ENV=1` without `HERDR_PANE_ID`), and `main()` exit/exec behavior.

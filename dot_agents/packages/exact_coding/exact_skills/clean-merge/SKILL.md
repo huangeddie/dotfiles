@@ -33,7 +33,8 @@ For a linked worktree in a multiplexer pane:
    close
    ```
 
-   `close` closes your Rex session, Herdr App terminal, or Herdr pane; see the `close` skill.
+   `close` closes only your own Rex pane, Herdr App terminal, or Herdr pane; see
+   the `close` skill.
 
 ### `wt` sandboxes
 
