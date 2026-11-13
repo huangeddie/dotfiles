@@ -15,7 +15,7 @@ split_horizontal = ["prefix+minus"]
 zoom = ["prefix+z"]
 previous_workspace = "ctrl+alt+k"
 next_workspace = "ctrl+alt+j"
-toggle_sidebar = "ctrl+alt+b"
+toggle_sidebar = "ctrl+alt+a"
 
 [theme]
 name = "catppuccin"
