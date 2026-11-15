@@ -1,12 +1,12 @@
 # Our Preferences
 
-We care most about **data schemas, file structure, interfaces, and unit tests**.
-When presenting work or asking for decisions, always lead with these core
-components. Implementation details and concrete code should only be surfaced
-when necessary for a specific decision or when explicitly requested.
-
 Avoid reinventing wheels; strongly prefer leveraging first-party libraries and
 suggest third-party libraries when applicable.
+
+### Documentation
+
+Use capitalized keywords MUST, MUST NOT, SHOULD, and MAY are used as described
+in RFC 2119 and RFC 8174.
 
 ### Naming
 
@@ -27,6 +27,7 @@ books:
   - Prefer `Domain Models` for highly scalable object-oriented business logic
 - Clean Architecture - Robert C. Martin
 - Designing Data-Intensive Applications - Martin Kleppmann
+- No Silver Bullets - Essence and Accident in Software Engineering - Fred Brooks
 
 ### Boundaries
 
@@ -97,7 +98,7 @@ The following code changes SHOULD NOT use red-green TDD.
 
 ## Testing
 
-All unit tests should have the following properties
+All unit tests MUST have the following properties
 
 - **Fakes over mocks**: Used for decoupling from hard-to-test entities such as
   network calls, UI, or anything slow / expensive. Prefer practical fakes over
@@ -107,8 +108,6 @@ All unit tests should have the following properties
   system tests.
 - **Deterministic**: If logic depends on random noise or concurrency, fix or
   fake them. You MUST NOT depend on sampling of any size to assert correctness.
-
-Any tests discovered to violate these properties MUST be flagged to the user.
 
 ### Quality Assurance (QA)
 
@@ -123,19 +122,17 @@ QA tests MUST NOT be included in pre-commit, pre-push, or CI/CD pipelines. They
 should only by our discretion . Generally speaking, maintain and run QA tests
 related to any code changes, also in red-green fashion.
 
-QA tests can further be classified between **agent-driven** and
-**human-driven**. Agent-driven means the agent can invoke and evaluate the
-results of the QA without human guidance. This likely requires that the QA can
-be controlled by CLI and the output is either text and/or images. Human-driven
-QA are the even-harder-to-test domains such as interacting with a GUI and/or
-evaluating video / audio data. Aim to make as much of the QA agent-driven as
-possible.
+QA tests can further be classified between **imperative** and **declarative**.
+Imperative QA are often scripts or step-by-step instructions on how to test user
+journeys. Declarative QA are informal docs that declare _what_ we want to test
+and leave it up to the testers' discretion on how. Declarative QA are often
+easier to maintain as the codebase evolves. Use imperative QA when the user
+journey is deemed very stable and declarative otherwise.
 
 ## Debugging
 
 1. Start with reproducing the bug as closely aligned to the environment of the
-   bug report, excluding UI components. If UI interaction is needed, ask the
-   user for assistance.
+   bug report.
 2. Then try narrow the scope of the bug and distill it into a RED-GREEN unit
    test. If this cannot be done easily, flag and seek guidance from the user.
 
@@ -151,6 +148,8 @@ possible.
 ## Flagging
 
 - Any code smells you discover that misalign with our preferences stated above.
+- Redundant code that ought to be refactored at your discretion. Too DAMP
+  instead of DRY.
 
 ## Terminology
 
