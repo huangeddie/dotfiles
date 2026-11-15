@@ -11,8 +11,16 @@ return {
 		})
 		opts.image = opts.image or {}
 
-		-- Workaround for multiplexers (e.g. Herdr) where TIOCGWINSZ reports 0x0 pixel size
 		local terminal = require("snacks.image.terminal")
+
+		-- Rex speaks the kitty graphics protocol (with placeholders) but identifies
+		-- itself as "rex" via XTVERSION, which Snacks' allowlist doesn't recognize.
+		local envs = terminal.envs()
+		if not vim.iter(envs):any(function(e) return e.name == "rex" end) then
+			table.insert(envs, { name = "rex", terminal = "rex", supported = true, placeholders = true })
+		end
+
+		-- Workaround for multiplexers (e.g. Herdr) where TIOCGWINSZ reports 0x0 pixel size
 		local orig_size = terminal.size
 		terminal.size = function()
 			local s = orig_size()
