@@ -12,6 +12,10 @@ if
   or vim.env.SSH_CONNECTION
   or vim.env.TMUX
   or vim.env.HERDR_ENV
+  -- herdr-core terminals carry no SSH_* variables but inherit the host's
+  -- DISPLAY, so the automatic provider would copy to the host's clipboard
+  -- instead of the herdr-app window's.
+  or vim.env.HC_TERMINAL_ID
   or vim.env.REX_SESSION
 then
   -- Reading the clipboard via OSC 52 requires the terminal to answer a

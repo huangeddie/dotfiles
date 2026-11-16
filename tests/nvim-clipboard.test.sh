@@ -17,7 +17,7 @@ package.loaded["vim.ui.clipboard.osc52"] = {
   end,
 }
 
-local remote_markers = { "SSH_TTY", "SSH_CLIENT", "SSH_CONNECTION", "TMUX", "HERDR_ENV", "REX_SESSION" }
+local remote_markers = { "SSH_TTY", "SSH_CLIENT", "SSH_CONNECTION", "TMUX", "HERDR_ENV", "HC_TERMINAL_ID", "REX_SESSION" }
 for _, marker in ipairs(remote_markers) do
   vim.env[marker] = nil
 end
@@ -28,6 +28,7 @@ assert(vim.g.clipboard == nil, "local sessions must retain automatic clipboard s
 -- Test each remote marker independently, including Rex without SSH variables.
 for _, marker in ipairs(remote_markers) do
   vim.env[marker] = "1"
+  vim.g.clipboard = nil -- don't let the previous marker's provider leak in
   dofile(root .. "/dot_config/nvim/lua/config/options.lua")
   assert(vim.g.clipboard.name == "OSC 52", marker .. " must select OSC 52")
   copies = {}
