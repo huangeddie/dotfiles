@@ -17,8 +17,10 @@
     "alt-j": "pane.go:down",
     "alt-k": "pane.go:up",
     "alt-l": "pane.go:right",
+{{- if ne .chezmoi.os "darwin" }}
     "alt-left": "pane.go:left",
     "alt-right": "pane.go:right",
+{{- end }}
     "alt-shift-h": "pane.swap:left",
     "alt-shift-j": "pane.swap:down",
     "alt-shift-k": "pane.swap:up",
@@ -84,8 +86,6 @@
     "cmd-f": "terminal.search",
 {{- end }}
     "ctrl-backspace": "send:\u0017",
-    "ctrl-left": "send:\u001bb",
-    "ctrl-right": "send:\u001bf",
     "ctrl-shift-c": "terminal.copy",
     "ctrl-shift-v": "terminal.paste",
     "ctrl-shift-f": "terminal.search",

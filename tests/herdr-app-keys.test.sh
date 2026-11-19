@@ -66,12 +66,32 @@ if cmd_bindings(darwin) != CMD_BINDINGS:
 if cmd_bindings(linux):
     fail(f"linux render must not bind Cmd keys, got {cmd_bindings(linux)}")
 
-# Test 3: macOS only adds the Cmd bindings; every other binding matches linux.
+# Test 3: word-navigation chords reach the terminal program untouched, so it
+# gets the native (or negotiated Kitty) encoding instead of a literal ESC b/f.
+WORD_KEYS = {"ctrl-left", "ctrl-right", "alt-left", "alt-right"}
+for os_name, keys in (("darwin", darwin), ("linux", linux)):
+    bound = WORD_KEYS & set(keys.get("terminal", {}))
+    if bound:
+        fail(f"{os_name} terminal section must not bind word keys, got {sorted(bound)}")
+
+# Test 4: macOS leaves Option+arrows to the program; linux keeps them for panes.
+MAC_WORD_KEYS = {"alt-left", "alt-right"}
+if MAC_WORD_KEYS & set(darwin["global"]):
+    fail(f"darwin must not bind {sorted(MAC_WORD_KEYS)} globally")
+if not MAC_WORD_KEYS <= set(linux["global"]):
+    fail(f"linux should keep {sorted(MAC_WORD_KEYS)} for pane.go")
+
+# Test 5: otherwise macOS only adds the Cmd bindings; the rest matches linux.
 darwin_without_cmd = {
     section: {k: v for k, v in bindings.items() if not k.startswith("cmd-")}
     for section, bindings in darwin.items()
 }
-if darwin_without_cmd != linux:
+linux_without_mac_word_keys = {
+    section: {k: v for k, v in bindings.items()
+              if not (section == "global" and k in MAC_WORD_KEYS)}
+    for section, bindings in linux.items()
+}
+if darwin_without_cmd != linux_without_mac_word_keys:
     fail("darwin render changed or dropped bindings shared with linux")
 
 print("herdr-app keys verified successfully!")
