@@ -53,9 +53,6 @@ Prefer to scope the simplest most incremental spec changes. Rely on the user to
 explicitly expand the scope. Incremental spec changes are the most effective way
 of concentrating our attention, focus, and understanding.
 
-If Tailscale is available, any UI server brought up for reporting MUST be served
-on it.
-
 ## Test Driven Development
 
 All commit messages MUST follow the
