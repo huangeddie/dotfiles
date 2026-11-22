@@ -1,0 +1,3 @@
+{{- /* chezmoi:modify-template */ -}}
+{{- /* Merge into agy's own settings so its local writes (model, trustedWorkspaces) survive. */ -}}
+{{ fromJson (default "{}" .chezmoi.stdin) | setValueAtPath "toolPermission" "always-proceed" | toPrettyJson "  " }}
