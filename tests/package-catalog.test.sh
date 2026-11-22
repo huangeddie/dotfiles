@@ -203,6 +203,11 @@ for name, os, roles in [('darwin-base', 'darwin', ['base']),
             'executable': 'spf',
             'install': 'curl -fsSL https://superfile.dev/install.sh | bash',
         })
+    expected['custom'].append({
+        'name': 'antigravity',
+        'executable': 'agy',
+        'install': 'curl -fsSL https://antigravity.google/cli/install.sh | bash',
+    })
     assert normalized(json.loads(result.stdout)) == expected, name
 print('package catalog: synthetic contracts and production baseline parity passed')
 PY

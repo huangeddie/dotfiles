@@ -6,6 +6,21 @@ machineRolePolicy:
     darwin: [base]
 
 packages:
+  antigravity:
+    role: base
+    install:
+      darwin:
+        custom:
+          executable: "agy"
+          install: |-
+            curl -fsSL https://antigravity.google/cli/install.sh | bash
+        order: 40
+      linux:
+        custom:
+          executable: "agy"
+          install: |-
+            curl -fsSL https://antigravity.google/cli/install.sh | bash
+        order: 110
   bat:
     role: base
     install:
