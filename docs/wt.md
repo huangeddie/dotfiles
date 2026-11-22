@@ -140,9 +140,16 @@ Do not run simultaneous lifecycle operations against the same sandbox or edit it
 while it is being removed. Normal removal refuses initialized submodules;
 inspect their work before choosing force removal.
 
-There is no automatic TTL: `wt` removes sandboxes only through explicit merge,
-remove, or clear commands. External cache cleaners can still remove cache data,
-so keep valuable work committed and backed up. Worktrees share a Git repository;
+Sandboxes expire after `WT_TTL_DAYS` idle days (default `7`; `0` disables
+expiry). After each successful `wt new`, `wt` removes this repository's expired
+sandboxes exactly as `wt remove` would: only merged, clean, idle checkouts that
+are not a base for another sandbox. Others are skipped, never forced. The new
+sandbox and the invoking checkout are never swept. Idleness is measured from the
+branch reflog's newest entry (creation, commit, or reset); a branch without a
+reflog never expires. A failed sweep is reported but does not fail `wt new`, and
+an invalid `WT_TTL_DAYS` rejects `wt new` before anything is created. External
+cache cleaners can still remove cache data, so keep valuable work committed and
+backed up. Worktrees share a Git repository;
 this is filesystem convenience, **not a security sandbox**.
 
 ## Verification

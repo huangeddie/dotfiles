@@ -14,11 +14,13 @@ ALIASES = Path(__file__).resolve().parents[2] / "dot_bash_aliases"
 ENV = {k: v for k, v in os.environ.items() if not k.startswith(("GIT_", "REX_", "HERDR_"))}
 ENV.update(GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull,
            GIT_TERMINAL_PROMPT="0", GIT_EDITOR=":", GIT_MERGE_AUTOEDIT="no",
-           GIT_AUTHOR_DATE="2026-01-01T00:00:00Z", GIT_COMMITTER_DATE="2026-01-01T00:00:00Z")
+           GIT_AUTHOR_DATE="2026-01-01T00:00:00Z", GIT_COMMITTER_DATE="2026-01-01T00:00:00Z",
+           # The pinned committer date also dates reflogs, so every sandbox would look expired.
+           WT_TTL_DAYS="0")
 
 
-def run(cwd, *args, ok=True):
-    result = subprocess.run(args, cwd=cwd, env=ENV, text=True, capture_output=True)
+def run(cwd, *args, ok=True, env=ENV):
+    result = subprocess.run(args, cwd=cwd, env=env, text=True, capture_output=True)
     assert (result.returncode == 0) == ok, (args, result.returncode, result.stdout, result.stderr)
     return result.stdout.strip()
 
@@ -45,6 +47,23 @@ def setup(root, name):
     git(repo, "config", "user.email", "wt-qa@example.invalid")
     commit(repo, "shared.txt", "initial\n")
     return repo
+
+
+def verify_new_expires_idle_merged_clean_sandboxes(root):
+    repo = setup(root, "expiry")
+    wt(repo, "new", "stale")  # Reflog dated by the pinned 2026-01-01 committer date.
+    commit(Path(wt(repo, "new", "unmerged")), "work.txt", "unmerged\n")
+    (Path(wt(repo, "new", "dirty")) / "scratch.txt").write_text("uncommitted\n")
+    live = {k: v for k, v in ENV.items() if k != "GIT_COMMITTER_DATE"}
+    result = subprocess.run([sys.executable, str(CLI), "new", "fresh"], cwd=repo, text=True,
+                            capture_output=True, env={**live, "WT_TTL_DAYS": "7"})
+    assert result.returncode == 0, result.stderr
+    assert "Removed expired sandbox: stale" in result.stderr, result.stderr
+    branches = set(git(repo, "branch", "--format=%(refname:short)").split())
+    assert branches == {"trunk", "unmerged", "dirty", "fresh"}, branches
+    wt(repo, "new", "invalid", ok=False, env={**ENV, "WT_TTL_DAYS": "soon"})
+    assert "invalid" not in git(repo, "branch", "--list", "invalid")
+    wt(repo, "clear", "--force")
 
 
 def verify_display_names_and_normalized_branches(root):
@@ -345,7 +364,8 @@ def main():
         sandbox_root.mkdir()
         ENV["TMPDIR"] = str(sandbox_root)
         ENV["XDG_CACHE_HOME"] = str(root / "cache")
-        for verify in (verify_display_names_and_normalized_branches,
+        for verify in (verify_new_expires_idle_merged_clean_sandboxes,
+                       verify_display_names_and_normalized_branches,
                        verify_stable_private_cache_root, verify_clear_preflight_and_repository_scope,
                        verify_clear_preflights_initialized_submodules, verify_nested_clear_from_a_sandbox,
                        verify_merge_commit_and_cleanup, verify_bases_detached_and_nested,

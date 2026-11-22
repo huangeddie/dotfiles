@@ -23,6 +23,10 @@ class Repository:
         self.ancestors = set()
         self.events = []
         self.merge_fails = False
+        self.activity = {}
+
+    def last_activity(self, branch):
+        return self.activity.get(branch)
 
     def current_branch(self):
         return self.current
@@ -424,6 +428,88 @@ class ClearTest(unittest.TestCase):
             self.wt.clear()
         self.assertEqual(set(self.repo.metadata), {"b", "c"})
         self.assertEqual([event[1] for event in self.repo.events], ["a"])
+
+
+DAY = 86400
+NOW = 100 * DAY
+TTL = 7 * DAY
+
+
+class ExpireTest(unittest.TestCase):
+    setUp = ClearTest.setUp
+
+    def add(self, branch, base="trunk", merged=True, idle=8 * DAY):
+        path = ClearTest.add(self, branch, base, merged)
+        if idle is not None:
+            self.repo.activity[branch] = NOW - idle
+        return path
+
+    def expire(self, keep=()):
+        return self.wt.expire(NOW, TTL, keep)
+
+    def test_expire_removes_merged_clean_sandbox_idle_past_ttl(self):
+        path = self.add("stale")
+        self.assertEqual(self.expire(), ["stale"])
+        self.assertEqual(self.repo.events, [("delete", "stale", path, False)])
+
+    def test_expire_keeps_sandbox_active_within_ttl(self):
+        self.add("fresh", idle=TTL - 1)
+        self.assertEqual(self.expire(), [])
+        self.assertEqual(self.repo.events, [])
+
+    def test_expire_skips_unmerged_dirty_or_busy_sandboxes_without_failing(self):
+        self.add("unmerged", merged=False)
+        self.repo.dirty_paths.add(self.add("dirty"))
+        self.repo.busy_paths.add(self.add("busy"))
+        self.add("stale")
+        self.assertEqual(self.expire(), ["stale"])
+        self.assertEqual(set(self.repo.metadata), {"unmerged", "dirty", "busy"})
+
+    def test_expire_keeps_sandbox_without_recorded_activity(self):
+        self.add("unknown", idle=None)
+        self.assertEqual(self.expire(), [])
+
+    def test_expire_removes_expired_children_before_their_parents(self):
+        self.add("a-parent")
+        self.add("b-child", "a-parent")
+        self.assertEqual(self.expire(), ["b-child", "a-parent"])
+
+    def test_expire_keeps_parent_of_active_child(self):
+        self.add("a-parent")
+        self.add("b-child", "a-parent", idle=0)
+        self.assertEqual(self.expire(), [])
+
+    def test_expire_never_removes_kept_branch(self):
+        self.add("current")
+        self.assertEqual(self.expire(keep={"current"}), [])
+
+
+class TtlTest(unittest.TestCase):
+    ttl_seconds = staticmethod(script["ttl_seconds"])
+
+    def test_ttl_defaults_to_seven_days(self):
+        self.assertEqual(self.ttl_seconds({}), TTL)
+
+    def test_ttl_reads_days_from_environment(self):
+        self.assertEqual(self.ttl_seconds({"WT_TTL_DAYS": "1.5"}), 1.5 * DAY)
+
+    def test_zero_ttl_disables_expiry(self):
+        self.assertIsNone(self.ttl_seconds({"WT_TTL_DAYS": "0"}))
+
+    def test_invalid_ttl_is_rejected(self):
+        for value in ("soon", "-1", "nan", "inf"):
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, "WT_TTL_DAYS"):
+                self.ttl_seconds({"WT_TTL_DAYS": value})
+
+
+class ReflogTimeTest(unittest.TestCase):
+    parse = staticmethod(script["parse_reflog_time"])
+
+    def test_reflog_selector_yields_unix_timestamp(self):
+        self.assertEqual(self.parse("refs/heads/a/b@{1700000000}\n"), 1700000000)
+
+    def test_missing_reflog_yields_no_activity(self):
+        self.assertIsNone(self.parse(""))
 
 
 class SandboxRootTest(unittest.TestCase):
