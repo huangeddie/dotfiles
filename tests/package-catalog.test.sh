@@ -203,6 +203,8 @@ for name, os, roles in [('darwin-base', 'darwin', ['base']),
             'executable': 'spf',
             'install': 'curl -fsSL https://superfile.dev/install.sh | bash',
         })
+    expected['bun'].append('obsidian-headless')
+    expected['bun'].sort()
     expected['custom'].append({
         'name': 'antigravity',
         'executable': 'agy',

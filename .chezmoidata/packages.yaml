@@ -283,6 +283,13 @@ packages:
     install:
       linux:
         apt: ["nvtop"]
+  obsidian-headless:
+    role: base
+    install:
+      darwin:
+        bun: "obsidian-headless"
+      linux:
+        bun: "obsidian-headless"
   openssh-server:
     role: base
     install:
