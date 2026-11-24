@@ -9,10 +9,10 @@ vim_mode_default = true
 [tui.model_availability_nux]
 gpt-6-astra = 4
 
-[projects."/Users/eddie/Documents/GitHub/Tokens"]
+[projects."/Users/eddie/GitHub/Tokens"]
 trust_level = "trusted"
 
-[projects."/Users/eddie/Documents/GitHub/Lernr"]
+[projects."/Users/eddie/GitHub/Lernr"]
 trust_level = "trusted"
 
 [hooks.state]
