@@ -70,7 +70,7 @@ pi() {
 }
 
 # Obsidian
-alias vault='cd ~/Documents/Obsidian/ && nvim'
+alias vault='cd ~/Obsidian/ && nvim'
 
 # Files
 alias la='ls -a'

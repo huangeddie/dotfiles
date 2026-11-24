@@ -8,7 +8,7 @@ return {
 		workspaces = {
 			{
 				name = "main",
-				path = "~/Documents/Obsidian/",
+				path = "~/Obsidian/",
 			},
 		},
 		templates = {
