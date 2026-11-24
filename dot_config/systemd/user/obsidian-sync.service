@@ -1,0 +1,15 @@
+[Unit]
+Description=Obsidian Headless Continuous Sync
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=%h/Documents/Obsidian
+
+[Service]
+Type=simple
+Environment="PATH=%h/.bun/bin:%h/.local/bin:/usr/local/bin:/usr/bin:/bin"
+ExecStart=%h/.bun/bin/ob sync --path %h/Documents/Obsidian --continuous
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target
