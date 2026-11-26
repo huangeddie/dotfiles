@@ -2,12 +2,16 @@
 # sandbox_mode = "danger-full-access"
 
 default_permissions = ":danger-full-access"
+model = "gpt-6.2-astra"
+model_reasoning_effort = "high"
 
 [tui]
 vim_mode_default = true
+screen_reader_detection_done = true
 
 [tui.model_availability_nux]
 gpt-6-astra = 4
+"gpt-6.1-sol" = 2
 
 [projects."/Users/eddie/GitHub/Tokens"]
 trust_level = "trusted"
@@ -15,10 +19,16 @@ trust_level = "trusted"
 [projects."/Users/eddie/GitHub/Lernr"]
 trust_level = "trusted"
 
+[projects."/Users/eddie/GitHub/Nature"]
+trust_level = "trusted"
+
 [hooks.state]
 
 [hooks.state."/Users/eddie/.codex/hooks.json:session_start:0:0"]
 trusted_hash = "sha256:ed7562b28c8956655466fe4881cf53c0a1e23c5cca95388723f5a3b00e1055cf"
+
+[hooks.state."/Users/eddie/.codex/hooks.json:session_start:1:0"]
+trusted_hash = "sha256:3da181f6a6d78fa2e4446bb51881bea0b4d69562eb909961fa616df84970d643"
 
 [plugins."coding@local-agents"]
 enabled = true

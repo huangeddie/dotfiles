@@ -54,9 +54,9 @@ Each brief contains:
    > You own one task from the project tracker. The user will discuss the
    > details with you in this tab. Brief yourself on the proejct. Then ask the
    > user your clarifying questions one at a time, each with a recommended
-   > answer. Do not edit code until you and the user agree on scope. When you
-   > start implementing, use the `workspace` skill to create your own workspace
-   > and work there.
+   > answer. Do not edit code until you and the user agree on scope. Before you
+   > start designing / implementing, you MUST use the `workspace` skill to
+   > create your own workspace and work there.
 
 2. **The task.** Include its content, description, section, priority, Todoist
    ID, subtasks and comments.

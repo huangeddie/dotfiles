@@ -1,5 +1,5 @@
 {
-  "lastChangelogVersion": "1.4.0",
+  "lastChangelogVersion": "1.6.0",
   "theme": "light/dark",
   "defaultProvider": "openai-codex",
   "defaultModel": "gpt-6.2-astra",
@@ -25,5 +25,9 @@
     "defaultProvider": "openai-codex"
   },
   "tuiMode": "regular",
-  "hideThinkingBlock": true
+  "hideThinkingBlock": true,
+  "extensionChangelogVersions": {
+    "{\"source\":\"npm:pi-subagents\",\"scope\":\"user\"}": "0.89.2",
+    "{\"source\":\"npm:pi-web-access\",\"scope\":\"user\"}": "0.48.0"
+  }
 }
