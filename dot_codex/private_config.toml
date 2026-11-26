@@ -6,7 +6,6 @@ model = "gpt-6.2-astra"
 model_reasoning_effort = "high"
 
 [tui]
-vim_mode_default = true
 screen_reader_detection_done = true
 
 [tui.model_availability_nux]
