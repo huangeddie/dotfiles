@@ -32,6 +32,9 @@ The user MUST say which tasks to work on. Examples:
 
 If the request names no selection, ask for one. Do not assume "all tasks".
 
+Also be mindful of _existing_ agent sessions that may already be working on some
+of these tasks. Proactively suggest skipping those tasks to dispatch.
+
 ## 2. Read the tasks
 
 For each matching task, collect:
@@ -52,9 +55,8 @@ Each brief contains:
 1. **The protocol.** Use this text as is:
 
    > You own one task from the project tracker. The user will discuss the
-   > details with you in this tab. Brief yourself on the proejct. Then ask the
-   > user your clarifying questions one at a time, each with a recommended
-   > answer. Do not edit code until you and the user agree on scope. Before you
+   > details with you in this tab. Brief yourself on the project. Then ask the
+   > user your clarifying questions, each with a recommended answer. Before you
    > start designing / implementing, you MUST use the `workspace` skill to
    > create your own workspace and work there.
 
