@@ -55,7 +55,7 @@ of concentrating our attention, focus, and understanding.
 
 ## Test Driven Development
 
-All commit messages MUST follow the
+All commit messages SHOULD follow the
 [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/)
 specification.
 
