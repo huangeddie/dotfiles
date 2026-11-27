@@ -45,6 +45,21 @@ class Worktrees:
             raise ValueError(f"Worktree for {branch!r} is missing or unavailable: {checkout.path}")
         return checkout.path
 
+    def cd_branches(self):
+        checkouts = self.repo.worktrees()
+        counts = {}
+        for checkout in checkouts:
+            if checkout.branch:
+                counts[checkout.branch] = counts.get(checkout.branch, 0) + 1
+        return [
+            checkout.branch
+            for checkout in checkouts
+            if checkout.branch
+            and counts[checkout.branch] == 1
+            and not checkout.prunable
+            and self.repo.is_directory(checkout.path)
+        ]
+
     def title(self):
         branch = self.repo.current_branch()
         record = self.repo.records().get(branch)
@@ -460,9 +475,13 @@ def run_tab_command(command):
 
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
-    # Private shell hook: called only after builtin cd succeeds.
+    # Private shell hooks: called by shell wrapper and tab completion.
     if argv == ["_rename-tab"]:
         rename_tab(Worktrees(GitRepository()).title(), os.environ, run_tab_command)
+        return 0
+    if argv == ["_complete", "cd"]:
+        for branch in Worktrees(GitRepository()).cd_branches():
+            print(branch)
         return 0
     parser = argparse.ArgumentParser(description="Create, list, navigate, merge, and remove Git worktrees.")
     commands = parser.add_subparsers(dest="command", required=True)

@@ -62,7 +62,9 @@ wt merge feature
   directories produce a readable error without changing directory. It never
   creates a worktree or switches a checkout's branch. Dirty and locked checkouts
   remain navigable. Detached worktrees can be entered by their listed path using
-  ordinary shell `cd`.
+  ordinary shell `cd`. Shell integration registers Bash and Zsh tab completion
+  for `wt cd <branch>`, suggesting navigable checked-out branch names in the
+  current repository.
 - For scripting without changing directories, `command wt new feature` and
   `command wt cd feature` bypass the shell wrapper and print only the absolute
   path to stdout. Help and non-navigation commands are forwarded unchanged.

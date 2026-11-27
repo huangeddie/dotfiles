@@ -1,3 +1,5 @@
+autoload -Uz compinit && compinit
+
 # bash is primary; .bashrc is the source of truth and is portable enough to run under zsh.
 [ -f ~/.bashrc ] && . ~/.bashrc
 

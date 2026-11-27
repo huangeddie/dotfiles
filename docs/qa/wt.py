@@ -287,6 +287,7 @@ def verify_listing_and_existing_checkouts(root):
     (manual / "untracked").write_text("keep\n")
     git(repo, "worktree", "lock", str(manual))
     assert wt(repo, "cd", "feature/a") == str(manual)
+    assert wt(repo, "_complete", "cd").splitlines() == ["trunk", "feature/a"]
     for branch, message in (("unoccupied", "not checked out"), ("unknown", "No local branch")):
         result = subprocess.run([sys.executable, str(CLI), "cd", branch],
                                 cwd=repo, env=ENV, text=True, capture_output=True)

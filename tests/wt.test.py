@@ -786,5 +786,33 @@ class ListAllTest(unittest.TestCase):
         self.assertEqual(self.list_all([], {}), "")
 
 
+class CdCompletionTest(unittest.TestCase):
+    def setUp(self):
+        self.repo = Repository()
+        self.wt = Worktrees(self.repo)
+
+    def test_cd_branches_returns_navigable_checked_out_branches(self):
+        self.repo.branches.update({"feature/a", "manual", "unoccupied"})
+        self.repo.checkouts.extend([
+            Checkout("/cache/wt/feature-a", "feature/a"),
+            Checkout("/manual/checkout", "manual", locked=True),
+        ])
+        self.repo.dirty_paths.add("/manual/checkout")
+        self.assertEqual(self.wt.cd_branches(), ["trunk", "feature/a", "manual"])
+
+    def test_cd_branches_excludes_detached_prunable_missing_and_duplicate_checkouts(self):
+        self.repo.branches.update({"gone", "pruned", "dup", "ok"})
+        self.repo.checkouts.extend([
+            Checkout("/detached"),
+            Checkout("/gone", "gone"),
+            Checkout("/pruned", "pruned", prunable=True),
+            Checkout("/dup-1", "dup"),
+            Checkout("/dup-2", "dup"),
+            Checkout("/ok", "ok"),
+        ])
+        self.repo.missing_paths.add("/gone")
+        self.assertEqual(self.wt.cd_branches(), ["trunk", "ok"])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -6,6 +6,8 @@ repo_dir=$(cd "$(dirname "$0")/.." && pwd)
 . "$repo_dir/dot_bash_aliases"
 fail() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
 typeset -f wt >/dev/null || fail 'wt shell wrapper is missing'
+complete_log=$(mktemp)
+trap 'rm -f "$complete_log"' EXIT
 
 command() {
   if [ "$#" = 2 ] && [ "$1" = wt ] && [ "$2" = _rename-tab ]; then
@@ -13,9 +15,20 @@ command() {
     title_calls=$((title_calls + 1))
     return "$title_exit"
   fi
+  if [ "$#" = 3 ] && [ "$1" = wt ] && [ "$2" = _complete ] && [ "$3" = cd ]; then
+    printf 'called\n' >> "$complete_log"
+    if [ -n "$complete_output" ]; then
+      printf '%s\n' "$complete_output"
+    fi
+    return "$complete_exit"
+  fi
   [ "$(printf '<%s>' "$@")" = "$expected_arguments" ] || fail 'CLI arguments changed'
   printf '%s\n' "$cli_output"
   return "$cli_exit"
+}
+
+complete_call_count() {
+  wc -l < "$complete_log" | tr -d ' '
 }
 
 builtin() {
@@ -29,6 +42,9 @@ reset() {
   unset REX_SESSION REX_BLOCK HERDR_ENV HERDR_PANE_ID HERDR_TAB_ID
   title_calls=0
   title_exit=0
+  : > "$complete_log"
+  complete_exit=0
+  complete_output=''
   cli_output='/tmp/work tree/repo'
   cli_exit=0
   cd_exit=0
@@ -181,6 +197,109 @@ test_no_arguments_are_forwarded_without_attempting_cd() {
   [ "$result" = 2 ] && [ "$cd_calls" = 0 ] || fail 'no-argument invocation changed'
 }
 
+test_cd_completion_suggests_matching_worktree_branches() {
+  if [ -n "${BASH_VERSION:-}" ]; then
+    complete -p wt | grep -q -- '-F _wt_complete wt' || fail 'bash completion for wt is not registered'
+    reset
+    complete_output='trunk
+feature/a
+feature/b'
+    COMP_WORDS=(wt cd '')
+    COMP_CWORD=2
+    _wt_complete
+    [ "$(complete_call_count)" = 1 ] || fail 'bash completion did not query wt _complete cd'
+    [ "${#COMPREPLY[@]}" = 3 ] || fail 'bash completion did not return all branches'
+    [ "${COMPREPLY[0]}" = trunk ] && [ "${COMPREPLY[1]}" = 'feature/a' ] && [ "${COMPREPLY[2]}" = 'feature/b' ] || fail 'bash completion returned wrong branches'
+
+    reset
+    complete_output='trunk
+feature/a
+feature/b'
+    COMP_WORDS=(wt cd 'feat')
+    COMP_CWORD=2
+    _wt_complete
+    [ "${#COMPREPLY[@]}" = 2 ] || fail 'bash completion did not filter by prefix'
+    [ "${COMPREPLY[0]}" = 'feature/a' ] && [ "${COMPREPLY[1]}" = 'feature/b' ] || fail 'bash completion filtered wrong branches'
+  elif [ -n "${ZSH_VERSION:-}" ]; then
+    typeset -f _wt_zsh_complete >/dev/null || fail 'zsh completion function is missing'
+    reset
+    complete_output='trunk
+feature/a
+feature/b'
+    compadd_calls=0
+    compadd_result=''
+    compadd() {
+      compadd_calls=$((compadd_calls + 1))
+      [ "$1" = -a ] || fail 'zsh completion did not pass -a to compadd'
+      shift
+      [ "$1" = -- ] && shift
+      eval "compadd_result=\${(j:,:)$1}"
+    }
+    words=(wt cd '')
+    CURRENT=3
+    _wt_zsh_complete
+    [ "$(complete_call_count)" = 1 ] && [ "$compadd_calls" = 1 ] || fail 'zsh completion did not invoke compadd'
+    [ "$compadd_result" = 'trunk,feature/a,feature/b' ] || fail "zsh completion passed unexpected candidates: $compadd_result"
+    unset -f compadd
+
+    compdef_args=''
+    compdef() { compdef_args="$*"; }
+    . "$repo_dir/dot_bash_aliases"
+    [ "$compdef_args" = '_wt_zsh_complete wt' ] || fail "zsh compdef registration mismatch: $compdef_args"
+    unset -f compdef
+  fi
+}
+
+test_cd_completion_ignores_other_subcommands_positions_and_errors() {
+  if [ -n "${BASH_VERSION:-}" ]; then
+    reset
+    complete_output='trunk'
+    COMP_WORDS=(wt new '')
+    COMP_CWORD=2
+    _wt_complete
+    [ "$(complete_call_count)" = 0 ] && [ "${#COMPREPLY[@]}" = 0 ] || fail 'bash completion ran for non-cd subcommand'
+
+    reset
+    complete_output='trunk'
+    COMP_WORDS=(wt cd trunk '')
+    COMP_CWORD=3
+    _wt_complete
+    [ "$(complete_call_count)" = 0 ] && [ "${#COMPREPLY[@]}" = 0 ] || fail 'bash completion ran for extra cd argument'
+
+    reset
+    complete_exit=1
+    COMP_WORDS=(wt cd '')
+    COMP_CWORD=2
+    _wt_complete
+    [ "$(complete_call_count)" = 1 ] && [ "${#COMPREPLY[@]}" = 0 ] || fail 'bash completion did not handle CLI failure'
+  elif [ -n "${ZSH_VERSION:-}" ]; then
+    compadd_calls=0
+    compadd() { compadd_calls=$((compadd_calls + 1)); }
+
+    reset
+    complete_output='trunk'
+    words=(wt new '')
+    CURRENT=3
+    _wt_zsh_complete
+    [ "$(complete_call_count)" = 0 ] && [ "$compadd_calls" = 0 ] || fail 'zsh completion ran for non-cd subcommand'
+
+    reset
+    complete_output='trunk'
+    words=(wt cd trunk '')
+    CURRENT=4
+    _wt_zsh_complete
+    [ "$(complete_call_count)" = 0 ] && [ "$compadd_calls" = 0 ] || fail 'zsh completion ran for extra cd argument'
+
+    reset
+    complete_exit=1
+    words=(wt cd '')
+    CURRENT=3
+    _wt_zsh_complete
+    [ "$(complete_call_count)" = 1 ] && [ "$compadd_calls" = 0 ] || fail 'zsh completion did not handle CLI failure'
+    unset -f compadd
+  fi
+}
+
 test_new_enters_the_returned_path_without_splitting_spaces
 test_new_preserves_quoted_display_name_as_one_argument
 test_cd_enters_existing_checkout_without_splitting_spaces
@@ -196,4 +315,6 @@ test_navigation_renames_mux_tabs_only_after_success
 test_failed_navigation_does_not_rename_tabs
 test_title_failure_does_not_fail_successful_navigation
 test_list_and_help_do_not_rename_tabs
-printf 'PASS: wt shell navigation, forwarding, help, and failure propagation\n'
+test_cd_completion_suggests_matching_worktree_branches
+test_cd_completion_ignores_other_subcommands_positions_and_errors
+printf 'PASS: wt shell navigation, forwarding, help, completion, and failure propagation\n'
