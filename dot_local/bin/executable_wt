@@ -26,7 +26,10 @@ class Worktrees:
         self.repo = repository
 
     def list(self):
-        return "\n".join(f"{c.branch or '(detached)'}\t{c.path}" for c in self.repo.worktrees())
+        return "\n".join(
+            f"{c.branch or '(detached)'}\t{self.repo.disk_usage(c.path)}\t{c.path}"
+            for c in self.repo.worktrees()
+        )
 
     def path(self, branch):
         if not branch or not self.repo.has_branch(branch):
@@ -198,6 +201,64 @@ def parse_worktrees(output):
     return checkouts
 
 
+def disk_usage(path):
+    """Return human-readable disk usage for path via du, or '-' if unavailable."""
+    if not Path(path).exists():
+        return "-"
+    result = subprocess.run(["du", "-sh", "--", path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if result.returncode != 0:
+        return "-"
+    return os.fsdecode(result.stdout).partition("\t")[0].strip() or "-"
+
+
+def list_all(catalog):
+    """List all worktrees across all repositories discovered via the sandbox catalog."""
+    repositories = {}
+    for entry in catalog.sandbox_entries():
+        checkouts = catalog.worktrees_for(entry)
+        if not checkouts:
+            continue
+        repositories.setdefault(checkouts[0].path, checkouts)
+    lines = []
+    for repo_path, checkouts in sorted(repositories.items(), key=lambda item: (Path(item[0]).name, item[0])):
+        project = Path(repo_path).name or repo_path
+        for checkout in checkouts:
+            lines.append(
+                f"{project}\t{checkout.branch or '(detached)'}\t{catalog.disk_usage(checkout.path)}\t{checkout.path}"
+            )
+    return "\n".join(lines)
+
+
+class SandboxCatalog:
+    """Effect boundary: discover repositories from sandboxes under the shared cache root."""
+
+    def __init__(self, root):
+        self.root = Path(root)
+
+    def sandbox_entries(self):
+        if not self.root.is_dir():
+            return []
+        entries = []
+        for entry in sorted(self.root.iterdir()):
+            if entry.is_symlink() or not entry.is_dir():
+                continue
+            if (entry / ".git").exists():
+                entries.append(str(entry))
+            elif entry.name.startswith("wt-") and (entry / "repo" / ".git").exists():
+                entries.append(str(entry / "repo"))
+        return entries
+
+    def worktrees_for(self, path):
+        result = subprocess.run(["git", "worktree", "list", "--porcelain", "-z"], cwd=path,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if result.returncode != 0:
+            return None
+        return parse_worktrees(os.fsdecode(result.stdout))
+
+    def disk_usage(self, path):
+        return disk_usage(path)
+
+
 class GitRepository:
     """Effect boundary: subprocesses, local Git metadata, and sandbox directories."""
 
@@ -240,6 +301,9 @@ class GitRepository:
 
     def is_directory(self, path):
         return Path(path).is_dir()
+
+    def disk_usage(self, path):
+        return disk_usage(path)
 
     def last_activity(self, branch):
         # The branch reflog records creation, commits, and resets with local timestamps.
@@ -387,7 +451,10 @@ def main(argv=None):
     new = commands.add_parser("new", help="create a sandbox from the current local branch")
     new.add_argument("name", help="display name; branch is lowercased with whitespace replaced by hyphens")
     new.add_argument("--base", help="use another local branch instead")
-    commands.add_parser("list", help="list all worktrees in this repository by branch and path")
+    list_parser = commands.add_parser("list", aliases=["ls"],
+                                      help="list all worktrees in this repository by branch and path")
+    list_parser.add_argument("-a", "--all", action="store_true",
+                             help="list all worktrees across all projects in the sandbox cache")
     cd = commands.add_parser("cd", help="enter an existing branch checkout (print its path without shell integration)")
     cd.add_argument("branch", help="exact local branch name; must already have a worktree")
     merge = commands.add_parser("merge", help="merge into recorded base, then remove sandbox and branch")
@@ -398,6 +465,11 @@ def main(argv=None):
     clear = commands.add_parser("clear", help="remove all managed sandboxes in this repository after preflight")
     clear.add_argument("--force", action="store_true", help="discard unmerged commits and uncommitted files")
     args = parser.parse_args(argv)
+    if args.command in ("list", "ls") and args.all:
+        output = list_all(SandboxCatalog(sandbox_root(Path.home(), os.environ)))
+        if output:
+            print(output)
+        return 0
     repository = GitRepository()
     worktrees = Worktrees(repository)
     if args.command == "new":
@@ -410,7 +482,7 @@ def main(argv=None):
                     print(f"Removed expired sandbox: {branch}", file=sys.stderr)
             except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
                 print(f"wt: expiry sweep stopped: {error}", file=sys.stderr)
-    elif args.command == "list":
+    elif args.command in ("list", "ls"):
         print(worktrees.list())
     elif args.command == "cd":
         print(worktrees.path(args.branch))

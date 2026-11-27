@@ -24,6 +24,10 @@ class Repository:
         self.events = []
         self.merge_fails = False
         self.activity = {}
+        self.sizes = {}
+
+    def disk_usage(self, path):
+        return self.sizes.get(path, "-")
 
     def last_activity(self, branch):
         return self.activity.get(branch)
@@ -537,8 +541,9 @@ class NavigationTest(unittest.TestCase):
         self.wt = Worktrees(self.repo)
 
     def test_list_includes_original_unmanaged_and_detached_checkouts(self):
+        self.repo.sizes = {"/project": "12M", "/manual worktree": "4.0K"}
         self.assertEqual(self.wt.list(),
-                         "trunk\t/project\nfeature/a\t/manual worktree\n(detached)\t/detached checkout")
+                         "trunk\t12M\t/project\nfeature/a\t4.0K\t/manual worktree\n(detached)\t-\t/detached checkout")
         self.assertEqual(self.repo.events, [])
 
     def test_cd_resolves_original_and_unmanaged_checkout_paths(self):
@@ -693,6 +698,86 @@ class ParsingTest(unittest.TestCase):
             Checkout("/my project", "trunk"),
             Checkout("/tmp/a\nb", "feature/a", locked=True),
             Checkout("/gone", prunable=True)])
+
+
+class FakeCatalog:
+    def __init__(self, entries, worktrees_by_entry, sizes=None):
+        self._entries = entries
+        self._worktrees = worktrees_by_entry
+        self._sizes = sizes or {}
+
+    def sandbox_entries(self):
+        return list(self._entries)
+
+    def worktrees_for(self, path):
+        return self._worktrees.get(path)
+
+    def disk_usage(self, path):
+        return self._sizes.get(path, "-")
+
+
+class ListAllTest(unittest.TestCase):
+    def list_all(self, entries, worktrees_by_entry, sizes=None):
+        return script["list_all"](FakeCatalog(entries, worktrees_by_entry, sizes))
+
+    def test_list_all_groups_by_project_and_deduplicates_shared_repositories(self):
+        alpha = [
+            Checkout("/repos/alpha", "main"),
+            Checkout("/cache/wt/a1", "feat/one"),
+            Checkout("/cache/wt/a2", "feat/two"),
+        ]
+        beta = [
+            Checkout("/repos/beta", "trunk"),
+            Checkout("/cache/wt/b1", "fix"),
+            Checkout("/manual/detached"),
+        ]
+        catalog = {
+            "/cache/wt/b1": beta,
+            "/cache/wt/a2": alpha,
+            "/cache/wt/a1": alpha,
+        }
+        sizes = {
+            "/repos/alpha": "1.2G",
+            "/cache/wt/a1": "120M",
+            "/cache/wt/a2": "80M",
+            "/repos/beta": "50M",
+            "/cache/wt/b1": "4.0K",
+        }
+        result = self.list_all(["/cache/wt/b1", "/cache/wt/a2", "/cache/wt/a1"], catalog, sizes)
+        self.assertEqual(result, "\n".join([
+            "alpha\tmain\t1.2G\t/repos/alpha",
+            "alpha\tfeat/one\t120M\t/cache/wt/a1",
+            "alpha\tfeat/two\t80M\t/cache/wt/a2",
+            "beta\ttrunk\t50M\t/repos/beta",
+            "beta\tfix\t4.0K\t/cache/wt/b1",
+            "beta\t(detached)\t-\t/manual/detached",
+        ]))
+
+    def test_list_all_preserves_distinct_projects_with_same_directory_name(self):
+        first = [Checkout("/personal/app", "main"), Checkout("/cache/wt/p1", "p1")]
+        second = [Checkout("/work/app", "main"), Checkout("/cache/wt/w1", "w1")]
+        result = self.list_all(
+            ["/cache/wt/w1", "/cache/wt/p1"],
+            {"/cache/wt/w1": second, "/cache/wt/p1": first},
+        )
+        self.assertEqual(result, "\n".join([
+            "app\tmain\t-\t/personal/app",
+            "app\tp1\t-\t/cache/wt/p1",
+            "app\tmain\t-\t/work/app",
+            "app\tw1\t-\t/cache/wt/w1",
+        ]))
+
+    def test_list_all_skips_unreadable_or_broken_entries(self):
+        alpha = [Checkout("/repos/alpha", "main"), Checkout("/cache/wt/good", "good")]
+        result = self.list_all(
+            ["/cache/wt/broken", "/cache/wt/empty", "/cache/wt/good"],
+            {"/cache/wt/broken": None, "/cache/wt/empty": [], "/cache/wt/good": alpha},
+            {"/repos/alpha": "10M", "/cache/wt/good": "2.0M"},
+        )
+        self.assertEqual(result, "alpha\tmain\t10M\t/repos/alpha\nalpha\tgood\t2.0M\t/cache/wt/good")
+
+    def test_list_all_returns_empty_string_when_no_projects_exist(self):
+        self.assertEqual(self.list_all([], {}), "")
 
 
 if __name__ == "__main__":

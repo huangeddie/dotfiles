@@ -278,8 +278,11 @@ def verify_listing_and_existing_checkouts(root):
     git(repo, "worktree", "add", "-qb", "feature/a", str(manual))
     git(repo, "worktree", "add", "-q", "--detach", str(detached))
     git(repo, "branch", "unoccupied")
-    assert set(wt(manual, "list").splitlines()) == {
-        f"trunk\t{repo}", f"feature/a\t{manual}", f"(detached)\t{detached}"}
+    listed = [line.split("\t") for line in wt(manual, "list").splitlines()]
+    assert all(len(cols) == 3 and cols[1] not in ("", "-") for cols in listed), listed
+    assert {(branch, path) for branch, _, path in listed} == {
+        ("trunk", str(repo)), ("feature/a", str(manual)), ("(detached)", str(detached))}
+    assert wt(manual, "ls") == wt(manual, "list")
     assert wt(manual, "cd", "trunk") == str(repo)
     (manual / "untracked").write_text("keep\n")
     git(repo, "worktree", "lock", str(manual))
@@ -296,6 +299,40 @@ def verify_listing_and_existing_checkouts(root):
     result = subprocess.run([sys.executable, str(CLI), "cd", "carriage"],
                             cwd=repo, env=ENV, capture_output=True, check=True)
     assert result.stdout == os.fsencode(carriage) + b"\n", "CRLF path was normalized"
+
+
+def verify_list_all_across_projects(root):
+    outside = root / "not-a-repo"
+    outside.mkdir()
+    assert wt(outside, "list", "--all") == ""
+    alpha = setup(root, "alpha-proj")
+    beta = setup(root, "beta-proj")
+    a1 = Path(wt(alpha, "new", "a-one"))
+    a2 = Path(wt(alpha, "new", "a-two"))
+    b1 = Path(wt(beta, "new", "b-one"))
+    manual = root / "beta-manual"
+    git(beta, "worktree", "add", "-q", "--detach", str(manual))
+    cache = Path(ENV["XDG_CACHE_HOME"]) / "wt"
+    empty_dir = cache / "wt-leftover"
+    empty_dir.mkdir()
+    broken_dir = cache / "broken-wt"
+    broken_dir.mkdir()
+    (broken_dir / ".git").write_text("gitdir: /nonexistent/repo/.git/worktrees/broken\n")
+    try:
+        output = wt(outside, "list", "--all")
+        assert output == wt(outside, "list", "-a") == wt(outside, "ls", "-a")
+        rows = [line.split("\t") for line in output.splitlines()]
+        assert all(len(cols) == 4 and cols[2] not in ("", "-") for cols in rows), rows
+        stripped = [(p, b, path) for p, b, _, path in rows]
+        assert stripped[0] == ("alpha-proj", "trunk", str(alpha)), rows
+        assert set(stripped[1:3]) == {("alpha-proj", "a-one", str(a1)), ("alpha-proj", "a-two", str(a2))}, rows
+        assert stripped[3] == ("beta-proj", "trunk", str(beta)), rows
+        assert set(stripped[4:]) == {("beta-proj", "b-one", str(b1)), ("beta-proj", "(detached)", str(manual))}, rows
+    finally:
+        empty_dir.rmdir()
+        shutil.rmtree(broken_dir)
+        wt(alpha, "clear", "--force")
+        wt(beta, "clear", "--force")
 
 
 def verify_shell_navigation(root):
@@ -371,7 +408,8 @@ def main():
                        verify_merge_commit_and_cleanup, verify_bases_detached_and_nested,
                        verify_force_and_dirty_protection, verify_conflict_recovery,
                        verify_unmanaged_and_dirty_base, verify_existing_branch_and_ignored_cleanup,
-                       verify_listing_and_existing_checkouts, verify_shell_navigation):
+                       verify_listing_and_existing_checkouts, verify_list_all_across_projects,
+                       verify_shell_navigation):
             verify(root)
             print(f"PASS: {verify.__name__}")
         assert list(sandbox_root.iterdir()) == [], "Leftover legacy sandbox directories"

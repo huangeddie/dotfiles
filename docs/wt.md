@@ -4,7 +4,8 @@ A Python 3.9+ / Git CLI for temporary worktrees, installed by chezmoi as
 `~/.local/bin/wt`. No third-party Python dependencies.
 
 ```sh
-wt list                         # list every worktree in this repository
+wt list                         # list every worktree in this repository (alias: ls)
+wt list --all                   # list worktrees across all projects in the sandbox cache (-a)
 wt cd feature                   # enter an existing checkout by exact branch name
 wt new feature                  # create from current branch and enter the sandbox
 wt new "Foo Bar"                 # branch foo-bar, tab/window title Foo Bar
@@ -46,9 +47,16 @@ wt merge feature
   characters such as `/` are preserved. `cd`, `merge`, `remove`, and `--base`
   still use exact branch names. Git hooks run by `git worktree add` (such as
   `post-checkout`) stream their output to stderr as they run.
-- `list` prints branch and path columns separated by a tab. It includes the
-  original checkout, unmanaged worktrees, and detached worktrees (labeled
+- `list` (alias `ls`) prints branch, disk usage, and path columns separated by
+  tabs. Disk usage comes from `du -sh` (or `-` when unavailable). It includes
+  the original checkout, unmanaged worktrees, and detached worktrees (labeled
   `(detached)`). It lists worktrees, not branches without checkouts.
+- `list --all` (`-a`) scans the shared sandbox root (`~/.cache/wt` or
+  `$XDG_CACHE_HOME/wt`) to discover every repository with a sandbox there, and
+  prints `project`, `branch`, `size`, and `path` columns separated by tabs,
+  grouped by project. It works even when invoked outside any Git repository,
+  deduplicates repositories with multiple sandboxes, and skips empty, non-Git,
+  or broken cache entries.
 - `cd <branch>` enters the existing checkout for an exact local branch name.
   Unknown branches, branches without checkouts, ambiguous checkouts, and missing
   directories produce a readable error without changing directory. It never
