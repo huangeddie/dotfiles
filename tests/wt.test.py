@@ -542,8 +542,11 @@ class NavigationTest(unittest.TestCase):
 
     def test_list_includes_original_unmanaged_and_detached_checkouts(self):
         self.repo.sizes = {"/project": "12M", "/manual worktree": "4.0K"}
-        self.assertEqual(self.wt.list(),
-                         "trunk\t12M\t/project\nfeature/a\t4.0K\t/manual worktree\n(detached)\t-\t/detached checkout")
+        self.assertEqual(self.wt.list(), "\n".join([
+            "trunk        12M  /project",
+            "feature/a   4.0K  /manual worktree",
+            "(detached)     -  /detached checkout",
+        ]))
         self.assertEqual(self.repo.events, [])
 
     def test_cd_resolves_original_and_unmanaged_checkout_paths(self):
@@ -745,12 +748,12 @@ class ListAllTest(unittest.TestCase):
         }
         result = self.list_all(["/cache/wt/b1", "/cache/wt/a2", "/cache/wt/a1"], catalog, sizes)
         self.assertEqual(result, "\n".join([
-            "alpha\tmain\t1.2G\t/repos/alpha",
-            "alpha\tfeat/one\t120M\t/cache/wt/a1",
-            "alpha\tfeat/two\t80M\t/cache/wt/a2",
-            "beta\ttrunk\t50M\t/repos/beta",
-            "beta\tfix\t4.0K\t/cache/wt/b1",
-            "beta\t(detached)\t-\t/manual/detached",
+            "alpha  main        1.2G  /repos/alpha",
+            "alpha  feat/one    120M  /cache/wt/a1",
+            "alpha  feat/two     80M  /cache/wt/a2",
+            "beta   trunk        50M  /repos/beta",
+            "beta   fix         4.0K  /cache/wt/b1",
+            "beta   (detached)     -  /manual/detached",
         ]))
 
     def test_list_all_preserves_distinct_projects_with_same_directory_name(self):
@@ -761,10 +764,10 @@ class ListAllTest(unittest.TestCase):
             {"/cache/wt/w1": second, "/cache/wt/p1": first},
         )
         self.assertEqual(result, "\n".join([
-            "app\tmain\t-\t/personal/app",
-            "app\tp1\t-\t/cache/wt/p1",
-            "app\tmain\t-\t/work/app",
-            "app\tw1\t-\t/cache/wt/w1",
+            "app  main  -  /personal/app",
+            "app  p1    -  /cache/wt/p1",
+            "app  main  -  /work/app",
+            "app  w1    -  /cache/wt/w1",
         ]))
 
     def test_list_all_skips_unreadable_or_broken_entries(self):
@@ -774,7 +777,10 @@ class ListAllTest(unittest.TestCase):
             {"/cache/wt/broken": None, "/cache/wt/empty": [], "/cache/wt/good": alpha},
             {"/repos/alpha": "10M", "/cache/wt/good": "2.0M"},
         )
-        self.assertEqual(result, "alpha\tmain\t10M\t/repos/alpha\nalpha\tgood\t2.0M\t/cache/wt/good")
+        self.assertEqual(result, "\n".join([
+            "alpha  main   10M  /repos/alpha",
+            "alpha  good  2.0M  /cache/wt/good",
+        ]))
 
     def test_list_all_returns_empty_string_when_no_projects_exist(self):
         self.assertEqual(self.list_all([], {}), "")

@@ -26,10 +26,11 @@ class Worktrees:
         self.repo = repository
 
     def list(self):
-        return "\n".join(
-            f"{c.branch or '(detached)'}\t{self.repo.disk_usage(c.path)}\t{c.path}"
+        rows = [
+            (c.branch or "(detached)", self.repo.disk_usage(c.path), c.path)
             for c in self.repo.worktrees()
-        )
+        ]
+        return format_table(rows, right_align={1})
 
     def path(self, branch):
         if not branch or not self.repo.has_branch(branch):
@@ -211,6 +212,22 @@ def disk_usage(path):
     return os.fsdecode(result.stdout).partition("\t")[0].strip() or "-"
 
 
+def format_table(rows, right_align=()):
+    """Format rows into vertically aligned columns separated by two spaces."""
+    if not rows:
+        return ""
+    widths = [max(len(row[i]) for row in rows) for i in range(len(rows[0]) - 1)]
+    lines = []
+    for row in rows:
+        padded = [
+            cell.rjust(widths[i]) if i in right_align else cell.ljust(widths[i])
+            for i, cell in enumerate(row[:-1])
+        ]
+        padded.append(row[-1])
+        lines.append("  ".join(padded))
+    return "\n".join(lines)
+
+
 def list_all(catalog):
     """List all worktrees across all repositories discovered via the sandbox catalog."""
     repositories = {}
@@ -219,14 +236,15 @@ def list_all(catalog):
         if not checkouts:
             continue
         repositories.setdefault(checkouts[0].path, checkouts)
-    lines = []
+    rows = []
     for repo_path, checkouts in sorted(repositories.items(), key=lambda item: (Path(item[0]).name, item[0])):
         project = Path(repo_path).name or repo_path
         for checkout in checkouts:
-            lines.append(
-                f"{project}\t{checkout.branch or '(detached)'}\t{catalog.disk_usage(checkout.path)}\t{checkout.path}"
-            )
-    return "\n".join(lines)
+            rows.append((
+                project, checkout.branch or "(detached)",
+                catalog.disk_usage(checkout.path), checkout.path,
+            ))
+    return format_table(rows, right_align={2})
 
 
 class SandboxCatalog:

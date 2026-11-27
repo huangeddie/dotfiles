@@ -47,13 +47,13 @@ wt merge feature
   characters such as `/` are preserved. `cd`, `merge`, `remove`, and `--base`
   still use exact branch names. Git hooks run by `git worktree add` (such as
   `post-checkout`) stream their output to stderr as they run.
-- `list` (alias `ls`) prints branch, disk usage, and path columns separated by
-  tabs. Disk usage comes from `du -sh` (or `-` when unavailable). It includes
+- `list` (alias `ls`) prints vertically aligned branch, disk usage, and path
+  columns. Disk usage comes from `du -sh` (or `-` when unavailable). It includes
   the original checkout, unmanaged worktrees, and detached worktrees (labeled
   `(detached)`). It lists worktrees, not branches without checkouts.
 - `list --all` (`-a`) scans the shared sandbox root (`~/.cache/wt` or
   `$XDG_CACHE_HOME/wt`) to discover every repository with a sandbox there, and
-  prints `project`, `branch`, `size`, and `path` columns separated by tabs,
+  prints vertically aligned `project`, `branch`, `size`, and `path` columns,
   grouped by project. It works even when invoked outside any Git repository,
   deduplicates repositories with multiple sandboxes, and skips empty, non-Git,
   or broken cache entries.

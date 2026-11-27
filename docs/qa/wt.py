@@ -278,7 +278,7 @@ def verify_listing_and_existing_checkouts(root):
     git(repo, "worktree", "add", "-qb", "feature/a", str(manual))
     git(repo, "worktree", "add", "-q", "--detach", str(detached))
     git(repo, "branch", "unoccupied")
-    listed = [line.split("\t") for line in wt(manual, "list").splitlines()]
+    listed = [line.split(None, 2) for line in wt(manual, "list").splitlines()]
     assert all(len(cols) == 3 and cols[1] not in ("", "-") for cols in listed), listed
     assert {(branch, path) for branch, _, path in listed} == {
         ("trunk", str(repo)), ("feature/a", str(manual)), ("(detached)", str(detached))}
@@ -321,7 +321,7 @@ def verify_list_all_across_projects(root):
     try:
         output = wt(outside, "list", "--all")
         assert output == wt(outside, "list", "-a") == wt(outside, "ls", "-a")
-        rows = [line.split("\t") for line in output.splitlines()]
+        rows = [line.split(None, 3) for line in output.splitlines()]
         assert all(len(cols) == 4 and cols[2] not in ("", "-") for cols in rows), rows
         stripped = [(p, b, path) for p, b, _, path in rows]
         assert stripped[0] == ("alpha-proj", "trunk", str(alpha)), rows
