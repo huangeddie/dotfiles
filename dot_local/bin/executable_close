@@ -11,12 +11,16 @@ def close_command(environment):
     # sibling tab (e.g. other worktrees) sharing the session.
     session, block = environment.get("REX_SESSION"), environment.get("REX_BLOCK")
     if session or block:
-        if not session or not block:
+        if not block:
             return None
-        return [
+        command = [
             "rex", "--autostart=false", "--timeout", "2s",
-            "block", "close", "-s", session, "--", block,
+            "block", "close",
         ]
+        if session:
+            command.extend(["-s", session])
+        command.extend(["--", block])
+        return command
 
     terminal = environment.get("HC_TERMINAL_ID")
     if (

@@ -13,6 +13,10 @@ REX_CLOSE = [
     "rex", "--autostart=false", "--timeout", "2s",
     "block", "close", "-s", "session:1", "--", "block:2",
 ]
+REX_BLOCK_CLOSE = [
+    "rex", "--autostart=false", "--timeout", "2s",
+    "block", "close", "--", "block:2",
+]
 HERDR_APP = {"HC_TERMINAL_ID": "t3d"}
 HERDR = {"HERDR_ENV": "1", "HERDR_PANE_ID": "pane-3"}
 
@@ -51,8 +55,11 @@ class CloseCommandTest(unittest.TestCase):
             ["herdr", "pane", "close", "--", "pane-3"],
         )
 
-    def test_rex_block_without_session_fails_closed_above_herdr_app(self):
-        self.assertIsNone(close_command({"REX_BLOCK": "block:2", **HERDR_APP}))
+    def test_rex_block_without_session_closes_its_own_block_above_herdr_app(self):
+        self.assertEqual(
+            close_command({"REX_BLOCK": "block:2", **HERDR_APP}),
+            REX_BLOCK_CLOSE,
+        )
 
     def test_herdr_app_socket_or_scope_without_terminal_id_fails_closed_above_herdr(self):
         self.assertIsNone(
@@ -68,9 +75,11 @@ class CloseCommandTest(unittest.TestCase):
 
     def test_option_like_target_ids_stay_after_double_dash(self):
         rex = close_command({"REX_SESSION": "s", "REX_BLOCK": "-s"})
+        rex_block_only = close_command({"REX_BLOCK": "-s"})
         herdr_app = close_command({"HC_TERMINAL_ID": "-h"})
         herdr = close_command({"HERDR_ENV": "1", "HERDR_PANE_ID": "--pane"})
         self.assertEqual(rex[-2:], ["--", "-s"])
+        self.assertEqual(rex_block_only[-2:], ["--", "-s"])
         self.assertEqual(herdr_app[-2:], ["--", "-h"])
         self.assertEqual(herdr[-2:], ["--", "--pane"])
 
