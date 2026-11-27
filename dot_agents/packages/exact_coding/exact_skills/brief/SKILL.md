@@ -29,6 +29,7 @@ For each matching task, collect:
 - subtasks
 - comments, if any
 
-## 3. Brainstorm
+## 3. Start working
 
-Brainstorm with the user.
+Brainstorm with the user. Before designing / implementing any work, proactively
+create a new workspace using the `workspace` skill.
